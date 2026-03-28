@@ -1,3 +1,23 @@
+"""Primary HTTP routes for Quantum API.
+
+Current routes are intentionally a minimal, stable core:
+- health and capability introspection
+- simple gate execution
+- dictionary-driven text transformation
+
+Why these endpoints exist:
+- They support current consumer apps immediately (Godot/Expo paths).
+- They provide a safe baseline while larger circuit endpoints are being built.
+- They establish request/response conventions used by future endpoints.
+
+Planned expansion (tracked in project/TODO.md):
+- /run_circuit (multi-qubit + shots + counts)
+- /transpile
+- /list_backends
+- QASM import/export
+- runtime/hardware jobs and advanced domain modules
+"""
+
 from fastapi import APIRouter, HTTPException
 
 from quantum_api.config import get_settings
@@ -21,6 +41,13 @@ router = APIRouter(prefix=initial_settings.api_prefix)
 
 @router.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
+    """Return service liveness and runtime capability status.
+
+    Purpose:
+    - Fast readiness/liveness probe.
+    - Tells clients whether qiskit-backed execution is available.
+    - Exposes the runtime mode used by computation endpoints.
+    """
     settings = get_settings()
     return HealthResponse(
         status="healthy",
@@ -33,6 +60,13 @@ def health() -> HealthResponse:
 
 @router.get("/echo-types", response_model=EchoTypesResponse)
 def echo_types() -> EchoTypesResponse:
+    """Return canonical text-transformation categories.
+
+    Purpose:
+    - Provides discoverability for client UIs.
+    - Keeps category naming centralized and consistent.
+    - Avoids hardcoded transformation labels in client projects.
+    """
     payload = [
         EchoTypeInfo(name=echo_type.value, description=description)
         for echo_type, description in ECHO_TYPE_DESCRIPTIONS.items()
@@ -42,6 +76,13 @@ def echo_types() -> EchoTypesResponse:
 
 @router.post("/gates/run", response_model=GateRunResponse)
 def gates_run(request: GateRunRequest) -> GateRunResponse:
+    """Run a single-qubit gate operation and return measurement results.
+
+    Purpose:
+    - Provides a low-friction quantum primitive for gameplay/app effects.
+    - Supports bit-flip, phase-flip, and rotation (radians).
+    - Acts as a stable stepping stone before generalized circuit execution.
+    """
     settings = get_settings()
     if settings.require_qiskit and not runtime.qiskit_available:
         raise HTTPException(
@@ -54,6 +95,13 @@ def gates_run(request: GateRunRequest) -> GateRunResponse:
 
 @router.post("/text/transform", response_model=TextTransformResponse)
 def text_transform(request: TextTransformRequest) -> TextTransformResponse:
+    """Apply dictionary-driven quantum-style text transformation.
+
+    Purpose:
+    - Transforms plain input text based on categorized word behavior.
+    - Returns coverage metrics and category counts for diagnostics/UI.
+    - Serves current narrative and animation clients with one stable contract.
+    """
     settings = get_settings()
     if settings.require_qiskit and not runtime.qiskit_available:
         raise HTTPException(
