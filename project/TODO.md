@@ -65,20 +65,20 @@ Goal: make circuits portable and hardware-aware.
 
 ### Transpilation and Backend Metadata
 
-- [ ] Add `POST /v1/transpile`
-- [ ] Add `GET /v1/list_backends`
-- [ ] Return basis gates, coupling map summary, qubit count, simulator/hardware flags
-- [ ] Add backend filtering options (simulator only, min qubits, provider)
+- [x] Add `POST /v1/transpile`
+- [x] Add `GET /v1/list_backends`
+- [x] Return basis gates, coupling map summary, qubit count, simulator/hardware flags
+- [x] Add backend filtering options (simulator only, min qubits, provider)
 
 ### QASM Interop
 
-- [ ] Add `POST /v1/qasm/import` (OpenQASM 2/3)
-- [ ] Add `POST /v1/qasm/export` (circuit to QASM)
-- [ ] Add validation and parser error normalization
+- [x] Add `POST /v1/qasm/import` (OpenQASM 2/3)
+- [x] Add `POST /v1/qasm/export` (circuit to QASM)
+- [x] Add validation and parser error normalization
 
 ### Completion Criteria
 
-- [ ] Users can submit QASM, transpile for a selected backend, and inspect backend capabilities before execution
+- [x] Users can submit QASM, transpile for a selected backend, and inspect backend capabilities before execution
 
 ## Phase 3 - Security and Production Hardening
 

@@ -21,6 +21,9 @@ class Settings(BaseSettings):
         le=30.0,
     )
     require_qiskit: bool = Field(default=False, alias="REQUIRE_QISKIT")
+    ibm_token: str = Field(default="", alias="IBM_TOKEN")
+    ibm_instance: str = Field(default="", alias="IBM_INSTANCE")
+    ibm_channel: str = Field(default="ibm_quantum", alias="IBM_CHANNEL")
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -33,6 +36,9 @@ class Settings(BaseSettings):
         if self.allow_origins.strip() == "*":
             return ["*"]
         return [origin.strip() for origin in self.allow_origins.split(",") if origin.strip()]
+
+    def ibm_is_configured(self) -> bool:
+        return bool(self.ibm_token.strip() and self.ibm_instance.strip())
 
 
 @lru_cache

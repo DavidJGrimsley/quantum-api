@@ -6,6 +6,10 @@ Quantum API is a greenfield FastAPI service for quantum-inspired runtime feature
 - `/v1/echo-types`
 - `/v1/gates/run`
 - `/v1/circuits/run`
+- `/v1/list_backends`
+- `/v1/transpile`
+- `/v1/qasm/import`
+- `/v1/qasm/export`
 - `/v1/text/transform`
 
 This repository is intentionally not backward compatible with the previous `public-facing/api/quantum/*` paths.
@@ -16,6 +20,7 @@ This repository is intentionally not backward compatible with the previous `publ
 - FastAPI + Uvicorn
 - Pydantic v2
 - Optional qiskit/qiskit-aer runtime (with classical fallback mode)
+- Optional qiskit-ibm-runtime integration for IBM backend discovery
 - Ruff + Pytest
 - Docker
 - GitHub Actions CI
@@ -115,6 +120,107 @@ Notes:
 - Use `include_statevector: true` to include serialized amplitudes (`real`, `imag`) for each basis state.
 - This endpoint is qiskit-dependent and returns `503` if qiskit is unavailable.
 
+### `GET /v1/list_backends`
+Query filters:
+
+- `provider`: `aer` or `ibm`
+- `simulator_only`: `true/false`
+- `min_qubits`: integer `>= 1`
+
+Response fields:
+
+- `backends`: list of backend summaries (`name`, `provider`, `is_simulator`, `is_hardware`, `num_qubits`, `basis_gates`, `coupling_map_summary`)
+- `total`
+- `filters_applied`
+- `warnings` (optional, e.g. IBM provider unavailable when not explicitly requested)
+
+Aer notes:
+
+- The API lists modern `aer_simulator*` backends.
+- Legacy aliases (`qasm_simulator`, `statevector_simulator`, `unitary_simulator`) are intentionally not exposed.
+
+If `provider=ibm` and IBM integration is not configured, the API returns:
+
+```json
+{
+  "error": "provider_unavailable",
+  "message": "Provider 'ibm' is unavailable.",
+  "details": {
+    "reason": "missing_credentials"
+  }
+}
+```
+
+### `POST /v1/transpile`
+Request accepts exactly one input source:
+
+- `circuit` (JSON operation format), or
+- `qasm` (`source`, `qasm_version` = `auto|2|3`)
+
+Plus:
+
+- `backend_name` (required)
+- `provider` (`aer|ibm`, optional)
+- `optimization_level` (`0-3`)
+- `seed_transpiler` (optional)
+- `output_qasm_version` (`2|3`, default `3`)
+
+Response fields:
+
+- `backend_name`
+- `provider`
+- `input_format` (`circuit|qasm`)
+- `num_qubits`, `depth`, `size`
+- `operations` (normalized generic operations)
+- `qasm_version`
+- `qasm`
+
+Validation note:
+
+- Sending both `circuit` and `qasm` in one request returns `422`.
+
+### `POST /v1/qasm/import`
+Request:
+
+```json
+{
+  "qasm": "OPENQASM 2.0; include \"qelib1.inc\"; qreg q[1]; h q[0];",
+  "qasm_version": "auto"
+}
+```
+
+Response fields:
+
+- `detected_qasm_version` (`2|3`)
+- `num_qubits`, `depth`, `size`
+- `operations` (normalized generic operations)
+
+### `POST /v1/qasm/export`
+Request:
+
+```json
+{
+  "circuit": {
+    "num_qubits": 2,
+    "operations": [
+      { "gate": "h", "target": 0 },
+      { "gate": "cx", "control": 0, "target": 1 }
+    ]
+  },
+  "qasm_version": "3"
+}
+```
+
+Response fields:
+
+- `qasm_version`
+- `qasm`
+- `num_qubits`, `depth`, `size`
+
+Default export version:
+
+- QASM export defaults to OpenQASM 3.
+
 ### `POST /v1/text/transform`
 Request:
 
@@ -154,6 +260,11 @@ Response:
 Set `REQUIRE_QISKIT=true` to force 503 responses for runtime endpoints when qiskit is unavailable.
 `/v1/circuits/run` always requires qiskit and returns `503` when qiskit is unavailable.
 
+QASM 3 import notes:
+
+- OpenQASM 3 import is best-effort.
+- If `qiskit_qasm3_import` is missing, the API returns `qasm3_dependency_missing`.
+
 ## Configuration
 
 Copy `.env.example` to `.env` and adjust values as needed.
@@ -167,6 +278,9 @@ Copy `.env.example` to `.env` and adjust values as needed.
 - `ALLOW_ORIGINS`
 - `REQUEST_TIMEOUT_SECONDS`
 - `REQUIRE_QISKIT`
+- `IBM_TOKEN` (optional)
+- `IBM_INSTANCE` (optional)
+- `IBM_CHANNEL` (optional, default `ibm_quantum`)
 
 ## Docker
 
@@ -197,12 +311,12 @@ RUN_PERF_BENCHMARKS=true uv run pytest tests/perf -s
 - `docs/migrations/` - external client migration plans (Godot, Expo, Unreal, Unity)
 - `project/` - planning, style, and implementation docs
 
-## Roadmap (Phase 1)
+## Roadmap (Phase 1-2 Delivered)
 
-1. Ship core power API for multi-qubit circuit execution (`/v1/circuits/run`) with strict limits.
-2. Keep `/v1/gates/run` and `/v1/text/transform` stable for existing consumers.
-3. Expand into transpilation and backend discovery in Phase 2.
-4. Defer SDK productization to Phase 6.
+1. Core power API for multi-qubit circuit execution (`/v1/circuits/run`) is delivered with strict limits.
+2. Phase 2 compilation and backend discovery endpoints are delivered (`/v1/transpile`, `/v1/list_backends`).
+3. QASM interop is delivered (`/v1/qasm/import`, `/v1/qasm/export`).
+4. Next major focus is Phase 3 security and production hardening.
 
 ## License
 
