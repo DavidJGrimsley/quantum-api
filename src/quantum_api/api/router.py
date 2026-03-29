@@ -3,6 +3,7 @@
 Current routes are intentionally a minimal, stable core:
 - health and capability introspection
 - simple gate execution
+- multi-qubit circuit execution
 - dictionary-driven text transformation
 
 Why these endpoints exist:
@@ -11,7 +12,6 @@ Why these endpoints exist:
 - They establish request/response conventions used by future endpoints.
 
 Planned expansion (tracked in project/TODO.md):
-- /run_circuit (multi-qubit + shots + counts)
 - /transpile
 - /list_backends
 - QASM import/export
@@ -23,6 +23,8 @@ from fastapi import APIRouter, HTTPException
 from quantum_api.config import get_settings
 from quantum_api.enums import ECHO_TYPE_DESCRIPTIONS
 from quantum_api.models.api import (
+    CircuitRunRequest,
+    CircuitRunResponse,
     EchoTypeInfo,
     EchoTypesResponse,
     GateRunRequest,
@@ -31,6 +33,7 @@ from quantum_api.models.api import (
     TextTransformRequest,
     TextTransformResponse,
 )
+from quantum_api.services.circuit_runner import run_circuit
 from quantum_api.services.gate_runner import run_gate
 from quantum_api.services.quantum_runtime import runtime
 from quantum_api.services.text_transform import transform_text
@@ -91,6 +94,24 @@ def gates_run(request: GateRunRequest) -> GateRunResponse:
         )
     payload = run_gate(request.gate_type, request.rotation_angle_rad)
     return GateRunResponse(**payload)
+
+
+@router.post("/circuits/run", response_model=CircuitRunResponse)
+def circuits_run(request: CircuitRunRequest) -> CircuitRunResponse:
+    """Run a validated multi-qubit circuit and return sampled measurement counts.
+
+    Purpose:
+    - Provides a practical multi-qubit execution contract for client workloads.
+    - Supports deterministic seeded simulation for reproducible behavior.
+    - Optionally returns simulator statevector amplitudes for diagnostics.
+    """
+    if not runtime.qiskit_available:
+        raise HTTPException(
+            status_code=503,
+            detail="qiskit is unavailable for /circuits/run",
+        )
+    payload = run_circuit(request)
+    return CircuitRunResponse(**payload)
 
 
 @router.post("/text/transform", response_model=TextTransformResponse)

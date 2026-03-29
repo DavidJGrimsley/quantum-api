@@ -46,3 +46,6 @@ ignore = ["E501"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 addopts = "-q"
+markers = [
+  "perf: non-blocking performance benchmark tests",
+]

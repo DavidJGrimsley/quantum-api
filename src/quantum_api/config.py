@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     app_env: str = Field(default="development", alias="APP_ENV")
     api_prefix: str = Field(default="/v1", alias="API_PREFIX")
     max_text_length: int = Field(default=2000, alias="MAX_TEXT_LENGTH", ge=1, le=20000)
+    max_circuit_qubits: int = Field(default=8, alias="MAX_CIRCUIT_QUBITS", ge=1, le=32)
+    max_circuit_depth: int = Field(default=256, alias="MAX_CIRCUIT_DEPTH", ge=1, le=10000)
+    max_circuit_shots: int = Field(default=4096, alias="MAX_CIRCUIT_SHOTS", ge=1, le=100000)
     allow_origins: str = Field(default="*", alias="ALLOW_ORIGINS")
     request_timeout_seconds: float = Field(
         default=5.0,

@@ -5,6 +5,7 @@ Quantum API is a greenfield FastAPI service for quantum-inspired runtime feature
 - `/v1/health`
 - `/v1/echo-types`
 - `/v1/gates/run`
+- `/v1/circuits/run`
 - `/v1/text/transform`
 
 This repository is intentionally not backward compatible with the previous `public-facing/api/quantum/*` paths.
@@ -68,6 +69,52 @@ Response:
 }
 ```
 
+### `POST /v1/circuits/run`
+Request (Bell circuit example):
+
+```json
+{
+  "num_qubits": 2,
+  "operations": [
+    { "gate": "h", "target": 0 },
+    { "gate": "cx", "control": 0, "target": 1 }
+  ],
+  "shots": 1024,
+  "include_statevector": false,
+  "seed": 7
+}
+```
+
+Operation rules:
+
+- `gate` must be one of `x`, `z`, `h`, `ry`, `cx`
+- `target` is required for every operation
+- `theta` is required only for `ry`
+- `control` is required only for `cx`
+- `control` and `target` must be different for `cx`
+- qubit indexes must be in range `[0, num_qubits - 1]`
+
+Response:
+
+```json
+{
+  "num_qubits": 2,
+  "shots": 1024,
+  "counts": {
+    "00": 496,
+    "11": 528
+  },
+  "backend_mode": "qiskit",
+  "statevector": null
+}
+```
+
+Notes:
+
+- `counts` keys are zero-padded bitstrings from qiskit simulator output.
+- Use `include_statevector: true` to include serialized amplitudes (`real`, `imag`) for each basis state.
+- This endpoint is qiskit-dependent and returns `503` if qiskit is unavailable.
+
 ### `POST /v1/text/transform`
 Request:
 
@@ -105,6 +152,7 @@ Response:
 - `classical-fallback`: qiskit imports are unavailable; math-backed simulation is used.
 
 Set `REQUIRE_QISKIT=true` to force 503 responses for runtime endpoints when qiskit is unavailable.
+`/v1/circuits/run` always requires qiskit and returns `503` when qiskit is unavailable.
 
 ## Configuration
 
@@ -113,6 +161,9 @@ Copy `.env.example` to `.env` and adjust values as needed.
 - `APP_ENV`
 - `API_PREFIX`
 - `MAX_TEXT_LENGTH`
+- `MAX_CIRCUIT_QUBITS`
+- `MAX_CIRCUIT_DEPTH`
+- `MAX_CIRCUIT_SHOTS`
 - `ALLOW_ORIGINS`
 - `REQUEST_TIMEOUT_SECONDS`
 - `REQUIRE_QISKIT`
@@ -131,6 +182,12 @@ uv run ruff check .
 uv run pytest
 ```
 
+Optional performance benchmarks (non-blocking, not run in CI by default):
+
+```bash
+RUN_PERF_BENCHMARKS=true uv run pytest tests/perf -s
+```
+
 ## Repository Layout
 
 - `src/quantum_api/` - backend app, routers, models, services
@@ -142,10 +199,10 @@ uv run pytest
 
 ## Roadmap (Phase 1)
 
-1. Complete core `/v1` runtime and validations.
-2. Stabilize transformation behavior and category strategy.
-3. Publish initial SDK packages.
-4. Execute Godot, Expo, Unreal, and Unity migration plans from `docs/migrations/`.
+1. Ship core power API for multi-qubit circuit execution (`/v1/circuits/run`) with strict limits.
+2. Keep `/v1/gates/run` and `/v1/text/transform` stable for existing consumers.
+3. Expand into transpilation and backend discovery in Phase 2.
+4. Defer SDK productization to Phase 6.
 
 ## License
 

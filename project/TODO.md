@@ -2,10 +2,6 @@
 
 This file is the single source of truth for implementation planning.
 
-The previous planning files are now condensed into this roadmap:
-- `project/quantum-api-plan.md`
-- `project/quantum-api-research-plan.md`
-
 ## North Star
 
 Build a production-ready Quantum API that starts with high-power core endpoints and expands toward broad Qiskit ecosystem coverage over time.
@@ -45,23 +41,23 @@ Goal: unlock the most practical quantum capability quickly.
 
 ### Circuit Execution
 
-- [ ] Add `POST /v1/run_circuit` (or `POST /v1/circuits/run`, choose one and lock it)
-- [ ] Support multi-qubit circuit definitions
-- [ ] Support `shots`-based sampling
-- [ ] Return measurement counts
-- [ ] Support optional statevector output for simulator backends
-- [ ] Add strict schema validation for circuit payloads
+- [x] Add `POST /v1/circuits/run` (locked path for Phase 1)
+- [x] Support multi-qubit circuit definitions
+- [x] Support `shots`-based sampling
+- [x] Return measurement counts
+- [x] Support optional statevector output for simulator backends
+- [x] Add strict schema validation for circuit payloads
 
 ### Core Quality for Circuit Execution
 
-- [ ] Add deterministic tests for circuit runner behavior
-- [ ] Add validation/error-path tests (invalid gate, invalid qubit index, invalid shots)
-- [ ] Add resource limits for qubits, depth, and execution time
-- [ ] Add benchmark tests for common circuits
+- [x] Add deterministic tests for circuit runner behavior
+- [x] Add validation/error-path tests (invalid gate, invalid qubit index, invalid shots)
+- [x] Add resource limits for qubits, depth, shots, and execution time
+- [x] Add benchmark tests for common circuits (non-CI-blocking)
 
 ### Completion Criteria
 
-- [ ] `/run_circuit` can execute Bell, GHZ, and simple rotation circuits with stable results and clear errors
+- [x] `/v1/circuits/run` can execute Bell, GHZ, and simple rotation circuits with stable results and clear errors
 
 ## Phase 2 - Compilation and Backend Discovery
 
