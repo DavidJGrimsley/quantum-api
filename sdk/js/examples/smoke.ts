@@ -1,7 +1,10 @@
 import { QuantumApiClient } from "../src/client";
 
 async function smoke(): Promise<void> {
-  const client = new QuantumApiClient({ baseUrl: "http://127.0.0.1:8000/v1" });
+  const client = new QuantumApiClient({
+    baseUrl: "http://127.0.0.1:8000/v1",
+    apiKey: "dev-local-key",
+  });
 
   const health = await client.health();
   console.log("Health", health);

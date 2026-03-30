@@ -9,6 +9,7 @@ import { QuantumApiClient } from "@quantum-api/sdk";
 
 const client = new QuantumApiClient({
   baseUrl: process.env.EXPO_PUBLIC_QUANTUM_API_BASE_URL ?? "http://127.0.0.1:8000/v1",
+  apiKey: process.env.EXPO_PUBLIC_QUANTUM_API_KEY ?? "dev-local-key",
 });
 
 const gate = await client.runGate({

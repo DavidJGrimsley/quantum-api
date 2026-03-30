@@ -11,6 +11,7 @@ Quantum API is a greenfield FastAPI service for quantum-inspired runtime feature
 - `/v1/qasm/import`
 - `/v1/qasm/export`
 - `/v1/text/transform`
+- `/metrics` (internal metrics endpoint)
 
 This repository is intentionally not backward compatible with the previous `public-facing/api/quantum/*` paths.
 
@@ -19,6 +20,8 @@ This repository is intentionally not backward compatible with the previous `publ
 - Python 3.11+
 - FastAPI + Uvicorn
 - Pydantic v2
+- Redis (rate limiting and quotas)
+- Prometheus client metrics
 - Optional qiskit/qiskit-aer runtime (with classical fallback mode)
 - Optional qiskit-ibm-runtime integration for IBM backend discovery
 - Ruff + Pytest
@@ -34,7 +37,33 @@ uv run uvicorn quantum_api.main:app --reload
 
 Open docs at `http://127.0.0.1:8000/docs`.
 
+For local development, use API key `dev-local-key` with the default `.env.example` values.
+
 ## API Contract
+
+### Authentication and Rate Limits
+
+- `GET /v1/health` is public.
+- All other `/v1/*` endpoints require `X-API-Key`.
+- Successful protected responses include:
+  - `X-Request-ID`
+  - `RateLimit-Limit`
+  - `RateLimit-Remaining`
+  - `RateLimit-Reset`
+- `429` responses include `Retry-After` and a normalized envelope.
+- Error envelope shape is standardized as:
+
+```json
+{
+  "error": "too_many_requests",
+  "message": "Rate limit or quota exceeded.",
+  "details": {
+    "policy": "key_minute",
+    "retry_after_seconds": 15
+  },
+  "request_id": "2e65df20-7f95-4709-bec0-69a2e4e58abf"
+}
+```
 
 ### `GET /v1/health`
 Response fields:
@@ -252,6 +281,11 @@ Response:
 }
 ```
 
+### `GET /metrics` (Internal)
+
+- Exposes Prometheus metrics.
+- In `staging` and `production`, requires `X-Metrics-Token`.
+
 ## Runtime Modes
 
 - `qiskit`: qiskit imports are available.
@@ -281,6 +315,33 @@ Copy `.env.example` to `.env` and adjust values as needed.
 - `IBM_TOKEN` (optional)
 - `IBM_INSTANCE` (optional)
 - `IBM_CHANNEL` (optional, default `ibm_quantum`)
+- `AUTH_ENABLED`
+- `API_KEY_HEADER`
+- `API_KEYS_JSON`
+- `RATE_LIMITING_ENABLED`
+- `REDIS_URL`
+- `DEV_RATE_LIMIT_BYPASS`
+- `IP_RATE_LIMIT_PER_SECOND`
+- `IP_RATE_LIMIT_PER_MINUTE`
+- `METRICS_ENABLED`
+- `METRICS_PATH`
+- `METRICS_TOKEN`
+- `METRICS_TOKEN_HEADER`
+- `REQUEST_ID_HEADER`
+
+Security defaults and guardrails:
+
+- `ALLOW_ORIGINS=*` is accepted only for `APP_ENV=development`.
+- `staging`/`production` require explicit CORS allowlists.
+- `staging`/`production` fail closed when Redis is unavailable for rate enforcement.
+- `staging`/`production` require `METRICS_TOKEN` when metrics are enabled.
+
+## Operations and SLOs
+
+- SLO and alert definitions: `docs/operations/slo.md`
+- Prometheus alert rule examples: `docs/operations/alerts.prometheus.yml`
+- Staging deployment playbook: `docs/operations/deploy-staging.md`
+- Production deployment playbook: `docs/operations/deploy-production.md`
 
 ## Docker
 

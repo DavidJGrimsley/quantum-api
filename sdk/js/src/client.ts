@@ -44,21 +44,39 @@ export interface TextTransformResponse {
 
 export interface QuantumApiClientOptions {
   baseUrl: string;
+  apiKey?: string;
   fetchImpl?: typeof fetch;
 }
 
 export class QuantumApiClient {
   private readonly baseUrl: string;
+  private readonly apiKey?: string;
   private readonly fetchImpl: typeof fetch;
 
   constructor(options: QuantumApiClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
+    this.apiKey = options.apiKey;
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    if (init?.headers) {
+      const initial = new Headers(init.headers);
+      for (const [key, value] of initial.entries()) {
+        headers[key] = value;
+      }
+    }
+
+    if (this.apiKey) {
+      headers["X-API-Key"] = this.apiKey;
+    }
+
     const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
-      headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+      headers,
       ...init,
     });
 

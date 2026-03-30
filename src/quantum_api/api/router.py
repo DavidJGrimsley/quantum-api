@@ -20,7 +20,7 @@ Planned expansion (tracked in project/TODO.md):
 
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
 from quantum_api.config import get_settings
@@ -60,20 +60,27 @@ initial_settings = get_settings()
 router = APIRouter(prefix=initial_settings.api_prefix)
 
 
-def _phase2_error_response(exc: Phase2ServiceError) -> JSONResponse:
+def _request_id_from(request: Request) -> str:
+    return getattr(request.state, "request_id", "unknown")
+
+
+def _phase2_error_response(request: Request, exc: Phase2ServiceError) -> JSONResponse:
+    payload = exc.to_payload()
+    payload["request_id"] = _request_id_from(request)
     return JSONResponse(
         status_code=exc.status_code,
-        content=exc.to_payload(),
+        content=payload,
     )
 
 
-def _qiskit_unavailable_response() -> JSONResponse:
+def _qiskit_unavailable_response(request: Request) -> JSONResponse:
     return JSONResponse(
         status_code=503,
         content={
             "error": "provider_unavailable",
             "message": "qiskit is unavailable for this endpoint.",
             "details": {"runtime_mode": runtime.mode},
+            "request_id": _request_id_from(request),
         },
     )
 
@@ -152,13 +159,14 @@ def circuits_run(request: CircuitRunRequest) -> CircuitRunResponse:
 
 @router.get("/list_backends", response_model=BackendListResponse)
 def get_backends(
+    request: Request,
     provider: Annotated[BackendProvider | None, Query()] = None,
     simulator_only: Annotated[bool, Query()] = False,
     min_qubits: Annotated[int, Query(ge=1)] = 1,
 ) -> BackendListResponse | JSONResponse:
     """List available backends from Aer and optional IBM providers."""
     if not runtime.qiskit_available:
-        return _qiskit_unavailable_response()
+        return _qiskit_unavailable_response(request)
 
     try:
         backends, warnings = list_backends(
@@ -167,7 +175,7 @@ def get_backends(
             min_qubits=min_qubits,
         )
     except Phase2ServiceError as exc:
-        return _phase2_error_response(exc)
+        return _phase2_error_response(request, exc)
 
     return BackendListResponse(
         backends=backends,
@@ -182,43 +190,43 @@ def get_backends(
 
 
 @router.post("/transpile", response_model=TranspileResponse)
-def transpile(request: TranspileRequest) -> TranspileResponse | JSONResponse:
+def transpile(request_data: TranspileRequest, request: Request) -> TranspileResponse | JSONResponse:
     """Transpile a circuit for a selected backend and return normalized output."""
     if not runtime.qiskit_available:
-        return _qiskit_unavailable_response()
+        return _qiskit_unavailable_response(request)
 
     try:
-        payload = transpile_circuit(request)
+        payload = transpile_circuit(request_data)
     except Phase2ServiceError as exc:
-        return _phase2_error_response(exc)
+        return _phase2_error_response(request, exc)
 
     return TranspileResponse(**payload)
 
 
 @router.post("/qasm/import", response_model=QasmImportResponse)
-def qasm_import(request: QasmImportRequest) -> QasmImportResponse | JSONResponse:
+def qasm_import(request_data: QasmImportRequest, request: Request) -> QasmImportResponse | JSONResponse:
     """Import OpenQASM and return normalized circuit operation metadata."""
     if not runtime.qiskit_available:
-        return _qiskit_unavailable_response()
+        return _qiskit_unavailable_response(request)
 
     try:
-        payload = import_qasm(request)
+        payload = import_qasm(request_data)
     except Phase2ServiceError as exc:
-        return _phase2_error_response(exc)
+        return _phase2_error_response(request, exc)
 
     return QasmImportResponse(**payload)
 
 
 @router.post("/qasm/export", response_model=QasmExportResponse)
-def qasm_export(request: QasmExportRequest) -> QasmExportResponse | JSONResponse:
+def qasm_export(request_data: QasmExportRequest, request: Request) -> QasmExportResponse | JSONResponse:
     """Export a JSON-defined circuit as OpenQASM text."""
     if not runtime.qiskit_available:
-        return _qiskit_unavailable_response()
+        return _qiskit_unavailable_response(request)
 
     try:
-        payload = export_circuit_to_qasm(request)
+        payload = export_circuit_to_qasm(request_data)
     except Phase2ServiceError as exc:
-        return _phase2_error_response(exc)
+        return _phase2_error_response(request, exc)
 
     return QasmExportResponse(**payload)
 

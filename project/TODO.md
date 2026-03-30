@@ -86,21 +86,21 @@ Goal: make public operation safe and sustainable.
 
 ### Access Control and Abuse Protection
 
-- [ ] Add API key authentication for non-health endpoints
-- [ ] Add rate limiting per key/IP
-- [ ] Add request quota policies and consistent 429 responses
-- [ ] Add CORS allowlist configuration by environment
+- [x] Add API key authentication for non-health endpoints
+- [x] Add rate limiting per key/IP
+- [x] Add request quota policies and consistent 429 responses
+- [x] Add CORS allowlist configuration by environment
 
 ### Operational Hardening
 
-- [ ] Structured logging and request correlation IDs
-- [ ] Metrics and observability (latency, error rate, queue pressure)
-- [ ] SLO definitions and alerting rules
-- [ ] Deployment playbooks for staging and production
+- [x] Structured logging and request correlation IDs
+- [x] Metrics and observability (latency, error rate, queue pressure)
+- [x] SLO definitions and alerting rules
+- [x] Deployment playbooks for staging and production
 
 ### Completion Criteria
 
-- [ ] Service can be safely exposed publicly with abuse controls and observability in place
+- [x] Service can be safely exposed publicly with abuse controls and observability in place
 
 ## Phase 4 - Runtime and Hardware Integrations
 

@@ -7,7 +7,7 @@ Python HTTPX client scaffold for Quantum API `/v1`.
 ```python
 from quantum_api_sdk import QuantumApiClient
 
-client = QuantumApiClient(base_url="http://127.0.0.1:8000/v1")
+client = QuantumApiClient(base_url="http://127.0.0.1:8000/v1", api_key="dev-local-key")
 
 health = client.health()
 print(health)

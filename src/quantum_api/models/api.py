@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -11,6 +11,8 @@ from quantum_api.enums import GateType
 class ErrorResponse(BaseModel):
     error: str
     message: str
+    details: dict[str, Any] | list[Any] | None = None
+    request_id: str | None = None
 
 
 class HealthResponse(BaseModel):

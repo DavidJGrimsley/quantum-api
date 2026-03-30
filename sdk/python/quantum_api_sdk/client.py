@@ -8,15 +8,20 @@ from quantum_api_sdk.types import GateRunResponse, TextTransformResponse
 
 
 class QuantumApiClient:
-    def __init__(self, base_url: str, timeout: float = 10.0) -> None:
+    def __init__(self, base_url: str, timeout: float = 10.0, api_key: str | None = None) -> None:
         self._base_url = base_url.rstrip("/")
+        self._api_key = api_key
         self._client = httpx.Client(timeout=timeout)
 
     def close(self) -> None:
         self._client.close()
 
     def _request(self, method: str, path: str, payload: dict[str, Any] | None = None) -> Any:
-        response = self._client.request(method, f"{self._base_url}{path}", json=payload)
+        headers: dict[str, str] = {}
+        if self._api_key:
+            headers["X-API-Key"] = self._api_key
+
+        response = self._client.request(method, f"{self._base_url}{path}", json=payload, headers=headers)
         response.raise_for_status()
         return response.json()
 
