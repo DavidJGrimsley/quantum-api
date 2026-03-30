@@ -31,3 +31,4 @@ node_modules/
 
 # Local notes
 *.log
+tests/test_quantum_api.db

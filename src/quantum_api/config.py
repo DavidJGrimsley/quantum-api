@@ -1,51 +1,11 @@
 from __future__ import annotations
 
-import json
-import re
 from functools import lru_cache
 
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-_SHA256_HEX_PATTERN = re.compile(r"^[a-f0-9]{64}$")
-
-_DEFAULT_API_KEYS_JSON = json.dumps(
-    [
-        {
-            "key_id": "dev-local",
-            "key_hash_sha256": "3700285e3c8496a57e45eb1ccd43f2424852788576961320fbb31f86f17edb61",
-            "rate_limit_per_second": 10,
-            "rate_limit_per_minute": 600,
-            "daily_quota": 20000,
-            "enabled": True,
-        }
-    ]
-)
-
-
-class ApiKeyPolicy(BaseModel):
-    key_id: str = Field(min_length=1)
-    key_hash_sha256: str = Field(min_length=64, max_length=64)
-    rate_limit_per_second: int = Field(ge=1, le=100000)
-    rate_limit_per_minute: int = Field(ge=1, le=1000000)
-    daily_quota: int = Field(ge=1, le=1000000000)
-    enabled: bool = True
-
-    @field_validator("key_hash_sha256")
-    @classmethod
-    def validate_hash_format(cls, value: str) -> str:
-        normalized = value.strip().lower()
-        if not _SHA256_HEX_PATTERN.fullmatch(normalized):
-            raise ValueError("key_hash_sha256 must be a lowercase SHA-256 hex string")
-        return normalized
-
-    @field_validator("rate_limit_per_minute")
-    @classmethod
-    def validate_per_minute_not_below_second(cls, value: int, info) -> int:
-        per_second = info.data.get("rate_limit_per_second")
-        if isinstance(per_second, int) and value < per_second:
-            raise ValueError("rate_limit_per_minute must be >= rate_limit_per_second")
-        return value
+_DEFAULT_HASH_SECRET = "dev-only-change-me"
 
 
 class Settings(BaseSettings):
@@ -71,7 +31,50 @@ class Settings(BaseSettings):
 
     auth_enabled: bool = Field(default=True, alias="AUTH_ENABLED")
     api_key_header: str = Field(default="X-API-Key", alias="API_KEY_HEADER")
-    api_keys_json: str = Field(default=_DEFAULT_API_KEYS_JSON, alias="API_KEYS_JSON")
+    api_key_hash_secret: str = Field(default=_DEFAULT_HASH_SECRET, alias="API_KEY_HASH_SECRET")
+    api_key_format_prefix: str = Field(default="qapi", alias="API_KEY_FORMAT_PREFIX")
+    api_key_prefix_length: int = Field(default=12, alias="API_KEY_PREFIX_LENGTH", ge=6, le=24)
+    api_key_secret_length: int = Field(default=40, alias="API_KEY_SECRET_LENGTH", ge=16, le=128)
+    api_key_cache_ttl_seconds: int = Field(default=90, alias="API_KEY_CACHE_TTL_SECONDS", ge=5, le=86400)
+
+    default_key_rate_limit_per_second: int = Field(
+        default=10,
+        alias="DEFAULT_KEY_RATE_LIMIT_PER_SECOND",
+        ge=1,
+        le=100000,
+    )
+    default_key_rate_limit_per_minute: int = Field(
+        default=600,
+        alias="DEFAULT_KEY_RATE_LIMIT_PER_MINUTE",
+        ge=1,
+        le=1000000,
+    )
+    default_key_daily_quota: int = Field(
+        default=20000,
+        alias="DEFAULT_KEY_DAILY_QUOTA",
+        ge=1,
+        le=1000000000,
+    )
+
+    database_url: str = Field(default="sqlite+aiosqlite:///./quantum_api.db", alias="DATABASE_URL")
+    database_auto_create: bool = Field(default=True, alias="DATABASE_AUTO_CREATE")
+
+    supabase_url: str = Field(default="https://example.supabase.co", alias="SUPABASE_URL")
+    supabase_jwt_audience: str = Field(default="authenticated", alias="SUPABASE_JWT_AUDIENCE")
+    supabase_jwt_issuer: str = Field(default="", alias="SUPABASE_JWT_ISSUER")
+    supabase_jwks_cache_seconds: int = Field(
+        default=300,
+        alias="SUPABASE_JWKS_CACHE_SECONDS",
+        ge=15,
+        le=3600,
+    )
+
+    dev_bootstrap_api_key_enabled: bool = Field(default=True, alias="DEV_BOOTSTRAP_API_KEY_ENABLED")
+    dev_bootstrap_api_key: str = Field(
+        default="qapi_devlocal_0123456789abcdef0123456789abcdef",
+        alias="DEV_BOOTSTRAP_API_KEY",
+    )
+    dev_bootstrap_owner_id: str = Field(default="local-dev", alias="DEV_BOOTSTRAP_OWNER_ID")
 
     rate_limiting_enabled: bool = Field(default=True, alias="RATE_LIMITING_ENABLED")
     redis_url: str = Field(default="redis://127.0.0.1:6379/0", alias="REDIS_URL")
@@ -105,33 +108,34 @@ class Settings(BaseSettings):
             return ["*"]
         return [origin.strip() for origin in self.allow_origins.split(",") if origin.strip()]
 
-    def parsed_api_keys(self) -> list[ApiKeyPolicy]:
-        raw = self.api_keys_json.strip()
-        if not raw:
-            return []
-
-        try:
-            decoded = json.loads(raw)
-        except json.JSONDecodeError as exc:
-            raise ValueError("API_KEYS_JSON must be valid JSON") from exc
-
-        if not isinstance(decoded, list):
-            raise ValueError("API_KEYS_JSON must decode to a JSON array")
-
-        try:
-            return [ApiKeyPolicy.model_validate(item) for item in decoded]
-        except ValidationError as exc:
-            raise ValueError("API_KEYS_JSON contains invalid policy records") from exc
-
     def requires_api_key(self, path: str) -> bool:
         prefix = self.api_prefix.rstrip("/")
         if not path.startswith(prefix):
             return False
-        return path != f"{prefix}/health"
+        if path == f"{prefix}/health":
+            return False
+        return not path.startswith(f"{prefix}/keys")
+
+    def requires_user_jwt(self, path: str) -> bool:
+        prefix = self.api_prefix.rstrip("/")
+        return path.startswith(f"{prefix}/keys")
+
+    @property
+    def supabase_jwt_issuer_effective(self) -> str:
+        explicit = self.supabase_jwt_issuer.strip()
+        if explicit:
+            return explicit
+        if not self.supabase_url.strip():
+            return ""
+        return f"{self.supabase_url.rstrip('/')}/auth/v1"
 
     def validate_runtime_configuration(self) -> None:
         if self.ip_rate_limit_per_minute < self.ip_rate_limit_per_second:
             raise ValueError("IP_RATE_LIMIT_PER_MINUTE must be >= IP_RATE_LIMIT_PER_SECOND")
+        if self.default_key_rate_limit_per_minute < self.default_key_rate_limit_per_second:
+            raise ValueError(
+                "DEFAULT_KEY_RATE_LIMIT_PER_MINUTE must be >= DEFAULT_KEY_RATE_LIMIT_PER_SECOND"
+            )
 
         if self.is_production_like():
             origins = self.parsed_allow_origins()
@@ -139,11 +143,22 @@ class Settings(BaseSettings):
                 raise ValueError("ALLOW_ORIGINS must be an explicit allowlist in staging/production")
             if self.dev_rate_limit_bypass:
                 raise ValueError("DEV_RATE_LIMIT_BYPASS must be false in staging/production")
+            if self.database_auto_create:
+                raise ValueError("DATABASE_AUTO_CREATE must be false in staging/production")
+            if self.api_key_hash_secret.strip() == _DEFAULT_HASH_SECRET:
+                raise ValueError("API_KEY_HASH_SECRET must be changed in staging/production")
 
         if self.auth_enabled:
-            enabled_keys = [policy for policy in self.parsed_api_keys() if policy.enabled]
-            if not enabled_keys:
-                raise ValueError("AUTH_ENABLED=true requires at least one enabled key in API_KEYS_JSON")
+            if not self.database_url.strip():
+                raise ValueError("AUTH_ENABLED=true requires DATABASE_URL")
+            if not self.api_key_hash_secret.strip():
+                raise ValueError("AUTH_ENABLED=true requires API_KEY_HASH_SECRET")
+            if not self.supabase_url.strip():
+                raise ValueError("AUTH_ENABLED=true requires SUPABASE_URL")
+            if not self.supabase_jwt_audience.strip():
+                raise ValueError("AUTH_ENABLED=true requires SUPABASE_JWT_AUDIENCE")
+            if not self.supabase_jwt_issuer_effective.strip():
+                raise ValueError("AUTH_ENABLED=true requires SUPABASE_JWT_ISSUER or SUPABASE_URL")
 
         if self.rate_limiting_enabled and self.is_production_like() and not self.redis_url.strip():
             raise ValueError("REDIS_URL is required when RATE_LIMITING_ENABLED=true in staging/production")

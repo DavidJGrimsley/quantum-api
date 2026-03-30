@@ -1,9 +1,22 @@
+import os
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
-from quantum_api.main import app
+_TEST_DB = Path(__file__).resolve().parent / "test_quantum_api.db"
+if _TEST_DB.exists():
+    _TEST_DB.unlink()
 
-TEST_API_KEY = "dev-local-key"
+os.environ.setdefault("DATABASE_URL", f"sqlite+aiosqlite:///{_TEST_DB.as_posix()}")
+os.environ.setdefault("DATABASE_AUTO_CREATE", "true")
+os.environ.setdefault("DEV_BOOTSTRAP_API_KEY_ENABLED", "true")
+os.environ.setdefault("SUPABASE_URL", "https://example.supabase.co")
+os.environ.setdefault("SUPABASE_JWT_AUDIENCE", "authenticated")
+
+from quantum_api.main import app  # noqa: E402
+
+TEST_API_KEY = "qapi_devlocal_0123456789abcdef0123456789abcdef"
 
 
 @pytest.fixture

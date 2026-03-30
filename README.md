@@ -11,6 +11,9 @@ Quantum API is a greenfield FastAPI service for quantum-inspired runtime feature
 - `/v1/qasm/import`
 - `/v1/qasm/export`
 - `/v1/text/transform`
+- `/v1/keys`
+- `/v1/keys/{key_id}/revoke`
+- `/v1/keys/{key_id}/rotate`
 - `/metrics` (internal metrics endpoint)
 
 This repository is intentionally not backward compatible with the previous `public-facing/api/quantum/*` paths.
@@ -37,14 +40,15 @@ uv run uvicorn quantum_api.main:app --reload
 
 Open docs at `http://127.0.0.1:8000/docs`.
 
-For local development, use API key `dev-local-key` with the default `.env.example` values.
+For local development, use API key `qapi_devlocal_0123456789abcdef0123456789abcdef` with the default `.env.example` values.
 
 ## API Contract
 
 ### Authentication and Rate Limits
 
 - `GET /v1/health` is public.
-- All other `/v1/*` endpoints require `X-API-Key`.
+- `GET /v1/keys`, `POST /v1/keys`, `POST /v1/keys/{key_id}/revoke`, and `POST /v1/keys/{key_id}/rotate` require `Authorization: Bearer <supabase_jwt>`.
+- All other protected `/v1/*` endpoints require `X-API-Key` (DB-managed key records only; no `API_KEYS_JSON` fallback).
 - Successful protected responses include:
   - `X-Request-ID`
   - `RateLimit-Limit`
@@ -76,6 +80,15 @@ Response fields:
 
 ### `GET /v1/echo-types`
 Lists canonical transformation categories and descriptions from one enum source.
+
+### Key Management Endpoints (`/v1/keys*`)
+
+- `GET /v1/keys`: list current user's keys (masked metadata only).
+- `POST /v1/keys`: create a key and return the raw key exactly once.
+- `POST /v1/keys/{key_id}/revoke`: revoke an existing key.
+- `POST /v1/keys/{key_id}/rotate`: atomically rotate key (old key becomes invalid, new raw key shown once).
+
+All key-management endpoints are user-scoped to the JWT subject (`sub`) and require a valid Supabase bearer token.
 
 ### `POST /v1/gates/run`
 Request:
@@ -317,7 +330,23 @@ Copy `.env.example` to `.env` and adjust values as needed.
 - `IBM_CHANNEL` (optional, default `ibm_quantum`)
 - `AUTH_ENABLED`
 - `API_KEY_HEADER`
-- `API_KEYS_JSON`
+- `API_KEY_HASH_SECRET`
+- `API_KEY_FORMAT_PREFIX`
+- `API_KEY_PREFIX_LENGTH`
+- `API_KEY_SECRET_LENGTH`
+- `API_KEY_CACHE_TTL_SECONDS`
+- `DEFAULT_KEY_RATE_LIMIT_PER_SECOND`
+- `DEFAULT_KEY_RATE_LIMIT_PER_MINUTE`
+- `DEFAULT_KEY_DAILY_QUOTA`
+- `DATABASE_URL`
+- `DATABASE_AUTO_CREATE`
+- `SUPABASE_URL`
+- `SUPABASE_JWT_AUDIENCE`
+- `SUPABASE_JWT_ISSUER`
+- `SUPABASE_JWKS_CACHE_SECONDS`
+- `DEV_BOOTSTRAP_API_KEY_ENABLED`
+- `DEV_BOOTSTRAP_API_KEY`
+- `DEV_BOOTSTRAP_OWNER_ID`
 - `RATE_LIMITING_ENABLED`
 - `REDIS_URL`
 - `DEV_RATE_LIMIT_BYPASS`
@@ -335,6 +364,8 @@ Security defaults and guardrails:
 - `staging`/`production` require explicit CORS allowlists.
 - `staging`/`production` fail closed when Redis is unavailable for rate enforcement.
 - `staging`/`production` require `METRICS_TOKEN` when metrics are enabled.
+- `staging`/`production` require `DATABASE_AUTO_CREATE=false`.
+- `staging`/`production` require `API_KEY_HASH_SECRET` to be rotated from dev default.
 
 ## Operations and SLOs
 
@@ -342,6 +373,7 @@ Security defaults and guardrails:
 - Prometheus alert rule examples: `docs/operations/alerts.prometheus.yml`
 - Staging deployment playbook: `docs/operations/deploy-staging.md`
 - Production deployment playbook: `docs/operations/deploy-production.md`
+- Supabase Phase 3.5 schema script: `docs/operations/phase3_5_supabase_schema.sql`
 
 ## Docker
 

@@ -14,6 +14,17 @@ def test_non_health_requires_api_key(unauth_client):
     assert response.headers["X-Request-ID"] == payload["request_id"]
 
 
+def test_key_management_endpoints_require_bearer_jwt(unauth_client):
+    response = unauth_client.get("/v1/keys")
+    assert response.status_code == 401
+    payload = response.json()
+    assert payload["error"] == "auth_required"
+    assert (
+        payload["message"]
+        == "Authentication required: send a valid Supabase JWT in 'Authorization: Bearer <token>'."
+    )
+
+
 def test_health_endpoint_is_public(unauth_client):
     response = unauth_client.get("/v1/health")
     assert response.status_code == 200
@@ -45,7 +56,7 @@ def test_rate_limit_headers_present_on_success(client, monkeypatch):
             },
         )
 
-    async def allow_key(_policy) -> RateLimitResult:
+    async def allow_key(*, key_id: str, policy) -> RateLimitResult:
         return RateLimitResult(
             allowed=True,
             reason="key_minute",
@@ -86,7 +97,7 @@ def test_rate_limit_429_envelope_and_headers(client, monkeypatch):
             },
         )
 
-    async def deny_key(_policy) -> RateLimitResult:
+    async def deny_key(*, key_id: str, policy) -> RateLimitResult:
         return RateLimitResult(
             allowed=False,
             reason="key_daily",
@@ -165,7 +176,7 @@ def test_rate_limiter_unavailable_returns_503(client, monkeypatch):
             },
         )
 
-    async def fail_key(_policy) -> RateLimitResult:
+    async def fail_key(*, key_id: str, policy) -> RateLimitResult:
         raise RateLimiterUnavailableError("redis down")
 
     monkeypatch.setattr(rate_limiter, "check_ip", allow_ip)

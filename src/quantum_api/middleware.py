@@ -28,6 +28,7 @@ from quantum_api.security import (
     RateLimitResult,
     RedisRateLimiter,
 )
+from quantum_api.supabase_auth import JwtVerificationError, SupabaseJwtVerifier
 
 logger = logging.getLogger(__name__)
 
@@ -40,11 +41,13 @@ class SecurityObservabilityMiddleware(BaseHTTPMiddleware):
         settings: Settings,
         auth_service: ApiKeyAuthService,
         rate_limiter: RedisRateLimiter,
+        jwt_verifier: SupabaseJwtVerifier,
     ) -> None:
         super().__init__(app)
         self._settings = settings
         self._auth_service = auth_service
         self._rate_limiter = rate_limiter
+        self._jwt_verifier = jwt_verifier
 
     async def dispatch(self, request: Request, call_next):  # type: ignore[override]
         started_at = time.perf_counter()
@@ -79,7 +82,7 @@ class SecurityObservabilityMiddleware(BaseHTTPMiddleware):
                         client_ip=client_ip,
                     )
 
-            if self._settings.auth_enabled and self._settings.requires_api_key(request.url.path):
+            if self._settings.auth_enabled and self._settings.requires_user_jwt(request.url.path):
                 if self._should_apply_rate_limits():
                     ip_result = await self._rate_limiter.check_ip(client_ip=client_ip)
                     if not ip_result.allowed:
@@ -93,7 +96,44 @@ class SecurityObservabilityMiddleware(BaseHTTPMiddleware):
                             client_ip=client_ip,
                         )
 
-                auth_key = self._auth_service.authenticate(
+                try:
+                    user = await self._jwt_verifier.verify_authorization_header(
+                        request.headers.get("Authorization"),
+                    )
+                except JwtVerificationError:
+                    AUTH_FAILURES_TOTAL.labels(reason="jwt").inc()
+                    response = self._error_response(
+                        status_code=401,
+                        error="auth_required",
+                        message=self._friendly_auth_message(auth_target="jwt"),
+                        request_id=request_id,
+                    )
+                    return self._finalize_response(
+                        request=request,
+                        response=response,
+                        started_at=started_at,
+                        path_label=path_label,
+                        client_ip=client_ip,
+                    )
+
+                request.state.auth_user_id = user.user_id
+                request.state.auth_user_email = user.email
+
+            elif self._settings.auth_enabled and self._settings.requires_api_key(request.url.path):
+                if self._should_apply_rate_limits():
+                    ip_result = await self._rate_limiter.check_ip(client_ip=client_ip)
+                    if not ip_result.allowed:
+                        RATE_LIMIT_REJECTIONS_TOTAL.labels(reason=ip_result.reason).inc()
+                        response = self._rate_limited_response(ip_result, request_id=request_id)
+                        return self._finalize_response(
+                            request=request,
+                            response=response,
+                            started_at=started_at,
+                            path_label=path_label,
+                            client_ip=client_ip,
+                        )
+
+                auth_key = await self._auth_service.authenticate(
                     request.headers.get(self._settings.api_key_header),
                 )
                 if auth_key is None:
@@ -116,7 +156,10 @@ class SecurityObservabilityMiddleware(BaseHTTPMiddleware):
                 api_key_id_context.set(auth_key.key_id)
 
                 if self._should_apply_rate_limits():
-                    key_result = await self._rate_limiter.check_key(auth_key.policy)
+                    key_result = await self._rate_limiter.check_key(
+                        key_id=auth_key.key_id,
+                        policy=auth_key.policy,
+                    )
                     rate_headers.update(key_result.headers)
                     if not key_result.allowed:
                         RATE_LIMIT_REJECTIONS_TOTAL.labels(reason=key_result.reason).inc()
@@ -228,6 +271,7 @@ class SecurityObservabilityMiddleware(BaseHTTPMiddleware):
                 "duration_ms": round(duration_ms, 3),
                 "client_ip": client_ip,
                 "api_key_id": getattr(request.state, "api_key_id", None),
+                "auth_user_id": getattr(request.state, "auth_user_id", None),
             },
         )
         return response
@@ -267,6 +311,8 @@ class SecurityObservabilityMiddleware(BaseHTTPMiddleware):
                 "Authentication required: send a valid metrics token in "
                 f"'{self._settings.metrics_token_header}' to access this endpoint."
             )
+        if auth_target == "jwt":
+            return "Authentication required: send a valid Supabase JWT in 'Authorization: Bearer <token>'."
         return (
             "Authentication required: send a valid API key in "
             f"'{self._settings.api_key_header}' for this endpoint."

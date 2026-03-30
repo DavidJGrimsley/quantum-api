@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -303,6 +304,66 @@ class QasmExportResponse(BaseModel):
     num_qubits: int = Field(ge=0)
     depth: int = Field(ge=0)
     size: int = Field(ge=0)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ApiKeyPolicyResponse(BaseModel):
+    rate_limit_per_second: int = Field(ge=1)
+    rate_limit_per_minute: int = Field(ge=1)
+    daily_quota: int = Field(ge=1)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ApiKeyMetadataResponse(BaseModel):
+    key_id: str
+    owner_user_id: str
+    name: str | None = None
+    key_prefix: str
+    masked_key: str
+    status: str
+    policy: ApiKeyPolicyResponse
+    created_at: datetime
+    revoked_at: datetime | None = None
+    rotated_from_id: str | None = None
+    rotated_to_id: str | None = None
+    last_used_at: datetime | None = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ApiKeyListResponse(BaseModel):
+    keys: list[ApiKeyMetadataResponse]
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ApiKeyCreateRequest(BaseModel):
+    name: str | None = Field(default=None, max_length=128)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ApiKeyCreateResponse(BaseModel):
+    key: ApiKeyMetadataResponse
+    raw_key: str
+    secret_visible_once: bool = True
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ApiKeyRevokeResponse(BaseModel):
+    key: ApiKeyMetadataResponse
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ApiKeyRotateResponse(BaseModel):
+    previous_key: ApiKeyMetadataResponse
+    new_key: ApiKeyMetadataResponse
+    raw_key: str
+    secret_visible_once: bool = True
 
     model_config = ConfigDict(extra="forbid")
 

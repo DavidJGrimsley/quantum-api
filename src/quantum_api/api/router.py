@@ -25,7 +25,15 @@ from fastapi.responses import JSONResponse
 
 from quantum_api.config import get_settings
 from quantum_api.enums import ECHO_TYPE_DESCRIPTIONS
+from quantum_api.key_management import ApiKeyNotFoundError, KeyMetadata
 from quantum_api.models.api import (
+    ApiKeyCreateRequest,
+    ApiKeyCreateResponse,
+    ApiKeyListResponse,
+    ApiKeyMetadataResponse,
+    ApiKeyPolicyResponse,
+    ApiKeyRevokeResponse,
+    ApiKeyRotateResponse,
     BackendListResponse,
     BackendProvider,
     CircuitRunRequest,
@@ -85,6 +93,44 @@ def _qiskit_unavailable_response(request: Request) -> JSONResponse:
     )
 
 
+def _auth_user_id_from(request: Request) -> str:
+    user_id = getattr(request.state, "auth_user_id", None)
+    if not isinstance(user_id, str) or not user_id.strip():
+        raise HTTPException(status_code=401, detail="Supabase authentication required")
+    return user_id
+
+
+def _event_metadata_from_request(request: Request) -> dict[str, str]:
+    forwarded_for = request.headers.get("x-forwarded-for", "")
+    source_ip = forwarded_for.split(",")[0].strip() if forwarded_for else (request.client.host if request.client else "")
+    return {
+        "request_id": _request_id_from(request),
+        "source_ip": source_ip or "unknown",
+        "user_agent": request.headers.get("user-agent", ""),
+    }
+
+
+def _key_metadata_response(metadata: KeyMetadata) -> ApiKeyMetadataResponse:
+    return ApiKeyMetadataResponse(
+        key_id=metadata.key_id,
+        owner_user_id=metadata.owner_user_id,
+        name=metadata.name,
+        key_prefix=metadata.key_prefix,
+        masked_key=metadata.masked_key,
+        status=metadata.status,
+        policy=ApiKeyPolicyResponse(
+            rate_limit_per_second=metadata.policy.rate_limit_per_second,
+            rate_limit_per_minute=metadata.policy.rate_limit_per_minute,
+            daily_quota=metadata.policy.daily_quota,
+        ),
+        created_at=metadata.created_at,
+        revoked_at=metadata.revoked_at,
+        rotated_from_id=metadata.rotated_from_id,
+        rotated_to_id=metadata.rotated_to_id,
+        last_used_at=metadata.last_used_at,
+    )
+
+
 @router.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
     """Return service liveness and runtime capability status.
@@ -118,6 +164,72 @@ def echo_types() -> EchoTypesResponse:
         for echo_type, description in ECHO_TYPE_DESCRIPTIONS.items()
     ]
     return EchoTypesResponse(echo_types=payload)
+
+
+@router.get("/keys", response_model=ApiKeyListResponse)
+async def list_keys(request: Request) -> ApiKeyListResponse:
+    owner_user_id = _auth_user_id_from(request)
+    lifecycle = request.app.state.api_key_lifecycle_service
+    keys = await lifecycle.list_user_keys(owner_user_id=owner_user_id)
+    return ApiKeyListResponse(keys=[_key_metadata_response(item) for item in keys])
+
+
+@router.post("/keys", response_model=ApiKeyCreateResponse)
+async def create_key(request: Request, payload: ApiKeyCreateRequest) -> ApiKeyCreateResponse:
+    owner_user_id = _auth_user_id_from(request)
+    lifecycle = request.app.state.api_key_lifecycle_service
+    created = await lifecycle.create_key(
+        owner_user_id=owner_user_id,
+        actor_user_id=owner_user_id,
+        name=payload.name,
+        event_metadata=_event_metadata_from_request(request),
+    )
+    return ApiKeyCreateResponse(key=_key_metadata_response(created.metadata), raw_key=created.raw_key)
+
+
+@router.post("/keys/{key_id}/revoke", response_model=ApiKeyRevokeResponse)
+async def revoke_key(key_id: str, request: Request) -> ApiKeyRevokeResponse:
+    owner_user_id = _auth_user_id_from(request)
+    lifecycle = request.app.state.api_key_lifecycle_service
+    auth_service = request.app.state.auth_service
+    try:
+        revoked = await lifecycle.revoke_key(
+            owner_user_id=owner_user_id,
+            actor_user_id=owner_user_id,
+            key_id=key_id,
+            event_metadata=_event_metadata_from_request(request),
+        )
+    except ApiKeyNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=f"Key '{exc}' was not found.") from exc
+
+    await auth_service.invalidate_key_prefix(revoked.key_prefix)
+    return ApiKeyRevokeResponse(key=_key_metadata_response(revoked))
+
+
+@router.post("/keys/{key_id}/rotate", response_model=ApiKeyRotateResponse)
+async def rotate_key(key_id: str, request: Request) -> ApiKeyRotateResponse:
+    owner_user_id = _auth_user_id_from(request)
+    lifecycle = request.app.state.api_key_lifecycle_service
+    auth_service = request.app.state.auth_service
+    try:
+        rotated = await lifecycle.rotate_key(
+            owner_user_id=owner_user_id,
+            actor_user_id=owner_user_id,
+            key_id=key_id,
+            event_metadata=_event_metadata_from_request(request),
+        )
+    except ApiKeyNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=f"Key '{exc}' was not found.") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    await auth_service.invalidate_key_prefix(rotated.previous_metadata.key_prefix)
+    await auth_service.invalidate_key_prefix(rotated.new_key.metadata.key_prefix)
+    return ApiKeyRotateResponse(
+        previous_key=_key_metadata_response(rotated.previous_metadata),
+        new_key=_key_metadata_response(rotated.new_key.metadata),
+        raw_key=rotated.new_key.raw_key,
+    )
 
 
 @router.post("/gates/run", response_model=GateRunResponse)

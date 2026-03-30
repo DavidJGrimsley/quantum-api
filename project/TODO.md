@@ -178,6 +178,12 @@ Goal: make adoption easy across game and app stacks.
 
 Goal: keep the platform stable as capabilities grow.
 
+### Portfolio Metadata Contract (`/public-facing/api/quantum/portfolio.json`)
+
+- [ ] Final-phase cutover: ensure `/public-facing/api/quantum/portfolio.json` is re-added/served by the current deployment stack as a first-class public contract.
+- [ ] Treat `portfolio.json` as a release artifact: update it whenever API endpoints, schemas, docs URLs, version, or health/docs links change.
+- [ ] Add a release checklist item (or CI guard) that fails if `portfolio.json` is stale against current API behavior.
+
 ### Release Discipline
 
 - [ ] Enforce semantic versioning rules across API and SDKs

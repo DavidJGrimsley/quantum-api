@@ -11,17 +11,22 @@ from fastapi.responses import JSONResponse, Response
 
 from quantum_api.api.router import router
 from quantum_api.config import get_settings
+from quantum_api.key_management import ApiKeyLifecycleService, DatabaseManager
 from quantum_api.logging_config import setup_logging
 from quantum_api.metrics import metrics_response
 from quantum_api.middleware import SecurityObservabilityMiddleware
 from quantum_api.security import ApiKeyAuthService, RedisRateLimiter
+from quantum_api.supabase_auth import SupabaseJwtVerifier
 
 settings = get_settings()
 setup_logging(settings)
 logger = logging.getLogger(__name__)
 
-auth_service = ApiKeyAuthService(settings)
+database = DatabaseManager(settings)
+api_key_lifecycle_service = ApiKeyLifecycleService(settings, database)
+auth_service = ApiKeyAuthService(settings, api_key_lifecycle_service)
 rate_limiter = RedisRateLimiter(settings)
+jwt_verifier = SupabaseJwtVerifier(settings)
 
 app = FastAPI(
     title=settings.app_name,
@@ -31,14 +36,18 @@ app = FastAPI(
 )
 
 app.state.settings = settings
+app.state.database = database
+app.state.api_key_lifecycle_service = api_key_lifecycle_service
 app.state.auth_service = auth_service
 app.state.rate_limiter = rate_limiter
+app.state.jwt_verifier = jwt_verifier
 
 app.add_middleware(
     SecurityObservabilityMiddleware,
     settings=settings,
     auth_service=auth_service,
     rate_limiter=rate_limiter,
+    jwt_verifier=jwt_verifier,
 )
 app.add_middleware(
     CORSMiddleware,
@@ -112,12 +121,19 @@ def _validation_message(exc: RequestValidationError) -> str:
 
 @app.on_event("startup")
 async def startup_event() -> None:
+    await database.startup()
+    await api_key_lifecycle_service.ensure_dev_bootstrap_key()
+    await auth_service.startup_check()
+    await jwt_verifier.startup_check()
     await rate_limiter.startup_check()
 
 
 @app.on_event("shutdown")
 async def shutdown_event() -> None:
     await rate_limiter.close()
+    await auth_service.close()
+    await jwt_verifier.close()
+    await database.shutdown()
 
 
 @app.exception_handler(RequestValidationError)

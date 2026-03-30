@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import hashlib
 import hmac
+import json
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -10,7 +10,13 @@ from typing import Any
 from redis.asyncio import Redis
 from redis.exceptions import RedisError
 
-from quantum_api.config import ApiKeyPolicy, Settings
+from quantum_api.config import Settings
+from quantum_api.key_management import (
+    ApiKeyLifecycleService,
+    KeyPolicy,
+    RuntimeApiKey,
+    parse_api_key_prefix,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +98,9 @@ class RateLimiterUnavailableError(Exception):
 @dataclass(frozen=True)
 class AuthenticatedApiKey:
     key_id: str
-    policy: ApiKeyPolicy
+    owner_user_id: str
+    key_prefix: str
+    policy: KeyPolicy
 
 
 @dataclass(frozen=True)
@@ -104,19 +112,120 @@ class RateLimitResult:
 
 
 class ApiKeyAuthService:
-    def __init__(self, settings: Settings) -> None:
-        self._enabled_policies = [policy for policy in settings.parsed_api_keys() if policy.enabled]
+    def __init__(self, settings: Settings, lifecycle_service: ApiKeyLifecycleService) -> None:
+        self._settings = settings
+        self._lifecycle_service = lifecycle_service
+        self._redis: Redis | None = None
 
-    def authenticate(self, raw_api_key: str | None) -> AuthenticatedApiKey | None:
+    async def startup_check(self) -> None:
+        if not self._settings.redis_url.strip():
+            return
+        self._redis = Redis.from_url(self._settings.redis_url, decode_responses=True)
+        try:
+            await self._redis.ping()
+        except RedisError:
+            logger.warning("API key metadata cache is unavailable; falling back to DB lookups.")
+            await self._redis.aclose()
+            self._redis = None
+
+    async def close(self) -> None:
+        if self._redis is not None:
+            await self._redis.aclose()
+            self._redis = None
+
+    async def authenticate(self, raw_api_key: str | None) -> AuthenticatedApiKey | None:
         if not raw_api_key:
             return None
 
-        candidate_hash = hashlib.sha256(raw_api_key.encode("utf-8")).hexdigest()
-        for policy in self._enabled_policies:
-            if hmac.compare_digest(candidate_hash, policy.key_hash_sha256):
-                return AuthenticatedApiKey(key_id=policy.key_id, policy=policy)
+        prefix = parse_api_key_prefix(raw_api_key, key_format_prefix=self._settings.api_key_format_prefix)
+        if prefix is None:
+            return None
+
+        runtime_key = await self._runtime_key_by_prefix(prefix=prefix)
+        if runtime_key is None:
+            return None
+
+        candidate_hash = self._lifecycle_service.hash_raw_key(raw_api_key)
+        if hmac.compare_digest(candidate_hash, runtime_key.key_hash_sha256):
+            return AuthenticatedApiKey(
+                key_id=runtime_key.key_id,
+                owner_user_id=runtime_key.owner_user_id,
+                key_prefix=runtime_key.key_prefix,
+                policy=runtime_key.policy,
+            )
 
         return None
+
+    async def invalidate_key_prefix(self, prefix: str) -> None:
+        if self._redis is None:
+            return
+        try:
+            await self._redis.delete(self._cache_key(prefix))
+        except RedisError:
+            logger.warning("Unable to invalidate API key metadata cache.", exc_info=True)
+
+    async def _runtime_key_by_prefix(self, *, prefix: str) -> RuntimeApiKey | None:
+        cached = await self._read_cache(prefix=prefix)
+        if cached is not None:
+            return cached
+
+        runtime_key = await self._lifecycle_service.find_active_runtime_key_by_prefix(prefix=prefix)
+        if runtime_key is not None:
+            await self._write_cache(runtime_key)
+        return runtime_key
+
+    async def _read_cache(self, *, prefix: str) -> RuntimeApiKey | None:
+        if self._redis is None:
+            return None
+        try:
+            raw = await self._redis.get(self._cache_key(prefix))
+        except RedisError:
+            logger.warning("Unable to read API key metadata cache.", exc_info=True)
+            return None
+        if not raw:
+            return None
+
+        try:
+            payload = json.loads(raw)
+            policy = payload["policy"]
+            return RuntimeApiKey(
+                key_id=str(payload["key_id"]),
+                owner_user_id=str(payload["owner_user_id"]),
+                key_prefix=str(payload["key_prefix"]),
+                key_hash_sha256=str(payload["key_hash_sha256"]),
+                policy=KeyPolicy(
+                    rate_limit_per_second=int(policy["rate_limit_per_second"]),
+                    rate_limit_per_minute=int(policy["rate_limit_per_minute"]),
+                    daily_quota=int(policy["daily_quota"]),
+                ),
+            )
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+            logger.warning("Cached API key metadata payload is invalid.", exc_info=True)
+            return None
+
+    async def _write_cache(self, runtime_key: RuntimeApiKey) -> None:
+        if self._redis is None:
+            return
+        payload = json.dumps(
+            {
+                "key_id": runtime_key.key_id,
+                "owner_user_id": runtime_key.owner_user_id,
+                "key_prefix": runtime_key.key_prefix,
+                "key_hash_sha256": runtime_key.key_hash_sha256,
+                "policy": {
+                    "rate_limit_per_second": runtime_key.policy.rate_limit_per_second,
+                    "rate_limit_per_minute": runtime_key.policy.rate_limit_per_minute,
+                    "daily_quota": runtime_key.policy.daily_quota,
+                },
+            }
+        )
+        try:
+            await self._redis.set(self._cache_key(runtime_key.key_prefix), payload, ex=self._settings.api_key_cache_ttl_seconds)
+        except RedisError:
+            logger.warning("Unable to write API key metadata cache.", exc_info=True)
+
+    def _cache_key(self, prefix: str) -> str:
+        return f"api-key-meta:{prefix}"
 
 
 class RedisRateLimiter:
@@ -143,10 +252,10 @@ class RedisRateLimiter:
             await self._redis.aclose()
             self._redis = None
 
-    async def check_key(self, policy: ApiKeyPolicy) -> RateLimitResult:
+    async def check_key(self, *, key_id: str, policy: KeyPolicy) -> RateLimitResult:
         result = await self._evaluate_limit(
             scope="key",
-            identifier=policy.key_id,
+            identifier=key_id,
             second_limit=policy.rate_limit_per_second,
             minute_limit=policy.rate_limit_per_minute,
             day_limit=policy.daily_quota,
