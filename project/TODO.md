@@ -49,6 +49,7 @@ Goal: finalize Identerest-authenticated key management from Portfolio through Qu
 - [x] Ensure Supabase JWT verification supports current JWKS key types (including ES256/EC).
 - [x] Execute production migration in Identerest Supabase and verify table/policy presence.
 - [x] Publish a concrete rollout gate/checklist (`project/phase-3_75-cutover.md`) for deployment and recovery.
+- [x] Add executable rollback verification command (`scripts/verify_key_lifecycle.py`) and wire it into cutover docs.
 - [x] Run full live flow validation: login -> create -> rotate -> revoke -> runtime rejection checks.
 - [x] Capture post-rollout verification notes in release docs (`project/phase-3_75-cutover.md`).
 

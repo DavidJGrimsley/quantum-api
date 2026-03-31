@@ -46,5 +46,7 @@ If rollout issues appear:
 1. Keep migration in place (no destructive rollback on key tables).
 2. Roll Quantum API deployment back to previous known-good image.
 3. Confirm env parity (`SUPABASE_URL`, `SUPABASE_JWT_*`, `DATABASE_URL`, `API_KEY_HASH_SECRET`, `REDIS_URL`).
-4. Re-run lifecycle verification script to isolate config vs code regression.
+4. Re-run lifecycle verification command to isolate config vs code regression:
+   - Linux/macOS: `.venv/bin/uv run --no-sync python scripts/verify_key_lifecycle.py --cleanup`
+   - Windows PowerShell: `.\\.venv\\Scripts\\uv.exe run --no-sync python scripts/verify_key_lifecycle.py --cleanup`
 5. If needed, temporarily lock new key creation by reducing limits or adding maintenance banner in Portfolio while preserving read/revoke paths.
