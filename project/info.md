@@ -23,7 +23,7 @@ Run a production-ready Quantum API that supports:
   - `DELETE /v1/keys/revoked` (bulk permanent delete for revoked keys)
   - `POST /v1/keys/{key_id}/revoke`
   - `POST /v1/keys/{key_id}/rotate`
-- Phase 3.75 rollout alignment is in progress:
+- Phase 3.75 rollout alignment is complete for this session:
   - Identerest Supabase migration script hardened (`pgcrypto` + explicit RLS policies)
   - docs aligned to Identerest auth/key rollout flow
   - active key cap now enforced (`MAX_ACTIVE_API_KEYS_PER_USER`, default `5`)
@@ -31,6 +31,7 @@ Run a production-ready Quantum API that supports:
   - JWT verifier now accepts Supabase ES256 JWKS signing keys
   - runtime DB config switched to Supabase Postgres in `.env` (`postgresql+asyncpg`, `DATABASE_AUTO_CREATE=false`)
   - live verification confirms `api_keys` + `api_key_audit_events` tables exist with RLS enabled and policies present
+  - lifecycle verification confirms create -> rotate -> revoke behavior plus runtime key rejection checks
 
 ## Scope (Current Session)
 
@@ -40,6 +41,7 @@ Run a production-ready Quantum API that supports:
   - `X-API-Key` for other protected `/v1/*`
 - Keep schema aligned with runtime ORM (`api_keys`, `api_key_audit_events`) without introducing `app_scope`.
 - Align rollout docs and operational checklists to Identerest as the active auth/data project.
+- Use `project/phase-3_75-cutover.md` as the deployment gate and recovery checklist.
 
 ## Constraints
 

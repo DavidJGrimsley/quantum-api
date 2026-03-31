@@ -125,12 +125,13 @@ API_KEY_HASH_SECRET=<openssl rand -hex 32>
 
 SUPABASE_URL=https://<IDENTEREST_PROJECT_REF>.supabase.co
 SUPABASE_JWT_AUDIENCE=authenticated
-SUPABASE_JWT_ISSUER=
+SUPABASE_JWT_ISSUER=https://<IDENTEREST_PROJECT_REF>.supabase.co/auth/v1
 
 REDIS_URL=redis://127.0.0.1:6379/0
 DATABASE_AUTO_CREATE=false
 DEV_RATE_LIMIT_BYPASS=false
 MAX_ACTIVE_API_KEYS_PER_USER=5
+MAX_TOTAL_API_KEYS_PER_USER=100
 ```
 
 ## Rollout Sequence
@@ -143,6 +144,7 @@ MAX_ACTIVE_API_KEYS_PER_USER=5
    - login works from portfolio
    - `GET /v1/keys` works with bearer token
    - create/revoke/rotate persist in Identerest DB
+   - revoked cleanup works (`DELETE /v1/keys/{key_id}`, `DELETE /v1/keys/revoked`)
    - protected runtime endpoints still enforce `X-API-Key`
 
 ## Notes / Risks

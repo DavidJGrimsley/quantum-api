@@ -48,8 +48,9 @@ Goal: finalize Identerest-authenticated key management from Portfolio through Qu
 - [x] Add revoked-key cleanup endpoints (`DELETE /v1/keys/{key_id}`, `DELETE /v1/keys/revoked`) to keep user key history manageable.
 - [x] Ensure Supabase JWT verification supports current JWKS key types (including ES256/EC).
 - [x] Execute production migration in Identerest Supabase and verify table/policy presence.
-- [ ] Run full live flow validation: login -> create -> rotate -> revoke -> runtime rejection checks.
-- [ ] Capture post-rollout verification notes in `project/questions.md` or release log.
+- [x] Publish a concrete rollout gate/checklist (`project/phase-3_75-cutover.md`) for deployment and recovery.
+- [x] Run full live flow validation: login -> create -> rotate -> revoke -> runtime rejection checks.
+- [x] Capture post-rollout verification notes in release docs (`project/phase-3_75-cutover.md`).
 
 ## Phase 1 - Core Power API (High Priority)
 
