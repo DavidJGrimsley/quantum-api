@@ -25,10 +25,17 @@ from fastapi.responses import JSONResponse
 
 from quantum_api.config import get_settings
 from quantum_api.enums import ECHO_TYPE_DESCRIPTIONS
-from quantum_api.key_management import ApiKeyNotFoundError, KeyMetadata
+from quantum_api.key_management import (
+    ApiKeyDeleteConflictError,
+    ApiKeyLimitExceededError,
+    ApiKeyNotFoundError,
+    KeyMetadata,
+)
 from quantum_api.models.api import (
     ApiKeyCreateRequest,
     ApiKeyCreateResponse,
+    ApiKeyDeleteResponse,
+    ApiKeyDeleteRevokedResponse,
     ApiKeyListResponse,
     ApiKeyMetadataResponse,
     ApiKeyPolicyResponse,
@@ -178,12 +185,15 @@ async def list_keys(request: Request) -> ApiKeyListResponse:
 async def create_key(request: Request, payload: ApiKeyCreateRequest) -> ApiKeyCreateResponse:
     owner_user_id = _auth_user_id_from(request)
     lifecycle = request.app.state.api_key_lifecycle_service
-    created = await lifecycle.create_key(
-        owner_user_id=owner_user_id,
-        actor_user_id=owner_user_id,
-        name=payload.name,
-        event_metadata=_event_metadata_from_request(request),
-    )
+    try:
+        created = await lifecycle.create_key(
+            owner_user_id=owner_user_id,
+            actor_user_id=owner_user_id,
+            name=payload.name,
+            event_metadata=_event_metadata_from_request(request),
+        )
+    except ApiKeyLimitExceededError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     return ApiKeyCreateResponse(key=_key_metadata_response(created.metadata), raw_key=created.raw_key)
 
 
@@ -220,6 +230,8 @@ async def rotate_key(key_id: str, request: Request) -> ApiKeyRotateResponse:
         )
     except ApiKeyNotFoundError as exc:
         raise HTTPException(status_code=404, detail=f"Key '{exc}' was not found.") from exc
+    except ApiKeyLimitExceededError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
@@ -230,6 +242,37 @@ async def rotate_key(key_id: str, request: Request) -> ApiKeyRotateResponse:
         new_key=_key_metadata_response(rotated.new_key.metadata),
         raw_key=rotated.new_key.raw_key,
     )
+
+
+@router.delete("/keys/revoked", response_model=ApiKeyDeleteRevokedResponse)
+async def delete_all_revoked_keys(request: Request) -> ApiKeyDeleteRevokedResponse:
+    owner_user_id = _auth_user_id_from(request)
+    lifecycle = request.app.state.api_key_lifecycle_service
+    deleted_count = await lifecycle.delete_all_revoked_keys(
+        owner_user_id=owner_user_id,
+        actor_user_id=owner_user_id,
+        event_metadata=_event_metadata_from_request(request),
+    )
+    return ApiKeyDeleteRevokedResponse(deleted_count=deleted_count)
+
+
+@router.delete("/keys/{key_id}", response_model=ApiKeyDeleteResponse)
+async def delete_key(key_id: str, request: Request) -> ApiKeyDeleteResponse:
+    owner_user_id = _auth_user_id_from(request)
+    lifecycle = request.app.state.api_key_lifecycle_service
+    try:
+        deleted_key_id = await lifecycle.delete_revoked_key(
+            owner_user_id=owner_user_id,
+            actor_user_id=owner_user_id,
+            key_id=key_id,
+            event_metadata=_event_metadata_from_request(request),
+        )
+    except ApiKeyNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=f"Key '{exc}' was not found.") from exc
+    except ApiKeyDeleteConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    return ApiKeyDeleteResponse(deleted_key_id=deleted_key_id)
 
 
 @router.post("/gates/run", response_model=GateRunResponse)

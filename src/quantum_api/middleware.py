@@ -115,6 +115,24 @@ class SecurityObservabilityMiddleware(BaseHTTPMiddleware):
                         path_label=path_label,
                         client_ip=client_ip,
                     )
+                except Exception:
+                    logger.exception("JWT verifier backend error.")
+                    response = self._error_response(
+                        status_code=503,
+                        error="service_unavailable",
+                        message=(
+                            "Authentication service temporarily unavailable: "
+                            "unable to verify Supabase JWT at this time."
+                        ),
+                        request_id=request_id,
+                    )
+                    return self._finalize_response(
+                        request=request,
+                        response=response,
+                        started_at=started_at,
+                        path_label=path_label,
+                        client_ip=client_ip,
+                    )
 
                 request.state.auth_user_id = user.user_id
                 request.state.auth_user_email = user.email

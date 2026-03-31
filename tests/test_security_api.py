@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from quantum_api.main import rate_limiter, settings
+from quantum_api.main import app, rate_limiter, settings
 from quantum_api.security import RateLimiterUnavailableError, RateLimitResult
 
 
@@ -23,6 +23,16 @@ def test_key_management_endpoints_require_bearer_jwt(unauth_client):
         payload["message"]
         == "Authentication required: send a valid Supabase JWT in 'Authorization: Bearer <token>'."
     )
+
+
+def test_key_management_delete_endpoints_require_bearer_jwt(unauth_client):
+    revoked_batch = unauth_client.delete("/v1/keys/revoked")
+    single = unauth_client.delete("/v1/keys/some-key-id")
+
+    assert revoked_batch.status_code == 401
+    assert single.status_code == 401
+    assert revoked_batch.json()["error"] == "auth_required"
+    assert single.json()["error"] == "auth_required"
 
 
 def test_health_endpoint_is_public(unauth_client):
@@ -194,3 +204,39 @@ def test_rate_limiter_unavailable_returns_503(client, monkeypatch):
         assert payload["request_id"]
     finally:
         settings.dev_rate_limit_bypass = original_bypass
+
+
+def test_jwt_verifier_backend_failure_returns_503_with_cors(unauth_client, monkeypatch):
+    async def fail_verify(authorization_header: str | None):
+        raise RuntimeError("jwks backend unavailable")
+
+    monkeypatch.setattr(app.state.jwt_verifier, "verify_authorization_header", fail_verify)
+
+    response = unauth_client.get(
+        "/v1/keys",
+        headers={
+            "Authorization": "Bearer test-token",
+            "Origin": "http://localhost:8081",
+        },
+    )
+    assert response.status_code == 503
+    payload = response.json()
+    assert payload["error"] == "service_unavailable"
+    assert payload["message"] == (
+        "Authentication service temporarily unavailable: "
+        "unable to verify Supabase JWT at this time."
+    )
+    assert response.headers["access-control-allow-origin"] == "*"
+
+
+def test_delete_preflight_is_allowed_for_local_origin(unauth_client):
+    response = unauth_client.options(
+        "/v1/keys/revoked",
+        headers={
+            "Origin": "http://localhost:8081",
+            "Access-Control-Request-Method": "DELETE",
+        },
+    )
+    assert response.status_code == 200
+    allow_methods = response.headers.get("access-control-allow-methods", "")
+    assert "DELETE" in allow_methods

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import time
 from dataclasses import dataclass
@@ -9,7 +8,7 @@ from typing import Any
 
 import httpx
 import jwt
-from jwt import InvalidTokenError
+from jwt import InvalidTokenError, PyJWTError
 
 from quantum_api.config import Settings
 
@@ -69,7 +68,7 @@ class SupabaseJwtVerifier:
                 raise JwtVerificationError("Token signing key is unknown.")
 
         try:
-            public_key = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(key_jwk))
+            public_key = jwt.PyJWK.from_dict(key_jwk).key
             claims = jwt.decode(
                 token,
                 key=public_key,
@@ -78,7 +77,7 @@ class SupabaseJwtVerifier:
                 issuer=self._settings.supabase_jwt_issuer_effective,
                 options={"require": ["exp", "iat", "sub"]},
             )
-        except InvalidTokenError as exc:
+        except PyJWTError as exc:
             raise JwtVerificationError("JWT validation failed.") from exc
 
         user_id = str(claims.get("sub", "")).strip()

@@ -12,6 +12,8 @@ Quantum API is a greenfield FastAPI service for quantum-inspired runtime feature
 - `/v1/qasm/export`
 - `/v1/text/transform`
 - `/v1/keys`
+- `/v1/keys/{key_id}` (delete revoked key)
+- `/v1/keys/revoked` (bulk delete revoked keys)
 - `/v1/keys/{key_id}/revoke`
 - `/v1/keys/{key_id}/rotate`
 - `/metrics` (internal metrics endpoint)
@@ -47,7 +49,7 @@ For local development, use API key `qapi_devlocal_0123456789abcdef0123456789abcd
 ### Authentication and Rate Limits
 
 - `GET /v1/health` is public.
-- `GET /v1/keys`, `POST /v1/keys`, `POST /v1/keys/{key_id}/revoke`, and `POST /v1/keys/{key_id}/rotate` require `Authorization: Bearer <supabase_jwt>`.
+- `GET /v1/keys`, `POST /v1/keys`, `DELETE /v1/keys/{key_id}`, `DELETE /v1/keys/revoked`, `POST /v1/keys/{key_id}/revoke`, and `POST /v1/keys/{key_id}/rotate` require `Authorization: Bearer <supabase_jwt>`.
 - All other protected `/v1/*` endpoints require `X-API-Key` (DB-managed key records only; no `API_KEYS_JSON` fallback).
 - Successful protected responses include:
   - `X-Request-ID`
@@ -85,6 +87,8 @@ Lists canonical transformation categories and descriptions from one enum source.
 
 - `GET /v1/keys`: list current user's keys (masked metadata only).
 - `POST /v1/keys`: create a key and return the raw key exactly once.
+- `DELETE /v1/keys/{key_id}`: permanently delete one revoked key from history.
+- `DELETE /v1/keys/revoked`: permanently delete all revoked keys for the current user.
 - `POST /v1/keys/{key_id}/revoke`: revoke an existing key.
 - `POST /v1/keys/{key_id}/rotate`: atomically rotate key (old key becomes invalid, new raw key shown once).
 
@@ -323,6 +327,8 @@ Copy `.env.example` to `.env` and adjust values as needed.
 - `MAX_CIRCUIT_DEPTH`
 - `MAX_CIRCUIT_SHOTS`
 - `ALLOW_ORIGINS`
+- `DEV_CORS_ALLOW_LOCALHOST`
+- `DEV_CORS_LOCAL_ORIGINS`
 - `REQUEST_TIMEOUT_SECONDS`
 - `REQUIRE_QISKIT`
 - `IBM_TOKEN` (optional)
@@ -338,6 +344,8 @@ Copy `.env.example` to `.env` and adjust values as needed.
 - `DEFAULT_KEY_RATE_LIMIT_PER_SECOND`
 - `DEFAULT_KEY_RATE_LIMIT_PER_MINUTE`
 - `DEFAULT_KEY_DAILY_QUOTA`
+- `MAX_ACTIVE_API_KEYS_PER_USER`
+- `MAX_TOTAL_API_KEYS_PER_USER`
 - `DATABASE_URL`
 - `DATABASE_AUTO_CREATE`
 - `SUPABASE_URL`
@@ -361,11 +369,14 @@ Copy `.env.example` to `.env` and adjust values as needed.
 Security defaults and guardrails:
 
 - `ALLOW_ORIGINS=*` is accepted only for `APP_ENV=development`.
+- In `APP_ENV=development`, localhost origins are auto-allowlisted by default when `ALLOW_ORIGINS` is explicit (set `DEV_CORS_ALLOW_LOCALHOST=false` to disable).
 - `staging`/`production` require explicit CORS allowlists.
 - `staging`/`production` fail closed when Redis is unavailable for rate enforcement.
 - `staging`/`production` require `METRICS_TOKEN` when metrics are enabled.
 - `staging`/`production` require `DATABASE_AUTO_CREATE=false`.
 - `staging`/`production` require `API_KEY_HASH_SECRET` to be rotated from dev default.
+- Active API key creation is capped per owner by `MAX_ACTIVE_API_KEYS_PER_USER`.
+- Total API key history per owner (active + revoked + rotated) is capped by `MAX_TOTAL_API_KEYS_PER_USER`.
 
 ## Operations and SLOs
 
@@ -373,7 +384,16 @@ Security defaults and guardrails:
 - Prometheus alert rule examples: `docs/operations/alerts.prometheus.yml`
 - Staging deployment playbook: `docs/operations/deploy-staging.md`
 - Production deployment playbook: `docs/operations/deploy-production.md`
-- Supabase Phase 3.5 schema script: `docs/operations/phase3_5_supabase_schema.sql`
+- Supabase Phase 3.5 schema script (includes `pgcrypto`, RLS, and owner policies): `docs/operations/phase3_5_supabase_schema.sql`
+
+## Identerest Rollout (Phase 3.75)
+
+1. Point `SUPABASE_URL` and `DATABASE_URL` at the Identerest Supabase project.
+   - If using Supabase pooler (`*.pooler.supabase.com:6543`) with `asyncpg`, statement cache is auto-disabled by the service bootstrap for PgBouncer compatibility.
+2. Apply `docs/operations/phase3_5_supabase_schema.sql` in that project.
+3. Ensure OAuth providers and redirect URLs are configured for portfolio login.
+4. Keep `/v1/keys*` on bearer JWT and runtime `/v1/*` on `X-API-Key` (already enforced in middleware).
+5. Restart service and validate create/list/revoke/rotate flows.
 
 ## Docker
 
@@ -404,12 +424,13 @@ RUN_PERF_BENCHMARKS=true uv run pytest tests/perf -s
 - `docs/migrations/` - external client migration plans (Godot, Expo, Unreal, Unity)
 - `project/` - planning, style, and implementation docs
 
-## Roadmap (Phase 1-2 Delivered)
+## Roadmap Status
 
-1. Core power API for multi-qubit circuit execution (`/v1/circuits/run`) is delivered with strict limits.
-2. Phase 2 compilation and backend discovery endpoints are delivered (`/v1/transpile`, `/v1/list_backends`).
-3. QASM interop is delivered (`/v1/qasm/import`, `/v1/qasm/export`).
-4. Next major focus is Phase 3 security and production hardening.
+1. Phase 1 delivered: multi-qubit execution (`/v1/circuits/run`) with strict limits.
+2. Phase 2 delivered: backend discovery + transpilation + QASM interop.
+3. Phase 3 delivered: production auth/rate-limiting/observability hardening.
+4. Phase 3.5/3.75 active: Identerest-authenticated key lifecycle rollout and portfolio integration.
+5. Next major engineering focus after rollout: Phase 4 runtime/hardware integrations.
 
 ## License
 

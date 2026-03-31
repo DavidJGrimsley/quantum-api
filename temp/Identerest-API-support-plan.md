@@ -45,7 +45,6 @@ create extension if not exists pgcrypto;
 
 create table if not exists public.api_keys (
   id uuid primary key default gen_random_uuid(),
-  app_scope text not null default 'quantum-api',
   owner_user_id text not null,
   name text null,
   key_prefix text not null unique,
@@ -63,7 +62,6 @@ create table if not exists public.api_keys (
   constraint api_keys_rate_limit_minute_check check (rate_limit_per_minute >= rate_limit_per_second)
 );
 
-create index if not exists idx_api_keys_app_scope on public.api_keys (app_scope);
 create index if not exists idx_api_keys_owner_user_id on public.api_keys (owner_user_id);
 create index if not exists idx_api_keys_status on public.api_keys (status);
 create index if not exists idx_api_keys_key_hash_sha256 on public.api_keys (key_hash_sha256);
@@ -72,7 +70,6 @@ create index if not exists idx_api_keys_rotated_to_id on public.api_keys (rotate
 
 create table if not exists public.api_key_audit_events (
   id uuid primary key default gen_random_uuid(),
-  app_scope text not null default 'quantum-api',
   api_key_id uuid not null references public.api_keys(id) on delete cascade,
   owner_user_id text not null,
   actor_user_id text not null,
@@ -84,11 +81,37 @@ create table if not exists public.api_key_audit_events (
   constraint api_key_audit_events_type_check check (event_type in ('create', 'revoke', 'rotate'))
 );
 
-create index if not exists idx_api_key_audit_events_app_scope on public.api_key_audit_events (app_scope);
 create index if not exists idx_api_key_audit_events_api_key_id on public.api_key_audit_events (api_key_id);
 create index if not exists idx_api_key_audit_events_owner_user_id on public.api_key_audit_events (owner_user_id);
 create index if not exists idx_api_key_audit_events_actor_user_id on public.api_key_audit_events (actor_user_id);
 create index if not exists idx_api_key_audit_events_event_type on public.api_key_audit_events (event_type);
+
+alter table public.api_keys enable row level security;
+alter table public.api_key_audit_events enable row level security;
+
+create policy api_keys_select_own on public.api_keys
+  for select to authenticated
+  using (owner_user_id = auth.uid()::text);
+
+create policy api_keys_insert_own on public.api_keys
+  for insert to authenticated
+  with check (owner_user_id = auth.uid()::text);
+
+create policy api_keys_update_own on public.api_keys
+  for update to authenticated
+  using (owner_user_id = auth.uid()::text)
+  with check (owner_user_id = auth.uid()::text);
+
+create policy api_key_audit_events_select_own on public.api_key_audit_events
+  for select to authenticated
+  using (owner_user_id = auth.uid()::text);
+
+create policy api_key_audit_events_insert_own on public.api_key_audit_events
+  for insert to authenticated
+  with check (
+    owner_user_id = auth.uid()::text
+    and actor_user_id = auth.uid()::text
+  );
 ```
 
 ## Quantum API Env Mapping (Point To Identerest)
@@ -107,6 +130,7 @@ SUPABASE_JWT_ISSUER=
 REDIS_URL=redis://127.0.0.1:6379/0
 DATABASE_AUTO_CREATE=false
 DEV_RATE_LIMIT_BYPASS=false
+MAX_ACTIVE_API_KEYS_PER_USER=5
 ```
 
 ## Rollout Sequence
@@ -124,5 +148,6 @@ DEV_RATE_LIMIT_BYPASS=false
 ## Notes / Risks
 
 1. Shared auth is intentional: users sign into Identerest Account even if they came from Portfolio.
-2. `app_scope` defaults to `quantum-api`; later apps can reuse the same tables safely.
+2. Supabase automatic RLS settings do not replace explicit owner-scoped policies.
 3. No paid Redis provider is needed; keep Redis local to VPS and not publicly exposed.
+4. Supabase JWT signing keys may be ES256; Quantum API verifier now supports ES256/EC JWKS.

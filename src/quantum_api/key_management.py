@@ -10,7 +10,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, Integer, String, Text, func, select
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, Uuid, delete, func, select
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -33,7 +34,7 @@ class Base(DeclarativeBase):
 class ApiKeyRecordModel(Base):
     __tablename__ = "api_keys"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(Uuid(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
     owner_user_id: Mapped[str] = mapped_column(String(128), index=True)
     name: Mapped[str | None] = mapped_column(String(128), nullable=True)
     key_prefix: Mapped[str] = mapped_column(String(64), unique=True, index=True)
@@ -44,16 +45,16 @@ class ApiKeyRecordModel(Base):
     daily_quota: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    rotated_from_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
-    rotated_to_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    rotated_from_id: Mapped[str | None] = mapped_column(Uuid(as_uuid=False), nullable=True, index=True)
+    rotated_to_id: Mapped[str | None] = mapped_column(Uuid(as_uuid=False), nullable=True, index=True)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class ApiKeyAuditEventModel(Base):
     __tablename__ = "api_key_audit_events"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    api_key_id: Mapped[str] = mapped_column(String(36), index=True)
+    id: Mapped[str] = mapped_column(Uuid(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
+    api_key_id: Mapped[str] = mapped_column(Uuid(as_uuid=False), ForeignKey("api_keys.id"), index=True)
     owner_user_id: Mapped[str] = mapped_column(String(128), index=True)
     actor_user_id: Mapped[str] = mapped_column(String(128), index=True)
     event_type: Mapped[str] = mapped_column(String(24), index=True)
@@ -111,17 +112,47 @@ class ApiKeyNotFoundError(Exception):
     pass
 
 
+class ApiKeyLimitExceededError(Exception):
+    pass
+
+
+class ApiKeyDeleteConflictError(Exception):
+    pass
+
+
 class DatabaseManager:
     def __init__(self, settings: Settings) -> None:
         connect_args: dict[str, Any] = {}
+        database_driver = "unknown"
+        database_host = "unknown"
+
         if settings.database_url.startswith("sqlite"):
             connect_args["check_same_thread"] = False
+            database_driver = "sqlite"
+            database_host = "local-file"
+        elif settings.database_url.startswith("postgresql+asyncpg"):
+            database_driver = "postgresql+asyncpg"
+            # Supabase pooler (PgBouncer) requires disabling asyncpg statement caching.
+            # Keep this targeted to pooled hosts/ports so direct Postgres keeps default behavior.
+            try:
+                parsed = make_url(settings.database_url)
+                database_host = parsed.host or "unknown"
+                if database_host.endswith(".pooler.supabase.com") or parsed.port == 6543:
+                    connect_args["statement_cache_size"] = 0
+            except Exception:
+                connect_args["statement_cache_size"] = 0
 
         self._settings = settings
         self._engine: AsyncEngine = create_async_engine(
             settings.database_url,
             pool_pre_ping=True,
             connect_args=connect_args,
+        )
+        logger.info(
+            "Database engine initialized (driver=%s host=%s statement_cache_size=%s)",
+            database_driver,
+            database_host,
+            connect_args.get("statement_cache_size", "default"),
         )
         self._session_factory = async_sessionmaker(
             self._engine,
@@ -198,6 +229,7 @@ class ApiKeyLifecycleService:
                 created_at=now,
             )
             session.add(record)
+            await session.flush()
             session.add(
                 ApiKeyAuditEventModel(
                     api_key_id=record.id,
@@ -237,6 +269,8 @@ class ApiKeyLifecycleService:
         event_metadata: dict[str, Any] | None = None,
     ) -> CreatedApiKey:
         async with self._database.session() as session:
+            await self._assert_total_key_capacity(session, owner_user_id=owner_user_id)
+            await self._assert_active_key_capacity(session, owner_user_id=owner_user_id)
             for _ in range(6):
                 prefix = self._random_token(self._settings.api_key_prefix_length)
                 existing = await self._record_by_prefix(session, prefix=prefix)
@@ -258,6 +292,7 @@ class ApiKeyLifecycleService:
                     created_at=now,
                 )
                 session.add(model)
+                await session.flush()
                 session.add(
                     ApiKeyAuditEventModel(
                         api_key_id=model.id,
@@ -320,6 +355,12 @@ class ApiKeyLifecycleService:
                 raise ApiKeyNotFoundError(key_id)
             if current.status != "active":
                 raise ValueError("Only active keys can be rotated.")
+            await self._assert_total_key_capacity(session, owner_user_id=owner_user_id)
+            await self._assert_active_key_capacity(
+                session,
+                owner_user_id=owner_user_id,
+                excluding_key_id=current.id,
+            )
 
             created = await self._create_key_inside_session(
                 session,
@@ -352,6 +393,58 @@ class ApiKeyLifecycleService:
             await session.refresh(current)
 
             return RotatedApiKey(previous_metadata=self._to_metadata(current), new_key=created)
+
+    async def delete_revoked_key(
+        self,
+        *,
+        owner_user_id: str,
+        actor_user_id: str,
+        key_id: str,
+        event_metadata: dict[str, Any] | None = None,
+    ) -> str:
+        async with self._database.session() as session:
+            model = await session.get(ApiKeyRecordModel, key_id)
+            if model is None or model.owner_user_id != owner_user_id:
+                raise ApiKeyNotFoundError(key_id)
+            if model.status != "revoked":
+                raise ApiKeyDeleteConflictError("Only revoked keys can be deleted.")
+
+            await session.execute(
+                delete(ApiKeyAuditEventModel).where(ApiKeyAuditEventModel.api_key_id == model.id)
+            )
+            await session.execute(delete(ApiKeyRecordModel).where(ApiKeyRecordModel.id == model.id))
+            await session.commit()
+            return model.id
+
+    async def delete_all_revoked_keys(
+        self,
+        *,
+        owner_user_id: str,
+        actor_user_id: str,
+        event_metadata: dict[str, Any] | None = None,
+    ) -> int:
+        async with self._database.session() as session:
+            revoked_ids_query = select(ApiKeyRecordModel.id).where(
+                ApiKeyRecordModel.owner_user_id == owner_user_id,
+                ApiKeyRecordModel.status == "revoked",
+            )
+            rows = await session.execute(revoked_ids_query)
+            key_ids = [str(key_id) for key_id in rows.scalars().all()]
+            if not key_ids:
+                return 0
+
+            await session.execute(
+                delete(ApiKeyAuditEventModel).where(ApiKeyAuditEventModel.api_key_id.in_(key_ids))
+            )
+            await session.execute(
+                delete(ApiKeyRecordModel).where(
+                    ApiKeyRecordModel.owner_user_id == owner_user_id,
+                    ApiKeyRecordModel.status == "revoked",
+                    ApiKeyRecordModel.id.in_(key_ids),
+                )
+            )
+            await session.commit()
+            return len(key_ids)
 
     async def mark_key_used(self, *, key_id: str) -> None:
         async with self._database.session() as session:
@@ -398,6 +491,7 @@ class ApiKeyLifecycleService:
                 created_at=now,
             )
             session.add(model)
+            await session.flush()
             session.add(
                 ApiKeyAuditEventModel(
                     api_key_id=model.id,
@@ -425,6 +519,45 @@ class ApiKeyLifecycleService:
         statement = select(ApiKeyRecordModel).where(ApiKeyRecordModel.key_prefix == prefix)
         row = await session.execute(statement)
         return row.scalar_one_or_none()
+
+    async def _assert_active_key_capacity(
+        self,
+        session: AsyncSession,
+        *,
+        owner_user_id: str,
+        excluding_key_id: str | None = None,
+    ) -> None:
+        statement = select(func.count(ApiKeyRecordModel.id)).where(
+            ApiKeyRecordModel.owner_user_id == owner_user_id,
+            ApiKeyRecordModel.status == "active",
+        )
+        if excluding_key_id:
+            statement = statement.where(ApiKeyRecordModel.id != excluding_key_id)
+
+        row = await session.execute(statement)
+        active_key_count = int(row.scalar_one())
+        if active_key_count >= self._settings.max_active_api_keys_per_user:
+            raise ApiKeyLimitExceededError(
+                f"Maximum active API keys reached ({self._settings.max_active_api_keys_per_user}). "
+                "Revoke an existing key or rotate one to continue."
+            )
+
+    async def _assert_total_key_capacity(
+        self,
+        session: AsyncSession,
+        *,
+        owner_user_id: str,
+    ) -> None:
+        statement = select(func.count(ApiKeyRecordModel.id)).where(
+            ApiKeyRecordModel.owner_user_id == owner_user_id,
+        )
+        row = await session.execute(statement)
+        total_key_count = int(row.scalar_one())
+        if total_key_count >= self._settings.max_total_api_keys_per_user:
+            raise ApiKeyLimitExceededError(
+                f"Maximum total API key history reached ({self._settings.max_total_api_keys_per_user}). "
+                "This safeguard prevents unbounded key-history growth."
+            )
 
     def _format_raw_key(self, *, prefix: str, secret: str) -> str:
         return f"{self._settings.api_key_format_prefix}_{prefix}_{secret}"

@@ -368,6 +368,19 @@ class ApiKeyRotateResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class ApiKeyDeleteResponse(BaseModel):
+    deleted_key_id: str
+    deleted: bool = True
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ApiKeyDeleteRevokedResponse(BaseModel):
+    deleted_count: int = Field(ge=0)
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class TextTransformRequest(BaseModel):
     text: str = Field(min_length=1)
 

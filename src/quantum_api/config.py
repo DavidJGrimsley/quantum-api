@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     max_circuit_depth: int = Field(default=256, alias="MAX_CIRCUIT_DEPTH", ge=1, le=10000)
     max_circuit_shots: int = Field(default=4096, alias="MAX_CIRCUIT_SHOTS", ge=1, le=100000)
     allow_origins: str = Field(default="*", alias="ALLOW_ORIGINS")
+    dev_cors_allow_localhost: bool = Field(default=True, alias="DEV_CORS_ALLOW_LOCALHOST")
+    dev_cors_local_origins: str = Field(
+        default="http://localhost:8081,http://127.0.0.1:8081,http://localhost:3000,http://127.0.0.1:3000,http://localhost:19006,http://127.0.0.1:19006",
+        alias="DEV_CORS_LOCAL_ORIGINS",
+    )
     request_timeout_seconds: float = Field(
         default=5.0,
         alias="REQUEST_TIMEOUT_SECONDS",
@@ -54,6 +59,18 @@ class Settings(BaseSettings):
         alias="DEFAULT_KEY_DAILY_QUOTA",
         ge=1,
         le=1000000000,
+    )
+    max_active_api_keys_per_user: int = Field(
+        default=5,
+        alias="MAX_ACTIVE_API_KEYS_PER_USER",
+        ge=1,
+        le=1000,
+    )
+    max_total_api_keys_per_user: int = Field(
+        default=100,
+        alias="MAX_TOTAL_API_KEYS_PER_USER",
+        ge=1,
+        le=10000,
     )
 
     database_url: str = Field(default="sqlite+aiosqlite:///./quantum_api.db", alias="DATABASE_URL")
@@ -108,6 +125,26 @@ class Settings(BaseSettings):
             return ["*"]
         return [origin.strip() for origin in self.allow_origins.split(",") if origin.strip()]
 
+    def parsed_dev_cors_local_origins(self) -> list[str]:
+        return [origin.strip() for origin in self.dev_cors_local_origins.split(",") if origin.strip()]
+
+    def effective_allow_origins(self) -> list[str]:
+        origins = self.parsed_allow_origins()
+        if self.app_env_normalized != "development":
+            return origins
+        if not self.dev_cors_allow_localhost:
+            return origins
+        if "*" in origins:
+            return origins
+
+        merged: list[str] = []
+        seen: set[str] = set()
+        for origin in [*origins, *self.parsed_dev_cors_local_origins()]:
+            if origin not in seen:
+                seen.add(origin)
+                merged.append(origin)
+        return merged
+
     def requires_api_key(self, path: str) -> bool:
         prefix = self.api_prefix.rstrip("/")
         if not path.startswith(prefix):
@@ -136,6 +173,8 @@ class Settings(BaseSettings):
             raise ValueError(
                 "DEFAULT_KEY_RATE_LIMIT_PER_MINUTE must be >= DEFAULT_KEY_RATE_LIMIT_PER_SECOND"
             )
+        if self.max_total_api_keys_per_user < self.max_active_api_keys_per_user:
+            raise ValueError("MAX_TOTAL_API_KEYS_PER_USER must be >= MAX_ACTIVE_API_KEYS_PER_USER")
 
         if self.is_production_like():
             origins = self.parsed_allow_origins()

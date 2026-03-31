@@ -9,6 +9,13 @@ This is the practical checklist for setting up these backend env vars on your VP
 5. `SUPABASE_JWT_ISSUER`
 6. `REDIS_URL`
 
+## Status Update (March 30, 2026)
+
+- This plan is still valid for VPS deployment.
+- `quantum-api` now supports Supabase JWT signing keys that use `ES256` (EC) or RSA-compatible JWKs.
+- Local dev note: when `EXPO_PUBLIC_QUANTUM_API_BASE_URL=http://127.0.0.1:8000`, key-management routes under `/v1/*` are the target for Identerest login.
+- The legacy portfolio metadata/demo routes (`/portfolio.json`, `/quantum_gate`) are not part of the new `/v1` key-management flow and can return `404` locally without blocking `/v1/keys`.
+
 You do NOT need to pay another company for Redis. We will run Redis directly on your VPS.
 
 ## Hosting Policy (Important)

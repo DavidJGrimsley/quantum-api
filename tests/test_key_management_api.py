@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from quantum_api.main import app
+from quantum_api.main import app, settings
 from quantum_api.supabase_auth import AuthenticatedUser
 
 
@@ -73,4 +73,158 @@ def test_key_operations_are_user_scoped(unauth_client, monkeypatch):
         expected_token="Bearer intruder-token",
     )
     forbidden = unauth_client.post(f"/v1/keys/{key_id}/revoke", headers=intruder_headers)
+    assert forbidden.status_code == 404
+
+
+def test_max_active_keys_cap_blocks_extra_creates(unauth_client, monkeypatch):
+    headers = _mock_user(monkeypatch, user_id="key-limit-user")
+    original_cap = settings.max_active_api_keys_per_user
+    settings.max_active_api_keys_per_user = 2
+
+    try:
+        first = unauth_client.post("/v1/keys", json={"name": "first"}, headers=headers)
+        second = unauth_client.post("/v1/keys", json={"name": "second"}, headers=headers)
+        third = unauth_client.post("/v1/keys", json={"name": "third"}, headers=headers)
+
+        assert first.status_code == 200
+        assert second.status_code == 200
+        assert third.status_code == 409
+        assert "Maximum active API keys reached (2)." in third.json()["message"]
+    finally:
+        settings.max_active_api_keys_per_user = original_cap
+
+
+def test_rotate_still_works_when_user_is_at_cap(unauth_client, monkeypatch):
+    headers = _mock_user(monkeypatch, user_id="rotate-cap-user")
+    original_cap = settings.max_active_api_keys_per_user
+    settings.max_active_api_keys_per_user = 2
+
+    try:
+        first = unauth_client.post("/v1/keys", json={"name": "first"}, headers=headers)
+        second = unauth_client.post("/v1/keys", json={"name": "second"}, headers=headers)
+        assert first.status_code == 200
+        assert second.status_code == 200
+
+        first_key_id = first.json()["key"]["key_id"]
+        rotated = unauth_client.post(f"/v1/keys/{first_key_id}/rotate", headers=headers)
+        assert rotated.status_code == 200
+        assert rotated.json()["previous_key"]["status"] == "rotated"
+        assert rotated.json()["new_key"]["status"] == "active"
+    finally:
+        settings.max_active_api_keys_per_user = original_cap
+
+
+def test_max_total_key_history_cap_blocks_extra_creates(unauth_client, monkeypatch):
+    headers = _mock_user(monkeypatch, user_id="total-cap-user")
+    original_active_cap = settings.max_active_api_keys_per_user
+    original_total_cap = settings.max_total_api_keys_per_user
+    settings.max_active_api_keys_per_user = 5
+    settings.max_total_api_keys_per_user = 2
+
+    try:
+        first = unauth_client.post("/v1/keys", json={"name": "first"}, headers=headers)
+        second = unauth_client.post("/v1/keys", json={"name": "second"}, headers=headers)
+        third = unauth_client.post("/v1/keys", json={"name": "third"}, headers=headers)
+
+        assert first.status_code == 200
+        assert second.status_code == 200
+        assert third.status_code == 409
+        assert "Maximum total API key history reached (2)." in third.json()["message"]
+    finally:
+        settings.max_active_api_keys_per_user = original_active_cap
+        settings.max_total_api_keys_per_user = original_total_cap
+
+
+def test_rotate_blocked_when_total_key_history_cap_is_reached(unauth_client, monkeypatch):
+    headers = _mock_user(monkeypatch, user_id="total-cap-rotate-user")
+    original_active_cap = settings.max_active_api_keys_per_user
+    original_total_cap = settings.max_total_api_keys_per_user
+    settings.max_active_api_keys_per_user = 5
+    settings.max_total_api_keys_per_user = 2
+
+    try:
+        first = unauth_client.post("/v1/keys", json={"name": "first"}, headers=headers)
+        second = unauth_client.post("/v1/keys", json={"name": "second"}, headers=headers)
+        assert first.status_code == 200
+        assert second.status_code == 200
+
+        rotate = unauth_client.post(f"/v1/keys/{first.json()['key']['key_id']}/rotate", headers=headers)
+        assert rotate.status_code == 409
+        assert "Maximum total API key history reached (2)." in rotate.json()["message"]
+    finally:
+        settings.max_active_api_keys_per_user = original_active_cap
+        settings.max_total_api_keys_per_user = original_total_cap
+
+
+def test_delete_revoked_key_succeeds_and_removes_it_from_list(unauth_client, monkeypatch):
+    headers = _mock_user(monkeypatch, user_id="delete-revoked-user")
+    created = unauth_client.post("/v1/keys", json={"name": "to-delete"}, headers=headers)
+    assert created.status_code == 200
+    key_id = created.json()["key"]["key_id"]
+
+    revoked = unauth_client.post(f"/v1/keys/{key_id}/revoke", headers=headers)
+    assert revoked.status_code == 200
+
+    deleted = unauth_client.delete(f"/v1/keys/{key_id}", headers=headers)
+    assert deleted.status_code == 200
+    assert deleted.json()["deleted"] is True
+    assert deleted.json()["deleted_key_id"] == key_id
+
+    listed = unauth_client.get("/v1/keys", headers=headers)
+    assert listed.status_code == 200
+    assert all(item["key_id"] != key_id for item in listed.json()["keys"])
+
+
+def test_delete_active_key_is_rejected(unauth_client, monkeypatch):
+    headers = _mock_user(monkeypatch, user_id="delete-active-user")
+    created = unauth_client.post("/v1/keys", json={"name": "still-active"}, headers=headers)
+    assert created.status_code == 200
+    key_id = created.json()["key"]["key_id"]
+
+    rejected = unauth_client.delete(f"/v1/keys/{key_id}", headers=headers)
+    assert rejected.status_code == 409
+    assert "Only revoked keys can be deleted." in rejected.json()["message"]
+
+
+def test_delete_all_revoked_keys_only_removes_revoked_records(unauth_client, monkeypatch):
+    headers = _mock_user(monkeypatch, user_id="bulk-delete-user")
+    first = unauth_client.post("/v1/keys", json={"name": "first"}, headers=headers)
+    second = unauth_client.post("/v1/keys", json={"name": "second"}, headers=headers)
+    third = unauth_client.post("/v1/keys", json={"name": "third"}, headers=headers)
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert third.status_code == 200
+
+    first_id = first.json()["key"]["key_id"]
+    second_id = second.json()["key"]["key_id"]
+    third_id = third.json()["key"]["key_id"]
+
+    assert unauth_client.post(f"/v1/keys/{first_id}/revoke", headers=headers).status_code == 200
+    assert unauth_client.post(f"/v1/keys/{second_id}/revoke", headers=headers).status_code == 200
+
+    deleted = unauth_client.delete("/v1/keys/revoked", headers=headers)
+    assert deleted.status_code == 200
+    assert deleted.json()["deleted_count"] == 2
+
+    listed = unauth_client.get("/v1/keys", headers=headers)
+    assert listed.status_code == 200
+    remaining_ids = {item["key_id"] for item in listed.json()["keys"]}
+    assert third_id in remaining_ids
+    assert first_id not in remaining_ids
+    assert second_id not in remaining_ids
+
+
+def test_delete_key_is_user_scoped(unauth_client, monkeypatch):
+    owner_headers = _mock_user(monkeypatch, user_id="owner-delete-user")
+    created = unauth_client.post("/v1/keys", json={"name": "owner-key"}, headers=owner_headers)
+    assert created.status_code == 200
+    key_id = created.json()["key"]["key_id"]
+    assert unauth_client.post(f"/v1/keys/{key_id}/revoke", headers=owner_headers).status_code == 200
+
+    intruder_headers = _mock_user(
+        monkeypatch,
+        user_id="intruder-delete-user",
+        expected_token="Bearer intruder-delete-token",
+    )
+    forbidden = unauth_client.delete(f"/v1/keys/{key_id}", headers=intruder_headers)
     assert forbidden.status_code == 404

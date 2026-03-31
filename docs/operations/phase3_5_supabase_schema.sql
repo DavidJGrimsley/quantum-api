@@ -1,6 +1,8 @@
 -- Phase 3.5 schema for Supabase Postgres
 -- Run in Supabase SQL editor (or migration tooling) before production rollout.
 
+create extension if not exists pgcrypto;
+
 create table if not exists public.api_keys (
   id uuid primary key default gen_random_uuid(),
   owner_user_id text not null,
@@ -44,6 +46,47 @@ create index if not exists idx_api_key_audit_events_owner_user_id on public.api_
 create index if not exists idx_api_key_audit_events_actor_user_id on public.api_key_audit_events (actor_user_id);
 create index if not exists idx_api_key_audit_events_event_type on public.api_key_audit_events (event_type);
 
--- Optional RLS template (enable after verifying service roles and policies):
--- alter table public.api_keys enable row level security;
--- alter table public.api_key_audit_events enable row level security;
+alter table public.api_keys enable row level security;
+alter table public.api_key_audit_events enable row level security;
+
+drop policy if exists api_keys_select_own on public.api_keys;
+drop policy if exists api_keys_insert_own on public.api_keys;
+drop policy if exists api_keys_update_own on public.api_keys;
+drop policy if exists api_key_audit_events_select_own on public.api_key_audit_events;
+drop policy if exists api_key_audit_events_insert_own on public.api_key_audit_events;
+
+create policy api_keys_select_own on public.api_keys
+  for select
+  to authenticated
+  using (owner_user_id = auth.uid()::text);
+
+create policy api_keys_insert_own on public.api_keys
+  for insert
+  to authenticated
+  with check (owner_user_id = auth.uid()::text);
+
+create policy api_keys_update_own on public.api_keys
+  for update
+  to authenticated
+  using (owner_user_id = auth.uid()::text)
+  with check (owner_user_id = auth.uid()::text);
+
+create policy api_key_audit_events_select_own on public.api_key_audit_events
+  for select
+  to authenticated
+  using (owner_user_id = auth.uid()::text);
+
+create policy api_key_audit_events_insert_own on public.api_key_audit_events
+  for insert
+  to authenticated
+  with check (
+    owner_user_id = auth.uid()::text
+    and actor_user_id = auth.uid()::text
+  );
+
+grant select, insert, update on public.api_keys to authenticated;
+grant select, insert on public.api_key_audit_events to authenticated;
+
+-- Note on Supabase "automatic RLS":
+-- New tables may default to RLS enabled depending on your project settings,
+-- but owner-scoped policies like the above are still required.

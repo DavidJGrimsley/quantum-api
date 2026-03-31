@@ -35,6 +35,22 @@ Build a production-ready Quantum API that starts with high-power core endpoints 
   - [x] Unreal
   - [x] Unity
 
+## Phase 3.75 - Identerest Login + Key Lifecycle Rollout
+
+Goal: finalize Identerest-authenticated key management from Portfolio through Quantum API.
+
+- [x] Keep key-management endpoint contracts stable (`/v1/keys*`).
+- [x] Keep auth split stable (bearer JWT for `/v1/keys*`, `X-API-Key` elsewhere).
+- [x] Harden Supabase schema runbook with `pgcrypto` and explicit owner-scoped RLS policies.
+- [x] Align README rollout steps to Identerest Supabase migration flow.
+- [x] Add active key-cap safeguard per owner (`MAX_ACTIVE_API_KEYS_PER_USER`) with 409 responses on overflow.
+- [x] Add total key-history cap safeguard per owner (`MAX_TOTAL_API_KEYS_PER_USER`, default `100`) to prevent unbounded rotate/revoke history growth.
+- [x] Add revoked-key cleanup endpoints (`DELETE /v1/keys/{key_id}`, `DELETE /v1/keys/revoked`) to keep user key history manageable.
+- [x] Ensure Supabase JWT verification supports current JWKS key types (including ES256/EC).
+- [x] Execute production migration in Identerest Supabase and verify table/policy presence.
+- [ ] Run full live flow validation: login -> create -> rotate -> revoke -> runtime rejection checks.
+- [ ] Capture post-rollout verification notes in `project/questions.md` or release log.
+
 ## Phase 1 - Core Power API (High Priority)
 
 Goal: unlock the most practical quantum capability quickly.
