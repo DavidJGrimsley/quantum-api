@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
@@ -28,11 +30,29 @@ auth_service = ApiKeyAuthService(settings, api_key_lifecycle_service)
 rate_limiter = RedisRateLimiter(settings)
 jwt_verifier = SupabaseJwtVerifier(settings)
 
+
+@asynccontextmanager
+async def app_lifespan(_: FastAPI) -> AsyncIterator[None]:
+    await database.startup()
+    await api_key_lifecycle_service.ensure_dev_bootstrap_key()
+    await auth_service.startup_check()
+    await jwt_verifier.startup_check()
+    await rate_limiter.startup_check()
+    try:
+        yield
+    finally:
+        await rate_limiter.close()
+        await auth_service.close()
+        await jwt_verifier.close()
+        await database.shutdown()
+
+
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=app_lifespan,
 )
 
 app.state.settings = settings
@@ -117,23 +137,6 @@ def _validation_message(exc: RequestValidationError) -> str:
         suffix = f" (+{len(errors) - 3} more issue(s))"
 
     return "Validation failed: " + "; ".join(summarized) + suffix
-
-
-@app.on_event("startup")
-async def startup_event() -> None:
-    await database.startup()
-    await api_key_lifecycle_service.ensure_dev_bootstrap_key()
-    await auth_service.startup_check()
-    await jwt_verifier.startup_check()
-    await rate_limiter.startup_check()
-
-
-@app.on_event("shutdown")
-async def shutdown_event() -> None:
-    await rate_limiter.close()
-    await auth_service.close()
-    await jwt_verifier.close()
-    await database.shutdown()
 
 
 @app.exception_handler(RequestValidationError)

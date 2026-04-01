@@ -41,14 +41,14 @@ Run a production-ready Quantum API that supports:
   - `X-API-Key` for other protected `/v1/*`
 - Keep schema aligned with runtime ORM (`api_keys`, `api_key_audit_events`) without introducing `app_scope`.
 - Align rollout docs and operational checklists to Identerest as the active auth/data project.
-- Use `project/phase-3_75-cutover.md` as the deployment gate and recovery checklist.
+- Keep deployment gate and recovery checklist notes consolidated in `project/TODO.md`.
 
 ## Constraints
 
 - Production/staging must run with `DATABASE_AUTO_CREATE=false`.
 - Supabase JWT issuer/audience validation must stay strict.
 - Redis remains required for production rate limiting.
-- RLS must be explicit: project-level “automatic RLS” does not replace owner-scoped policy definitions.
+- RLS must be explicit: project-level "automatic RLS" does not replace owner-scoped policy definitions.
 
 ## Success Criteria
 

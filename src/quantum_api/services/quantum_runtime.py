@@ -44,7 +44,7 @@ def build_runtime() -> QuantumRuntime:
         qasm3 = None
 
     try:
-        from qiskit_ibm_runtime import QiskitRuntimeService
+        from qiskit_ibm_runtime import QiskitRuntimeService  # pyright: ignore[reportMissingImports]
 
         ibm_runtime_available = True
         ibm_runtime_import_error = None

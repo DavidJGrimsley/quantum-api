@@ -149,7 +149,7 @@ class Settings(BaseSettings):
         prefix = self.api_prefix.rstrip("/")
         if not path.startswith(prefix):
             return False
-        if path == f"{prefix}/health":
+        if path in {f"{prefix}/health", f"{prefix}/portfolio.json"}:
             return False
         return not path.startswith(f"{prefix}/keys")
 

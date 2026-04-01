@@ -35,24 +35,6 @@ Build a production-ready Quantum API that starts with high-power core endpoints 
   - [x] Unreal
   - [x] Unity
 
-## Phase 3.75 - Identerest Login + Key Lifecycle Rollout
-
-Goal: finalize Identerest-authenticated key management from Portfolio through Quantum API.
-
-- [x] Keep key-management endpoint contracts stable (`/v1/keys*`).
-- [x] Keep auth split stable (bearer JWT for `/v1/keys*`, `X-API-Key` elsewhere).
-- [x] Harden Supabase schema runbook with `pgcrypto` and explicit owner-scoped RLS policies.
-- [x] Align README rollout steps to Identerest Supabase migration flow.
-- [x] Add active key-cap safeguard per owner (`MAX_ACTIVE_API_KEYS_PER_USER`) with 409 responses on overflow.
-- [x] Add total key-history cap safeguard per owner (`MAX_TOTAL_API_KEYS_PER_USER`, default `100`) to prevent unbounded rotate/revoke history growth.
-- [x] Add revoked-key cleanup endpoints (`DELETE /v1/keys/{key_id}`, `DELETE /v1/keys/revoked`) to keep user key history manageable.
-- [x] Ensure Supabase JWT verification supports current JWKS key types (including ES256/EC).
-- [x] Execute production migration in Identerest Supabase and verify table/policy presence.
-- [x] Publish a concrete rollout gate/checklist (`project/phase-3_75-cutover.md`) for deployment and recovery.
-- [x] Add executable rollback verification command (`scripts/verify_key_lifecycle.py`) and wire it into cutover docs.
-- [x] Run full live flow validation: login -> create -> rotate -> revoke -> runtime rejection checks.
-- [x] Capture post-rollout verification notes in release docs (`project/phase-3_75-cutover.md`).
-
 ## Phase 1 - Core Power API (High Priority)
 
 Goal: unlock the most practical quantum capability quickly.
@@ -120,6 +102,35 @@ Goal: make public operation safe and sustainable.
 
 - [x] Service can be safely exposed publicly with abuse controls and observability in place
 
+## Phase 3.75 - Identerest Login + Key Lifecycle Rollout
+
+Goal: finalize Identerest-authenticated key management from Portfolio through Quantum API.
+
+- [x] Keep key-management endpoint contracts stable (`/v1/keys*`).
+- [x] Keep auth split stable (bearer JWT for `/v1/keys*`, `X-API-Key` elsewhere).
+- [x] Harden Supabase schema runbook with `pgcrypto` and explicit owner-scoped RLS policies.
+- [x] Align README rollout steps to Identerest Supabase migration flow.
+- [x] Add active key-cap safeguard per owner (`MAX_ACTIVE_API_KEYS_PER_USER`) with 409 responses on overflow.
+- [x] Add total key-history cap safeguard per owner (`MAX_TOTAL_API_KEYS_PER_USER`, default `100`) to prevent unbounded rotate/revoke history growth.
+- [x] Add revoked-key cleanup endpoints (`DELETE /v1/keys/{key_id}`, `DELETE /v1/keys/revoked`) to keep user key history manageable.
+- [x] Ensure Supabase JWT verification supports current JWKS key types (including ES256/EC).
+- [x] Execute production migration in Identerest Supabase and verify table/policy presence.
+- [x] Publish a concrete rollout gate/checklist for deployment and recovery.
+- [x] Add executable rollback verification command (`scripts/verify_key_lifecycle.py`) and wire it into release docs/TODO.
+- [x] Run full live flow validation: login -> create -> rotate -> revoke -> runtime rejection checks.
+- [x] Capture post-rollout verification notes in release docs/TODO.
+
+## Phase 3.8 - Portfolio endpoint migration
+
+- [x] Add public metadata contract at `GET /v1/portfolio.json`.
+- [x] Generate portfolio metadata dynamically from OpenAPI (endpoints, schemas, auth policy).
+- [x] Keep `/v1/portfolio.json` public while preserving existing auth rules for protected endpoints.
+- [x] Migrate portfolio/Expo API pages to `/v1` metadata and runtime endpoints only (no legacy route compatibility).
+- [x] Ensure frontend protected demo calls use `EXPO_PUBLIC_QUANTUM_API_KEY` when present with graceful fallback UX.
+- [ ] Add release/CI smoke check proving portfolio examples remain executable as API contracts evolve.
+
+## Phase 3.9 - VPS Deploy and Redis setup
+
 ## Phase 4 - Runtime and Hardware Integrations
 
 Goal: expand beyond local simulation.
@@ -163,7 +174,7 @@ Goal: cover major Qiskit domain capabilities through focused APIs.
 
 - [ ] Each adopted domain has at least one production-quality endpoint with tests and docs
 
-## Phase 6 - Client and Engine Integrations
+## Phase 6 - Client and Engine Integrations & Migrations (from old quantum-api)
 
 Goal: make adoption easy across game and app stacks.
 
@@ -192,14 +203,19 @@ Goal: make adoption easy across game and app stacks.
 
 - [ ] All four client paths (JS, Python, Godot, Unreal, Unity) have maintained reference integrations
 
+### Migrations
+- [x] Expo animation
+- [x] Portfolio website (endpoint that drives the info page)
+- [ ] Godot Game
+
 ## Phase 7 - Release Governance and Long-Term Maintenance
 
 Goal: keep the platform stable as capabilities grow.
 
-### Portfolio Metadata Contract (`/public-facing/api/quantum/portfolio.json`)
+### Portfolio Metadata Contract (`/v1/portfolio.json`)
 
-- [ ] Final-phase cutover: ensure `/public-facing/api/quantum/portfolio.json` is re-added/served by the current deployment stack as a first-class public contract.
-- [ ] Treat `portfolio.json` as a release artifact: update it whenever API endpoints, schemas, docs URLs, version, or health/docs links change.
+- [x] Final-phase cutover: ensure `/v1/portfolio.json` is served by the current deployment stack as a first-class public contract.
+- [x] Treat `portfolio.json` as a release artifact: generate it dynamically from current OpenAPI metadata, docs URL, health URL, and version.
 - [ ] Add a release checklist item (or CI guard) that fails if `portfolio.json` is stale against current API behavior.
 
 ### Release Discipline

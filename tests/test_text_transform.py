@@ -22,3 +22,11 @@ def test_text_transform_reports_category_counts():
     assert payload["category_counts"]["quantum_interference"] >= 1
     assert payload["category_counts"]["quantum_gates"] >= 1
     assert payload["category_counts"]["quantum_entanglement"] >= 1
+
+
+def test_quantum_gates_words_are_visibly_transformed():
+    source = "Hello quantum world"
+    payload = transform_text(source, rng=random.Random(5))
+
+    assert payload["category_counts"]["quantum_gates"] >= 1
+    assert payload["transformed"] != source

@@ -115,7 +115,7 @@ class ApiKeyAuthService:
     def __init__(self, settings: Settings, lifecycle_service: ApiKeyLifecycleService) -> None:
         self._settings = settings
         self._lifecycle_service = lifecycle_service
-        self._redis: Redis | None = None
+        self._redis: Any | None = None
 
     async def startup_check(self) -> None:
         if not self._settings.redis_url.strip():
@@ -231,7 +231,7 @@ class ApiKeyAuthService:
 class RedisRateLimiter:
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
-        self._redis: Redis | None = None
+        self._redis: Any | None = None
 
     async def startup_check(self) -> None:
         if not self._settings.rate_limiting_enabled:

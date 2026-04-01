@@ -3,6 +3,7 @@
 Quantum API is a greenfield FastAPI service for quantum-inspired runtime features:
 
 - `/v1/health`
+- `/v1/portfolio.json`
 - `/v1/echo-types`
 - `/v1/gates/run`
 - `/v1/circuits/run`
@@ -48,7 +49,7 @@ For local development, use API key `qapi_devlocal_0123456789abcdef0123456789abcd
 
 ### Authentication and Rate Limits
 
-- `GET /v1/health` is public.
+- `GET /v1/health` and `GET /v1/portfolio.json` are public.
 - `GET /v1/keys`, `POST /v1/keys`, `DELETE /v1/keys/{key_id}`, `DELETE /v1/keys/revoked`, `POST /v1/keys/{key_id}/revoke`, and `POST /v1/keys/{key_id}/rotate` require `Authorization: Bearer <supabase_jwt>`.
 - All other protected `/v1/*` endpoints require `X-API-Key` (DB-managed key records only; no `API_KEYS_JSON` fallback).
 - Successful protected responses include:
@@ -79,6 +80,13 @@ Response fields:
 - `version`
 - `qiskit_available`
 - `runtime_mode`
+
+### `GET /v1/portfolio.json`
+- Public metadata contract used by portfolio pages and app integrations.
+- Built dynamically from the current OpenAPI surface with endpoint auth classification:
+  - `public`
+  - `api_key`
+  - `bearer_jwt`
 
 ### `GET /v1/echo-types`
 Lists canonical transformation categories and descriptions from one enum source.
