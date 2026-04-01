@@ -25,8 +25,9 @@ class JsonFormatter(logging.Formatter):
             "message": record.getMessage(),
         }
 
-        if getattr(record, "request_id", None):
-            payload["request_id"] = record.request_id
+        request_id = getattr(record, "request_id", None)
+        if request_id:
+            payload["request_id"] = str(request_id)
 
         for field in ("event", "method", "path", "status_code", "duration_ms", "client_ip", "api_key_id"):
             value = getattr(record, field, None)

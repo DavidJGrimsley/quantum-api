@@ -7,7 +7,10 @@ from quantum_api.services.quantum_runtime import runtime
 
 
 def _build_circuit(num_qubits: int, operations: list[CircuitOperation]) -> Any:
-    circuit = runtime.QuantumCircuit(num_qubits)
+    circuit_class = runtime.QuantumCircuit
+    if circuit_class is None:
+        raise RuntimeError("qiskit QuantumCircuit is unavailable")
+    circuit = circuit_class(num_qubits)
     for operation in operations:
         if operation.gate == "x":
             circuit.x(operation.target)
@@ -42,15 +45,18 @@ def _serialize_statevector(statevector: Any) -> list[dict[str, float]]:
 
 
 def run_circuit(request: CircuitRunRequest) -> dict[str, object]:
-    if not runtime.qiskit_available:
+    if not runtime.qiskit_available or runtime.AerSimulator is None or runtime.transpile is None:
         raise RuntimeError("qiskit is unavailable for circuit execution")
 
+    aer_simulator = runtime.AerSimulator
+    transpile_fn = runtime.transpile
+
     base_circuit = _build_circuit(request.num_qubits, request.operations)
-    sampling_backend = runtime.AerSimulator()
+    sampling_backend = aer_simulator()
     sampling_circuit = base_circuit.copy()
     sampling_circuit.measure_all()
 
-    sampling_transpiled = runtime.transpile(
+    sampling_transpiled = transpile_fn(
         sampling_circuit,
         sampling_backend,
         seed_transpiler=request.seed,
@@ -69,10 +75,10 @@ def run_circuit(request: CircuitRunRequest) -> dict[str, object]:
     }
 
     if request.include_statevector:
-        statevector_backend = runtime.AerSimulator(method="statevector")
+        statevector_backend = aer_simulator(method="statevector")
         statevector_circuit = base_circuit.copy()
         statevector_circuit.save_statevector()
-        statevector_transpiled = runtime.transpile(
+        statevector_transpiled = transpile_fn(
             statevector_circuit,
             statevector_backend,
             seed_transpiler=request.seed,

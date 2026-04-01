@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import random
 from dataclasses import dataclass
+from typing import Any
 
 from quantum_api.enums import GateType
 from quantum_api.services.quantum_runtime import runtime
@@ -13,7 +14,7 @@ class QuantumGate:
     gate_type: GateType
     rotation_angle: float = 0.0
 
-    def apply_to(self, circuit: object, qubit_index: int) -> None:
+    def apply_to(self, circuit: Any, qubit_index: int) -> None:
         if not runtime.qiskit_available:
             return
         if self.gate_type == GateType.BIT_FLIP:
@@ -30,7 +31,8 @@ class Qubit:
     def __init__(self) -> None:
         self._alpha = 1 + 0j
         self._beta = 0 + 0j
-        self._state = runtime.Statevector([1, 0]) if runtime.qiskit_available else None
+        statevector_class = runtime.Statevector
+        self._state = statevector_class([1, 0]) if runtime.qiskit_available and statevector_class is not None else None
 
     def _sync_from_statevector(self) -> None:
         if self._state is None:
@@ -46,9 +48,10 @@ class Qubit:
         self._alpha, self._beta = alpha, beta
 
     def _apply_with_qiskit(self, method_name: str, theta: float | None = None) -> bool:
-        if not runtime.qiskit_available or self._state is None:
+        circuit_class = runtime.QuantumCircuit
+        if not runtime.qiskit_available or self._state is None or circuit_class is None:
             return False
-        circuit = runtime.QuantumCircuit(1)
+        circuit = circuit_class(1)
         if method_name == "x":
             circuit.x(0)
         elif method_name == "z":
@@ -100,12 +103,14 @@ class Qubit:
         measured = 0 if random_source.random() < p0 else 1
         if measured == 0:
             self._alpha, self._beta = 1 + 0j, 0 + 0j
-            if runtime.qiskit_available:
-                self._state = runtime.Statevector([1, 0])
+            statevector_class = runtime.Statevector
+            if runtime.qiskit_available and statevector_class is not None:
+                self._state = statevector_class([1, 0])
         else:
             self._alpha, self._beta = 0 + 0j, 1 + 0j
-            if runtime.qiskit_available:
-                self._state = runtime.Statevector([0, 1])
+            statevector_class = runtime.Statevector
+            if runtime.qiskit_available and statevector_class is not None:
+                self._state = statevector_class([0, 1])
         return measured
 
     def get_superposition_strength(self) -> float:
@@ -120,7 +125,12 @@ class QuantumCircuitManager:
             raise ValueError("num_qubits must be between 1 and 8")
         self.num_qubits = num_qubits
         self._gates: list[tuple[GateType, int, float]] = []
-        self.circuit = runtime.QuantumCircuit(num_qubits) if runtime.qiskit_available else None
+        circuit_class = runtime.QuantumCircuit
+        self.circuit = (
+            circuit_class(num_qubits)
+            if runtime.qiskit_available and circuit_class is not None
+            else None
+        )
 
     def apply_gate_to_qubit(self, gate: QuantumGate, qubit_index: int) -> None:
         if not (0 <= qubit_index < self.num_qubits):
@@ -175,10 +185,17 @@ class QuantumCircuitManager:
         return state
 
     def simulate(self) -> list[complex]:
-        if runtime.qiskit_available and self.circuit is not None:
-            backend = runtime.AerSimulator(method="statevector")
+        aer_simulator = runtime.AerSimulator
+        transpile_fn = runtime.transpile
+        if (
+            runtime.qiskit_available
+            and self.circuit is not None
+            and aer_simulator is not None
+            and transpile_fn is not None
+        ):
+            backend = aer_simulator(method="statevector")
             self.circuit.save_statevector()
-            transpiled = runtime.transpile(self.circuit, backend)
+            transpiled = transpile_fn(self.circuit, backend)
             result = backend.run(transpiled, shots=1).result()
             statevector = result.get_statevector()
             raw_values = getattr(statevector, "data", statevector)

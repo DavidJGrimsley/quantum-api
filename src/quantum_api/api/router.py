@@ -359,15 +359,17 @@ def _portfolio_endpoints_from_openapi(openapi_schema: dict[str, Any]) -> list[Po
             description_raw = raw_operation.get("description")
             description = str(description_raw) if isinstance(description_raw, str) else None
             endpoints.append(
-                PortfolioEndpoint(
-                    method=method_normalized,
-                    path=str(path),
-                    summary=summary,
-                    description=description,
-                    auth=_portfolio_auth_mode_for_path(str(path)),
-                    parameters=_portfolio_parameters(raw_operation),
-                    request_body=_portfolio_request_body(raw_operation, openapi_schema),
-                    responses=_portfolio_responses(raw_operation, openapi_schema),
+                PortfolioEndpoint.model_validate(
+                    {
+                        "method": method_normalized,
+                        "path": str(path),
+                        "summary": summary,
+                        "description": description,
+                        "auth": _portfolio_auth_mode_for_path(str(path)),
+                        "parameters": _portfolio_parameters(raw_operation),
+                        "requestBody": _portfolio_request_body(raw_operation, openapi_schema),
+                        "responses": _portfolio_responses(raw_operation, openapi_schema),
+                    }
                 )
             )
 
@@ -383,25 +385,29 @@ def portfolio_metadata(request: Request) -> PortfolioMetadataResponse:
     base_url = f"{request_root}{api_prefix}"
     openapi_schema = request.app.openapi()
 
-    return PortfolioMetadataResponse(
-        api=PortfolioApiInfo(
-            id="quantum",
-            name=settings.app_name,
-            version=settings.app_version,
-            icon="quantum",
-            description=(
-                "Production Quantum API with key lifecycle management and "
-                "runtime endpoints for simulation and transformation workloads."
+    return PortfolioMetadataResponse.model_validate(
+        {
+            "api": PortfolioApiInfo.model_validate(
+                {
+                    "id": "quantum",
+                    "name": settings.app_name,
+                    "version": settings.app_version,
+                    "icon": "quantum",
+                    "description": (
+                        "Production Quantum API with key lifecycle management and "
+                        "runtime endpoints for simulation and transformation workloads."
+                    ),
+                    "baseUrl": base_url,
+                    "docsUrl": f"{request_root}/docs",
+                    "healthUrl": f"{base_url}/health",
+                    "status": "active",
+                    "featured": True,
+                    "tags": ["quantum", "simulation", "security", "api"],
+                    "uptime": "n/a",
+                }
             ),
-            base_url=base_url,
-            docs_url=f"{request_root}/docs",
-            health_url=f"{base_url}/health",
-            status="active",
-            featured=True,
-            tags=["quantum", "simulation", "security", "api"],
-            uptime="n/a",
-        ),
-        endpoints=_portfolio_endpoints_from_openapi(openapi_schema),
+            "endpoints": _portfolio_endpoints_from_openapi(openapi_schema),
+        }
     )
 
 
@@ -558,7 +564,7 @@ def gates_run(request: GateRunRequest) -> GateRunResponse:
             detail="qiskit is unavailable and REQUIRE_QISKIT=true",
         )
     payload = run_gate(request.gate_type, request.rotation_angle_rad)
-    return GateRunResponse(**payload)
+    return GateRunResponse.model_validate(payload)
 
 
 @router.post("/circuits/run", response_model=CircuitRunResponse)
@@ -576,7 +582,7 @@ def circuits_run(request: CircuitRunRequest) -> CircuitRunResponse:
             detail="qiskit is unavailable for /circuits/run",
         )
     payload = run_circuit(request)
-    return CircuitRunResponse(**payload)
+    return CircuitRunResponse.model_validate(payload)
 
 
 @router.get("/list_backends", response_model=BackendListResponse)
@@ -599,15 +605,17 @@ def get_backends(
     except Phase2ServiceError as exc:
         return _phase2_error_response(request, exc)
 
-    return BackendListResponse(
-        backends=backends,
-        total=len(backends),
-        filters_applied={
-            "provider": provider,
-            "simulator_only": simulator_only,
-            "min_qubits": min_qubits,
-        },
-        warnings=warnings or None,
+    return BackendListResponse.model_validate(
+        {
+            "backends": backends,
+            "total": len(backends),
+            "filters_applied": {
+                "provider": provider,
+                "simulator_only": simulator_only,
+                "min_qubits": min_qubits,
+            },
+            "warnings": warnings or None,
+        }
     )
 
 
@@ -622,7 +630,7 @@ def transpile(request_data: TranspileRequest, request: Request) -> TranspileResp
     except Phase2ServiceError as exc:
         return _phase2_error_response(request, exc)
 
-    return TranspileResponse(**payload)
+    return TranspileResponse.model_validate(payload)
 
 
 @router.post("/qasm/import", response_model=QasmImportResponse)
@@ -636,7 +644,7 @@ def qasm_import(request_data: QasmImportRequest, request: Request) -> QasmImport
     except Phase2ServiceError as exc:
         return _phase2_error_response(request, exc)
 
-    return QasmImportResponse(**payload)
+    return QasmImportResponse.model_validate(payload)
 
 
 @router.post("/qasm/export", response_model=QasmExportResponse)
@@ -650,7 +658,7 @@ def qasm_export(request_data: QasmExportRequest, request: Request) -> QasmExport
     except Phase2ServiceError as exc:
         return _phase2_error_response(request, exc)
 
-    return QasmExportResponse(**payload)
+    return QasmExportResponse.model_validate(payload)
 
 
 @router.post("/text/transform", response_model=TextTransformResponse)
@@ -669,4 +677,4 @@ def text_transform(request: TextTransformRequest) -> TextTransformResponse:
             detail="qiskit is unavailable and REQUIRE_QISKIT=true",
         )
     payload = transform_text(request.text)
-    return TextTransformResponse(**payload)
+    return TextTransformResponse.model_validate(payload)

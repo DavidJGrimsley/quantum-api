@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import re
-from numbers import Integral, Real
-from typing import Any
+from numbers import Integral
+from typing import Any, cast
 
 from quantum_api.models.api import (
     CircuitDefinition,
     CircuitOperation,
+    OperationParam,
     OutputQasmVersion,
     QasmVersion,
 )
@@ -55,13 +56,18 @@ def normalize_operations(circuit: Any) -> list[dict[str, object]]:
     return payload
 
 
-def _serialize_param(value: object) -> Real | str | bool:
+def _serialize_param(value: object) -> OperationParam:
     if isinstance(value, bool):
         return value
     if isinstance(value, Integral):
         return int(value)
-    if isinstance(value, Real):
-        return float(value)
+    if isinstance(value, float):
+        return value
+    if hasattr(value, "__float__"):
+        try:
+            return float(cast(Any, value))
+        except (TypeError, ValueError):
+            return str(value)
     return str(value)
 
 
@@ -70,10 +76,13 @@ def parse_qasm(source: str, qasm_version: QasmVersion) -> tuple[Any, OutputQasmV
         raise RuntimeError("qiskit is unavailable for QASM parsing")
 
     if qasm_version in {"2", "3"}:
-        circuit = _parse_qasm_with_version(source, qasm_version)
-        return circuit, qasm_version
+        explicit_version: OutputQasmVersion = "2" if qasm_version == "2" else "3"
+        circuit = _parse_qasm_with_version(source, explicit_version)
+        return circuit, explicit_version
 
-    parse_order = ["3", "2"] if _detect_qasm_version_hint(source) == "3" else ["2", "3"]
+    parse_order: list[OutputQasmVersion] = (
+        ["3", "2"] if _detect_qasm_version_hint(source) == "3" else ["2", "3"]
+    )
     parser_errors: dict[str, str] = {}
     qasm3_dependency_missing = False
 

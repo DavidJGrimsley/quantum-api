@@ -51,11 +51,21 @@ def list_backends(
             warnings.append(exc.message)
 
     serialized = [_serialize_backend(provider_name, backend) for provider_name, backend in raw_entries]
-    filtered = [
-        payload
-        for payload in serialized
-        if (not simulator_only or bool(payload["is_simulator"])) and int(payload["num_qubits"]) >= min_qubits
-    ]
+    filtered: list[dict[str, object]] = []
+    for payload in serialized:
+        is_simulator = bool(payload.get("is_simulator", False))
+        num_qubits_raw = payload.get("num_qubits", 0)
+        if isinstance(num_qubits_raw, bool):
+            num_qubits = int(num_qubits_raw)
+        elif isinstance(num_qubits_raw, (int, float, str)):
+            try:
+                num_qubits = int(num_qubits_raw)
+            except ValueError:
+                num_qubits = 0
+        else:
+            num_qubits = 0
+        if (not simulator_only or is_simulator) and num_qubits >= min_qubits:
+            filtered.append(payload)
     filtered.sort(key=lambda item: (str(item["provider"]), str(item["name"])))
     return filtered, warnings
 
@@ -117,8 +127,11 @@ def _get_aer_backend(backend_name: str) -> Any | None:
 
 
 def _load_aer_backend(backend_name: str) -> Any | None:
+    aer = runtime.Aer
+    if aer is None:
+        return None
     try:
-        return runtime.Aer.get_backend(backend_name)
+        return aer.get_backend(backend_name)
     except Exception:
         return None
 
