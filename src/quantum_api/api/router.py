@@ -47,6 +47,7 @@ from quantum_api.models.api import (
     CircuitRunResponse,
     EchoTypeInfo,
     EchoTypesResponse,
+    EndpointAuthMode,
     GateRunRequest,
     GateRunResponse,
     HealthResponse,
@@ -148,7 +149,7 @@ def _request_base_url(request: Request) -> str:
     return str(request.base_url).rstrip("/")
 
 
-def _portfolio_auth_mode_for_path(path: str) -> str:
+def _portfolio_auth_mode_for_path(path: str) -> EndpointAuthMode:
     settings = get_settings()
     if settings.requires_user_jwt(path):
         return "bearer_jwt"
