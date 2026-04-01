@@ -33,11 +33,86 @@ class EchoTypesResponse(BaseModel):
     echo_types: list[EchoTypeInfo]
 
 
+EndpointAuthMode = Literal["public", "api_key", "bearer_jwt"]
+
+
+class PortfolioApiInfo(BaseModel):
+    id: str
+    name: str
+    version: str
+    icon: str
+    description: str
+    base_url: str = Field(alias="baseUrl")
+    docs_url: str = Field(alias="docsUrl")
+    health_url: str = Field(alias="healthUrl")
+    status: str
+    featured: bool = True
+    tags: list[str]
+    uptime: str
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+
+class PortfolioEndpointParameter(BaseModel):
+    name: str
+    type: str
+    required: bool
+    description: str
+    example: Any | None = None
+    enum: list[str] | None = None
+    depends_on: str | None = Field(default=None, alias="dependsOn")
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+
+class PortfolioEndpointRequestBody(BaseModel):
+    description: str
+    example: Any | None = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class PortfolioEndpointResponse(BaseModel):
+    code: str
+    description: str
+    example: Any | None = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class PortfolioEndpoint(BaseModel):
+    method: str
+    path: str
+    summary: str
+    description: str | None = None
+    auth: EndpointAuthMode
+    parameters: list[PortfolioEndpointParameter] | None = None
+    request_body: PortfolioEndpointRequestBody | None = Field(default=None, alias="requestBody")
+    responses: list[PortfolioEndpointResponse]
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+
+class PortfolioMetadataResponse(BaseModel):
+    api: PortfolioApiInfo
+    endpoints: list[PortfolioEndpoint]
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class GateRunRequest(BaseModel):
     gate_type: GateType
     rotation_angle_rad: float | None = None
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "gate_type": "rotation",
+                "rotation_angle_rad": 1.5708,
+            }
+        },
+    )
 
     @model_validator(mode="after")
     def validate_rotation_rules(self) -> GateRunRequest:
@@ -101,7 +176,20 @@ class CircuitRunRequest(BaseModel):
     include_statevector: bool = False
     seed: int | None = None
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "num_qubits": 2,
+                "operations": [
+                    {"gate": "h", "target": 0},
+                    {"gate": "cx", "target": 1, "control": 0},
+                ],
+                "shots": 1024,
+                "include_statevector": False,
+            }
+        },
+    )
 
     @field_validator("num_qubits")
     @classmethod
@@ -249,7 +337,23 @@ class TranspileRequest(BaseModel):
     seed_transpiler: int | None = None
     output_qasm_version: OutputQasmVersion = "3"
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "backend_name": "aer_simulator",
+                "optimization_level": 1,
+                "output_qasm_version": "3",
+                "circuit": {
+                    "num_qubits": 2,
+                    "operations": [
+                        {"gate": "h", "target": 0},
+                        {"gate": "cx", "target": 1, "control": 0},
+                    ],
+                },
+            }
+        },
+    )
 
     @model_validator(mode="after")
     def validate_input_source(self) -> TranspileRequest:
@@ -278,7 +382,15 @@ class QasmImportRequest(BaseModel):
     qasm: str = Field(min_length=1)
     qasm_version: QasmVersion = "auto"
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "qasm": 'OPENQASM 2.0; include "qelib1.inc"; qreg q[1]; h q[0];',
+                "qasm_version": "auto",
+            }
+        },
+    )
 
 
 class QasmImportResponse(BaseModel):
@@ -295,7 +407,21 @@ class QasmExportRequest(BaseModel):
     circuit: CircuitDefinition
     qasm_version: OutputQasmVersion = "3"
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "qasm_version": "3",
+                "circuit": {
+                    "num_qubits": 2,
+                    "operations": [
+                        {"gate": "h", "target": 0},
+                        {"gate": "cx", "target": 1, "control": 0},
+                    ],
+                },
+            }
+        },
+    )
 
 
 class QasmExportResponse(BaseModel):
@@ -342,7 +468,14 @@ class ApiKeyListResponse(BaseModel):
 class ApiKeyCreateRequest(BaseModel):
     name: str | None = Field(default=None, max_length=128)
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "name": "Portfolio demo key",
+            }
+        },
+    )
 
 
 class ApiKeyCreateResponse(BaseModel):
@@ -384,7 +517,14 @@ class ApiKeyDeleteRevokedResponse(BaseModel):
 class TextTransformRequest(BaseModel):
     text: str = Field(min_length=1)
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "text": "Hello quantum world",
+            }
+        },
+    )
 
     @field_validator("text")
     @classmethod

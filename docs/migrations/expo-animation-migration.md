@@ -2,31 +2,41 @@
 
 Target upstream app: `text-adventure/`
 
-This plan migrates Expo app API usage to the Quantum API `/v1` contract.
+Status: completed for the current `DJsPortfolio-new-api` integration on April 1, 2026. Keep this file as migration/reference guidance.
+
+This plan migrates Expo app API usage to the Quantum API `/v1` contract with API-key auth for protected runtime calls.
 
 ## 1. Endpoint Mapping
 
 | Legacy | New |
 |---|---|
+| `GET /public-facing/api/quantum/portfolio.json` | `GET /v1/portfolio.json` |
 | `POST /public-facing/api/quantum/quantum_gate` | `POST /v1/gates/run` |
 | `GET /public-facing/api/quantum/health` | `GET /v1/health` |
 | `GET /public-facing/api/quantum/quantum_echo_types` | `GET /v1/echo-types` |
 
-## 2. Environment Variable Strategy
-
-Use Expo public env var and a single API helper.
+## 2. Authentication and Environment Strategy
 
 - Add to env files:
-  - `EXPO_PUBLIC_QUANTUM_API_BASE_URL=https://<your-domain>/v1`
-- Create a helper module (recommended):
-  - `src/lib/quantumApi.ts`
+  - `EXPO_PUBLIC_QUANTUM_API_BASE_URL` (default local: `http://127.0.0.1:8000/v1`)
+  - `EXPO_PUBLIC_QUANTUM_API_KEY` (low-quota demo key for protected runtime calls)
+- Public route behavior:
+  - `GET /v1/health` and `GET /v1/portfolio.json` are public.
+- Protected route behavior:
+  - Runtime endpoints such as `/v1/gates/run`, `/v1/echo-types`, `/v1/text/transform` require `X-API-Key`.
+
+## 3. Shared Helper Module
+
+- Create a helper module:
+  - `src/services/quantumApi.ts`
 - Helper should export:
   - `getQuantumApiBaseUrl()`
-  - `postGateRun(payload)`
-  - `getHealth()`
-  - `getEchoTypes()`
+  - `getQuantumPortfolioUrl()`
+  - `getQuantumApiKey()`
+  - `getQuantumApiHeaders()`
+  - `hasQuantumApiKey()`
 
-## 3. Request and Response Diffs
+## 4. Request and Response Diffs
 
 ### Gate call
 
@@ -48,46 +58,54 @@ New request:
 }
 ```
 
-New response consumed by animation:
+### Required headers for protected call
 
-```json
-{
-  "gate_type": "rotation",
-  "measurement": 1,
-  "superposition_strength": 0.87,
-  "success": false
-}
+```http
+X-API-Key: <your_api_key>
+Content-Type: application/json
 ```
 
-## 4. File-by-File Checklist
+## 5. File-by-File Checklist
 
 ### `src/components/QuantumAnimation.tsx`
 
-- Replace hardcoded `quantumBaseUrl` with env-driven base URL helper.
-- Replace endpoint suffix from `/quantum_gate` to `/gates/run`.
+- Replace hardcoded legacy base URL with helper-driven `/v1` base URL.
+- Replace endpoint from `/quantum_gate` to `/gates/run`.
 - Rename request key from `rotation_angle` to `rotation_angle_rad`.
-- Keep response parsing for:
-  - `measurement`
-  - `superposition_strength`
-  - `success`
-- Update explanatory UI text/links to remove legacy path.
+- Send `X-API-Key` when available.
+- Gracefully fall back to classical mode when API key is missing or invalid.
+- Update explanatory UI links/text from legacy path to `/v1`.
 
-### `src/components/ServerLink.tsx`
+### `src/app/(tabs)/public-facing/api/index.tsx`
 
-- Replace static external link with env-driven base URL.
-- Ensure displayed text matches configured base URL.
+- Replace portfolio metadata URL with helper-driven `${BASE_URL}/portfolio.json`.
+- Keep fallback API card behavior if metadata fetch fails.
 
-## 5. Suggested Implementation Steps
+### `src/app/(tabs)/public-facing/api/quantum.tsx`
 
-1. Add env var and helper module.
-2. Migrate `QuantumAnimation.tsx` fetch path + payload shape.
-3. Migrate `ServerLink.tsx` URL rendering.
-4. Run web build and verify animation behavior.
-5. Verify error handling in offline/API-down scenario.
+- Replace legacy metadata and endpoint references with `/v1` equivalents.
+- Render endpoint auth requirements from metadata.
+- Wire endpoint cards to send API key for `api_key` routes.
+- Disable noisy live/test calls when required credentials are unavailable.
 
-## 6. Verification Cases
+### `src/components/PublicFacing/api/APIComponents.tsx`
 
-- Rotation call returns valid payload and drives animation values.
-- Non-rotation gate requests still succeed without `rotation_angle_rad`.
-- API timeout/network errors trigger fallback animation mode.
-- UI shows correct API base URL in links/tooling text.
+- Accept optional auth label and extra headers.
+- Use provided headers for live GET/test requests.
+- Show clear guidance when auth is required but credentials are missing.
+
+## 6. Suggested Migration Order
+
+1. Add env vars and helper module.
+2. Migrate metadata URL and runtime fetches to `/v1`.
+3. Add API key header support and graceful fallback UX.
+4. Update code snippets/copy to `/v1` contracts.
+5. Validate local flow and web build.
+
+## 7. Verification Cases
+
+- `GET /v1/portfolio.json` returns metadata used by API index/detail pages.
+- `POST /v1/gates/run` with valid `X-API-Key` returns `measurement`, `superposition_strength`, `success`.
+- Missing/invalid API key on protected calls does not crash the page and shows fallback behavior.
+- Rotation call uses `rotation_angle_rad` and succeeds.
+- UI displays `/v1` URLs (no legacy `public-facing/api/quantum/*` references).

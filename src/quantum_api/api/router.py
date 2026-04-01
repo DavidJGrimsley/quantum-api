@@ -18,7 +18,7 @@ Planned expansion (tracked in project/TODO.md):
 - runtime/hardware jobs and advanced domain modules
 """
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
@@ -50,6 +50,12 @@ from quantum_api.models.api import (
     GateRunRequest,
     GateRunResponse,
     HealthResponse,
+    PortfolioApiInfo,
+    PortfolioEndpoint,
+    PortfolioEndpointParameter,
+    PortfolioEndpointRequestBody,
+    PortfolioEndpointResponse,
+    PortfolioMetadataResponse,
     QasmExportRequest,
     QasmExportResponse,
     QasmImportRequest,
@@ -135,6 +141,267 @@ def _key_metadata_response(metadata: KeyMetadata) -> ApiKeyMetadataResponse:
         rotated_from_id=metadata.rotated_from_id,
         rotated_to_id=metadata.rotated_to_id,
         last_used_at=metadata.last_used_at,
+    )
+
+
+def _request_base_url(request: Request) -> str:
+    return str(request.base_url).rstrip("/")
+
+
+def _portfolio_auth_mode_for_path(path: str) -> str:
+    settings = get_settings()
+    if settings.requires_user_jwt(path):
+        return "bearer_jwt"
+    if settings.requires_api_key(path):
+        return "api_key"
+    return "public"
+
+
+def _resolve_openapi_ref(openapi_schema: dict[str, Any], ref: str) -> dict[str, Any] | None:
+    if not ref.startswith("#/"):
+        return None
+
+    current: Any = openapi_schema
+    for segment in ref[2:].split("/"):
+        if not isinstance(current, dict):
+            return None
+        current = current.get(segment)
+
+    return current if isinstance(current, dict) else None
+
+
+def _extract_schema_example(schema: dict[str, Any], openapi_schema: dict[str, Any]) -> Any | None:
+    if "example" in schema:
+        return schema.get("example")
+
+    ref = schema.get("$ref")
+    if isinstance(ref, str):
+        resolved = _resolve_openapi_ref(openapi_schema, ref)
+        if resolved is not None:
+            return _extract_schema_example(resolved, openapi_schema)
+
+    for composite_key in ("anyOf", "oneOf", "allOf"):
+        options = schema.get(composite_key)
+        if isinstance(options, list):
+            for option in options:
+                if isinstance(option, dict):
+                    example = _extract_schema_example(option, openapi_schema)
+                    if example is not None:
+                        return example
+
+    return None
+
+
+def _extract_json_example(content: dict[str, Any] | None, openapi_schema: dict[str, Any]) -> Any | None:
+    if not isinstance(content, dict):
+        return None
+
+    media_candidates = ["application/json", "application/*+json"]
+    media_payload: dict[str, Any] | None = None
+    for media_type in media_candidates:
+        candidate = content.get(media_type)
+        if isinstance(candidate, dict):
+            media_payload = candidate
+            break
+    if media_payload is None:
+        for candidate in content.values():
+            if isinstance(candidate, dict):
+                media_payload = candidate
+                break
+
+    if not isinstance(media_payload, dict):
+        return None
+
+    if "example" in media_payload:
+        return media_payload.get("example")
+
+    examples = media_payload.get("examples")
+    if isinstance(examples, dict):
+        for example_payload in examples.values():
+            if isinstance(example_payload, dict) and "value" in example_payload:
+                return example_payload.get("value")
+
+    schema = media_payload.get("schema")
+    if isinstance(schema, dict):
+        return _extract_schema_example(schema, openapi_schema)
+
+    return None
+
+
+def _schema_type_label(schema: dict[str, Any]) -> str:
+    if not isinstance(schema, dict):
+        return "object"
+
+    ref = schema.get("$ref")
+    if isinstance(ref, str):
+        return ref.rsplit("/", 1)[-1]
+
+    schema_type = schema.get("type")
+    if isinstance(schema_type, str):
+        if schema_type == "array":
+            items = schema.get("items")
+            item_label = _schema_type_label(items if isinstance(items, dict) else {})
+            return f"array<{item_label}>"
+        return schema_type
+
+    any_of = schema.get("anyOf")
+    if isinstance(any_of, list):
+        labels = [_schema_type_label(item) for item in any_of if isinstance(item, dict)]
+        if labels:
+            return " | ".join(labels)
+
+    one_of = schema.get("oneOf")
+    if isinstance(one_of, list):
+        labels = [_schema_type_label(item) for item in one_of if isinstance(item, dict)]
+        if labels:
+            return " | ".join(labels)
+
+    return "object"
+
+
+def _portfolio_parameters(operation: dict[str, Any]) -> list[PortfolioEndpointParameter] | None:
+    raw_parameters = operation.get("parameters")
+    if not isinstance(raw_parameters, list):
+        return None
+
+    parameters: list[PortfolioEndpointParameter] = []
+    for raw in raw_parameters:
+        if not isinstance(raw, dict):
+            continue
+        schema = raw.get("schema")
+        schema_dict = schema if isinstance(schema, dict) else {}
+        example = raw.get("example")
+        if example is None:
+            example = schema_dict.get("example")
+        enum_values = schema_dict.get("enum")
+        enum_payload = [str(item) for item in enum_values] if isinstance(enum_values, list) else None
+        parameters.append(
+            PortfolioEndpointParameter(
+                name=str(raw.get("name", "parameter")),
+                type=_schema_type_label(schema_dict),
+                required=bool(raw.get("required", False)),
+                description=str(raw.get("description", "")),
+                example=example,
+                enum=enum_payload,
+            )
+        )
+    return parameters or None
+
+
+def _portfolio_request_body(
+    operation: dict[str, Any], openapi_schema: dict[str, Any]
+) -> PortfolioEndpointRequestBody | None:
+    raw_request_body = operation.get("requestBody")
+    if not isinstance(raw_request_body, dict):
+        return None
+    content = raw_request_body.get("content")
+    content_payload = content if isinstance(content, dict) else None
+    return PortfolioEndpointRequestBody(
+        description=str(raw_request_body.get("description", "Request payload.")),
+        example=_extract_json_example(content_payload, openapi_schema),
+    )
+
+
+def _portfolio_responses(
+    operation: dict[str, Any], openapi_schema: dict[str, Any]
+) -> list[PortfolioEndpointResponse]:
+    raw_responses = operation.get("responses")
+    if not isinstance(raw_responses, dict):
+        return [PortfolioEndpointResponse(code="200", description="Success")]
+
+    responses: list[PortfolioEndpointResponse] = []
+    for code in sorted(raw_responses.keys(), key=lambda item: str(item)):
+        raw = raw_responses.get(code)
+        if not isinstance(raw, dict):
+            continue
+        content = raw.get("content")
+        content_payload = content if isinstance(content, dict) else None
+        responses.append(
+            PortfolioEndpointResponse(
+                code=str(code),
+                description=str(raw.get("description", "")),
+                example=_extract_json_example(content_payload, openapi_schema),
+            )
+        )
+    return responses or [PortfolioEndpointResponse(code="200", description="Success")]
+
+
+def _portfolio_endpoints_from_openapi(openapi_schema: dict[str, Any]) -> list[PortfolioEndpoint]:
+    raw_paths = openapi_schema.get("paths")
+    if not isinstance(raw_paths, dict):
+        return []
+
+    method_order = {
+        "get": 0,
+        "post": 1,
+        "put": 2,
+        "patch": 3,
+        "delete": 4,
+        "options": 5,
+        "head": 6,
+    }
+    endpoints: list[PortfolioEndpoint] = []
+
+    for path in sorted(raw_paths.keys()):
+        operations = raw_paths.get(path)
+        if not isinstance(operations, dict):
+            continue
+
+        for method in sorted(operations.keys(), key=lambda item: method_order.get(item.lower(), 99)):
+            raw_operation = operations.get(method)
+            if not isinstance(raw_operation, dict):
+                continue
+            method_normalized = method.upper()
+            if method_normalized not in {"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"}:
+                continue
+
+            summary = str(raw_operation.get("summary") or f"{method_normalized} {path}")
+            description_raw = raw_operation.get("description")
+            description = str(description_raw) if isinstance(description_raw, str) else None
+            endpoints.append(
+                PortfolioEndpoint(
+                    method=method_normalized,
+                    path=str(path),
+                    summary=summary,
+                    description=description,
+                    auth=_portfolio_auth_mode_for_path(str(path)),
+                    parameters=_portfolio_parameters(raw_operation),
+                    request_body=_portfolio_request_body(raw_operation, openapi_schema),
+                    responses=_portfolio_responses(raw_operation, openapi_schema),
+                )
+            )
+
+    return endpoints
+
+
+@router.get("/portfolio.json", response_model=PortfolioMetadataResponse)
+def portfolio_metadata(request: Request) -> PortfolioMetadataResponse:
+    """Return dynamic portfolio metadata generated from the current OpenAPI surface."""
+    settings = get_settings()
+    request_root = _request_base_url(request)
+    api_prefix = settings.api_prefix.rstrip("/")
+    base_url = f"{request_root}{api_prefix}"
+    openapi_schema = request.app.openapi()
+
+    return PortfolioMetadataResponse(
+        api=PortfolioApiInfo(
+            id="quantum",
+            name=settings.app_name,
+            version=settings.app_version,
+            icon="quantum",
+            description=(
+                "Production Quantum API with key lifecycle management and "
+                "runtime endpoints for simulation and transformation workloads."
+            ),
+            base_url=base_url,
+            docs_url=f"{request_root}/docs",
+            health_url=f"{base_url}/health",
+            status="active",
+            featured=True,
+            tags=["quantum", "simulation", "security", "api"],
+            uptime="n/a",
+        ),
+        endpoints=_portfolio_endpoints_from_openapi(openapi_schema),
     )
 
 

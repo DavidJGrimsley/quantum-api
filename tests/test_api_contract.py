@@ -22,6 +22,57 @@ def test_echo_types_contract(client):
     assert any(item["name"] == "quantum_interference" for item in payload["echo_types"])
 
 
+def test_portfolio_metadata_contract(unauth_client):
+    response = unauth_client.get("/v1/portfolio.json")
+    assert response.status_code == 200
+    payload = response.json()
+
+    assert payload["api"]["id"] == "quantum"
+    assert payload["api"]["baseUrl"].endswith("/v1")
+    assert payload["api"]["docsUrl"].endswith("/docs")
+    assert payload["api"]["healthUrl"].endswith("/v1/health")
+
+    by_signature = {
+        (item["method"], item["path"]): item
+        for item in payload["endpoints"]
+    }
+    assert ("GET", "/v1/health") in by_signature
+    assert ("GET", "/v1/echo-types") in by_signature
+    assert ("GET", "/v1/keys") in by_signature
+
+    assert by_signature[("GET", "/v1/health")]["auth"] == "public"
+    assert by_signature[("GET", "/v1/echo-types")]["auth"] == "api_key"
+    assert by_signature[("GET", "/v1/keys")]["auth"] == "bearer_jwt"
+
+
+def test_portfolio_request_body_examples_cover_required_fields(client, unauth_client):
+    response = unauth_client.get("/v1/portfolio.json")
+    assert response.status_code == 200
+    payload = response.json()
+
+    candidate_endpoints = []
+    for item in payload["endpoints"]:
+        if item.get("method") != "POST":
+            continue
+        if item.get("auth") not in {"public", "api_key"}:
+            continue
+        request_body = item.get("requestBody")
+        if not isinstance(request_body, dict):
+            continue
+        if request_body.get("example") is None:
+            continue
+        candidate_endpoints.append(item)
+
+    assert candidate_endpoints, "Expected POST endpoints with requestBody examples."
+
+    for endpoint in candidate_endpoints:
+        post_response = client.post(endpoint["path"], json=endpoint["requestBody"]["example"])
+        assert post_response.status_code != 422, (
+            f"Example payload missing required fields for {endpoint['path']}: "
+            f"{post_response.text}"
+        )
+
+
 def test_gate_run_contract_bit_flip(client):
     response = client.post("/v1/gates/run", json={"gate_type": "bit_flip"})
     assert response.status_code == 200

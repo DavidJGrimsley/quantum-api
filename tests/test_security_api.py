@@ -40,6 +40,11 @@ def test_health_endpoint_is_public(unauth_client):
     assert response.status_code == 200
 
 
+def test_portfolio_metadata_endpoint_is_public(unauth_client):
+    response = unauth_client.get("/v1/portfolio.json")
+    assert response.status_code == 200
+
+
 def test_request_id_passthrough_in_error_payload(client):
     request_id = "trace-request-id-123"
     response = client.post("/v1/text/transform", json={}, headers={"X-Request-ID": request_id})
