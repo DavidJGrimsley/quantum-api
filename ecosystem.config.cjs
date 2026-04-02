@@ -4,7 +4,7 @@ module.exports = {
       name: "quantum-api",
       cwd: "/home/deployer/quantum-api",
       script: ".venv/bin/python",
-      args: "-m uvicorn quantum_api.main:app --host 127.0.0.1 --port 8000",
+      args: "-m uvicorn quantum_api.main:app --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips \"127.0.0.1,::1\"",
       interpreter: "none",
       env: {
         PYTHONPATH: "/home/deployer/quantum-api/src",

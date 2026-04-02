@@ -63,6 +63,33 @@ def test_portfolio_metadata_respects_root_path():
     assert payload["api"]["healthUrl"] == "https://davidjgrimsley.com/public-facing/api/quantum/v1/health"
 
 
+def test_auth_and_cors_respected_with_root_path():
+    with TestClient(
+        app,
+        base_url="https://davidjgrimsley.com",
+        root_path="/public-facing/api/quantum",
+    ) as client:
+        # /v1/echo-types should still require an API key when mounted under a prefix.
+        echo_response = client.get(
+            "/v1/echo-types",
+            headers={"Origin": "https://davidjgrimsley.com"},
+        )
+        assert echo_response.status_code == 401
+        assert "access-control-allow-origin" in {
+            k.lower() for k in echo_response.headers
+        }
+
+        # Key-management routes (e.g., /v1/keys) should still require JWT when prefixed.
+        keys_response = client.get(
+            "/v1/keys",
+            headers={"Origin": "https://davidjgrimsley.com"},
+        )
+        assert keys_response.status_code == 401
+        assert "access-control-allow-origin" in {
+            k.lower() for k in keys_response.headers
+        }
+
+
 def test_portfolio_request_body_examples_cover_required_fields(client, unauth_client):
     response = unauth_client.get("/v1/portfolio.json")
     assert response.status_code == 200

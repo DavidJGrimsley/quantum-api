@@ -65,7 +65,7 @@ class RouteAwareCORSMiddleware(BaseHTTPMiddleware):
         )
 
     async def dispatch(self, request: Request, call_next):  # type: ignore[override]
-        policy = self._policy_for_path(request.url.path)
+        policy = self._policy_for_path(request.scope["path"])
         if self._is_preflight_request(request):
             return self._preflight_response(request, policy)
 
@@ -191,7 +191,7 @@ class SecurityObservabilityMiddleware(BaseHTTPMiddleware):
         client_ip = self._client_ip(request)
 
         try:
-            if self._settings.metrics_enabled and request.url.path == self._settings.metrics_path:
+            if self._settings.metrics_enabled and request.scope["path"] == self._settings.metrics_path:
                 metrics_token_header = request.headers.get(self._settings.metrics_token_header)
                 if self._settings.is_production_like() and metrics_token_header != self._settings.metrics_token:
                     AUTH_FAILURES_TOTAL.labels(reason="metrics_token").inc()
@@ -209,7 +209,7 @@ class SecurityObservabilityMiddleware(BaseHTTPMiddleware):
                         client_ip=client_ip,
                     )
 
-            if self._settings.auth_enabled and self._settings.requires_user_jwt(request.url.path):
+            if self._settings.auth_enabled and self._settings.requires_user_jwt(request.scope["path"]):
                 if self._should_apply_rate_limits():
                     ip_result = await self._rate_limiter.check_ip(client_ip=client_ip)
                     if not ip_result.allowed:
@@ -264,7 +264,7 @@ class SecurityObservabilityMiddleware(BaseHTTPMiddleware):
                 request.state.auth_user_id = user.user_id
                 request.state.auth_user_email = user.email
 
-            elif self._settings.auth_enabled and self._settings.requires_api_key(request.url.path):
+            elif self._settings.auth_enabled and self._settings.requires_api_key(request.scope["path"]):
                 if self._should_apply_rate_limits():
                     ip_result = await self._rate_limiter.check_ip(client_ip=client_ip)
                     if not ip_result.allowed:
@@ -370,7 +370,7 @@ class SecurityObservabilityMiddleware(BaseHTTPMiddleware):
         route = request.scope.get("route")
         if route is not None and hasattr(route, "path"):
             return str(route.path)
-        return request.url.path
+        return request.scope["path"]
 
     @staticmethod
     def _client_ip(request: Request) -> str:
