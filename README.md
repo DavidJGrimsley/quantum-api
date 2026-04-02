@@ -13,6 +13,13 @@ Quantum API is a greenfield FastAPI service for quantum-inspired runtime feature
 - `/v1/qasm/export`
 - `/v1/text/transform`
 - `/v1/keys`
+- `/v1/ibm/profiles`
+- `/v1/ibm/profiles/{profile_id}`
+- `/v1/ibm/profiles/{profile_id}/verify`
+- `/v1/jobs/circuits`
+- `/v1/jobs/{job_id}`
+- `/v1/jobs/{job_id}/result`
+- `/v1/jobs/{job_id}/cancel`
 - `/v1/keys/{key_id}` (delete revoked key)
 - `/v1/keys/revoked` (bulk delete revoked keys)
 - `/v1/keys/{key_id}/revoke`
@@ -29,7 +36,7 @@ This repository is intentionally not backward compatible with the previous `publ
 - Redis (rate limiting and quotas)
 - Prometheus client metrics
 - Optional qiskit/qiskit-aer runtime (with classical fallback mode)
-- Optional qiskit-ibm-runtime integration for IBM backend discovery
+- Optional qiskit-ibm-runtime integration for BYO IBM backend discovery and hardware jobs
 - Ruff + Pytest
 - Docker
 - GitHub Actions CI
@@ -50,7 +57,7 @@ For local development, use API key `qapi_devlocal_0123456789abcdef0123456789abcd
 ### Authentication and Rate Limits
 
 - `GET /v1/health` and `GET /v1/portfolio.json` are public.
-- `GET /v1/keys`, `POST /v1/keys`, `DELETE /v1/keys/{key_id}`, `DELETE /v1/keys/revoked`, `POST /v1/keys/{key_id}/revoke`, and `POST /v1/keys/{key_id}/rotate` require `Authorization: Bearer <supabase_jwt>`.
+- `GET /v1/keys`, `POST /v1/keys`, `DELETE /v1/keys/{key_id}`, `DELETE /v1/keys/revoked`, `POST /v1/keys/{key_id}/revoke`, `POST /v1/keys/{key_id}/rotate`, and all `/v1/ibm/profiles*` endpoints require `Authorization: Bearer <supabase_jwt>`.
 - All other protected `/v1/*` endpoints require `X-API-Key` (DB-managed key records only; no `API_KEYS_JSON` fallback).
 - Successful protected responses include:
   - `X-Request-ID`
@@ -101,6 +108,35 @@ Lists canonical transformation categories and descriptions from one enum source.
 - `POST /v1/keys/{key_id}/rotate`: atomically rotate key (old key becomes invalid, new raw key shown once).
 
 All key-management endpoints are user-scoped to the JWT subject (`sub`) and require a valid Supabase bearer token.
+
+### IBM Profile Endpoints (`/v1/ibm/profiles*`)
+
+- `GET /v1/ibm/profiles`: list the current user's saved IBM credential profiles.
+- `POST /v1/ibm/profiles`: save a new named IBM credential profile.
+- `PATCH /v1/ibm/profiles/{profile_id}`: rename a profile, replace token/instance/channel, or switch the default profile.
+- `DELETE /v1/ibm/profiles/{profile_id}`: remove one saved profile.
+- `POST /v1/ibm/profiles/{profile_id}/verify`: attempt a live IBM Runtime lookup and persist `verified` or `invalid`.
+
+IBM profile rules:
+
+- Profiles are user-scoped to the bearer JWT subject.
+- `profile_name` must be unique per user.
+- Raw IBM tokens are write-only. Responses return masked token metadata only.
+- Stored-profile support requires `IBM_CREDENTIAL_ENCRYPTION_KEY` on the server.
+- `IBM_CHANNEL` defaults to `ibm_quantum_platform`.
+- Server-level `IBM_TOKEN` and `IBM_INSTANCE` remain available as a local/self-host fallback when no stored BYO profile is available.
+
+Create request example:
+
+```json
+{
+  "profile_name": "my-open-plan",
+  "token": "ibm_api_token_here",
+  "instance": "crn:v1:bluemix:public:quantum-computing:us-east:...",
+  "channel": "ibm_quantum_platform",
+  "is_default": true
+}
+```
 
 ### `POST /v1/gates/run`
 Request:
@@ -180,6 +216,7 @@ Query filters:
 - `provider`: `aer` or `ibm`
 - `simulator_only`: `true/false`
 - `min_qubits`: integer `>= 1`
+- `ibm_profile`: optional IBM profile name when `provider=ibm` (defaults to the owner's default saved profile)
 
 Response fields:
 
@@ -193,15 +230,12 @@ Aer notes:
 - The API lists modern `aer_simulator*` backends.
 - Legacy aliases (`qasm_simulator`, `statevector_simulator`, `unitary_simulator`) are intentionally not exposed.
 
-If `provider=ibm` and IBM integration is not configured, the API returns:
+If `provider=ibm` and the request owner has no usable IBM profile or fallback credentials, the API returns:
 
 ```json
 {
-  "error": "provider_unavailable",
-  "message": "Provider 'ibm' is unavailable.",
-  "details": {
-    "reason": "missing_credentials"
-  }
+  "error": "provider_credentials_missing",
+  "message": "IBM provider credentials are not configured for this user."
 }
 ```
 
@@ -215,6 +249,7 @@ Plus:
 
 - `backend_name` (required)
 - `provider` (`aer|ibm`, optional)
+- `ibm_profile` (optional IBM profile name when `provider=ibm`; defaults to the owner's default saved profile)
 - `optimization_level` (`0-3`)
 - `seed_transpiler` (optional)
 - `output_qasm_version` (`2|3`, default `3`)
@@ -232,6 +267,70 @@ Response fields:
 Validation note:
 
 - Sending both `circuit` and `qasm` in one request returns `422`.
+
+### `POST /v1/jobs/circuits`
+Submit an asynchronous hardware execution job. Phase 4 V1 supports `provider: "ibm"` only.
+
+Request:
+
+```json
+{
+  "provider": "ibm",
+  "backend_name": "ibm_kingston",
+  "shots": 1024,
+  "ibm_profile": "my-open-plan",
+  "circuit": {
+    "num_qubits": 2,
+    "operations": [
+      { "gate": "h", "target": 0 },
+      { "gate": "cx", "control": 0, "target": 1 }
+    ]
+  }
+}
+```
+
+Response fields:
+
+- `job_id`
+- `provider`
+- `backend_name`
+- `ibm_profile`
+- `status`
+- `remote_job_id`
+- `created_at`
+- `updated_at`
+
+Notes:
+
+- Jobs are scoped by the owning API key's `owner_user_id`, not by bearer JWT.
+- Submit persists a local job row immediately, then status/result endpoints poll IBM on read and cache terminal state.
+
+### `GET /v1/jobs/{job_id}`
+Returns the normalized job contract with local status values:
+
+- `queued`
+- `running`
+- `succeeded`
+- `failed`
+- `cancelling`
+- `cancelled`
+
+### `GET /v1/jobs/{job_id}/result`
+Returns the cached terminal result for successful jobs. If the job is not finished yet, the API returns:
+
+```json
+{
+  "error": "result_not_ready",
+  "message": "Job 'job-id' has not produced a result yet.",
+  "details": {
+    "job_id": "job-id",
+    "status": "running"
+  }
+}
+```
+
+### `POST /v1/jobs/{job_id}/cancel`
+Attempts to cancel the remote hardware job and returns the updated normalized local status contract.
 
 ### `POST /v1/qasm/import`
 Request:
@@ -339,9 +438,10 @@ Copy `.env.example` to `.env` and adjust values as needed.
 - `DEV_CORS_LOCAL_ORIGINS`
 - `REQUEST_TIMEOUT_SECONDS`
 - `REQUIRE_QISKIT`
-- `IBM_TOKEN` (optional)
-- `IBM_INSTANCE` (optional)
-- `IBM_CHANNEL` (optional, default `ibm_quantum`)
+- `IBM_TOKEN` (optional local/self-host fallback)
+- `IBM_INSTANCE` (optional local/self-host fallback)
+- `IBM_CHANNEL` (optional, default `ibm_quantum_platform`)
+- `IBM_CREDENTIAL_ENCRYPTION_KEY` (required for stored BYO IBM profiles)
 - `AUTH_ENABLED`
 - `API_KEY_HEADER`
 - `API_KEY_HASH_SECRET`
@@ -402,6 +502,7 @@ Security defaults and guardrails:
 3. Ensure OAuth providers and redirect URLs are configured for portfolio login.
 4. Keep `/v1/keys*` on bearer JWT and runtime `/v1/*` on `X-API-Key` (already enforced in middleware).
 5. Restart service and validate create/list/revoke/rotate flows.
+6. For BYO IBM rollout, also set `IBM_CREDENTIAL_ENCRYPTION_KEY`, apply the updated Phase 3.5 schema script, and validate `/v1/ibm/profiles*` plus `/v1/jobs*`.
 
 ## Docker
 

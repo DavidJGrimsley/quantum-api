@@ -44,16 +44,16 @@ def test_list_backends_filtering(client):
 
 @requires_qiskit
 def test_list_backends_provider_ibm_unavailable_without_config(client, monkeypatch):
-    monkeypatch.delenv("IBM_TOKEN", raising=False)
-    monkeypatch.delenv("IBM_INSTANCE", raising=False)
+    monkeypatch.setenv("IBM_TOKEN", "")
+    monkeypatch.setenv("IBM_INSTANCE", "")
     get_settings.cache_clear()
     clear_backend_catalog_cache()
 
     response = client.get("/v1/list_backends?provider=ibm")
     assert response.status_code == 503
     payload = response.json()
-    assert payload["error"] == "provider_unavailable"
-    assert payload["details"]["reason"] == "missing_credentials"
+    assert payload["error"] == "provider_credentials_missing"
+    assert payload["details"]["reason"] in {"missing_credentials", "no_default_profile"}
 
     get_settings.cache_clear()
     clear_backend_catalog_cache()
@@ -71,7 +71,11 @@ def test_list_backends_simulated_ibm_listing(client, monkeypatch):
                 coupling_map=[(0, 1), (1, 2)],
             )
 
-    monkeypatch.setattr("quantum_api.services.backend_catalog._list_ibm_backends", lambda: [FakeBackend()])
+    monkeypatch.setenv("IBM_TOKEN", "ibm-token")
+    monkeypatch.setenv("IBM_INSTANCE", "instance-crn")
+    get_settings.cache_clear()
+    clear_backend_catalog_cache()
+    monkeypatch.setattr("quantum_api.services.backend_catalog._list_ibm_backends", lambda _credentials: [FakeBackend()])
 
     response = client.get("/v1/list_backends?provider=ibm")
     assert response.status_code == 200
@@ -83,6 +87,11 @@ def test_list_backends_simulated_ibm_listing(client, monkeypatch):
     assert backend["is_hardware"] is True
     assert backend["num_qubits"] == 127
     assert backend["coupling_map_summary"]["present"] is True
+
+    monkeypatch.setenv("IBM_TOKEN", "")
+    monkeypatch.setenv("IBM_INSTANCE", "")
+    get_settings.cache_clear()
+    clear_backend_catalog_cache()
 
 
 def test_list_backends_validation_invalid_provider(client):

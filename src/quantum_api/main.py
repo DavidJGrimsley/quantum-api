@@ -12,11 +12,14 @@ from fastapi.responses import JSONResponse, Response
 
 from quantum_api.api.router import router
 from quantum_api.config import get_settings
+from quantum_api.execution_jobs import QuantumExecutionJobService
+from quantum_api.ibm_credentials import IbmCredentialProfileService
 from quantum_api.key_management import ApiKeyLifecycleService, DatabaseManager
 from quantum_api.logging_config import setup_logging
 from quantum_api.metrics import metrics_response
 from quantum_api.middleware import RouteAwareCORSMiddleware, SecurityObservabilityMiddleware
 from quantum_api.security import ApiKeyAuthService, RedisRateLimiter
+from quantum_api.services.hardware_jobs import HardwareJobService
 from quantum_api.supabase_auth import SupabaseJwtVerifier
 
 settings = get_settings()
@@ -25,6 +28,9 @@ logger = logging.getLogger(__name__)
 
 database = DatabaseManager(settings)
 api_key_lifecycle_service = ApiKeyLifecycleService(settings, database)
+ibm_profile_service = IbmCredentialProfileService(settings, database)
+execution_job_service = QuantumExecutionJobService(database)
+hardware_job_service = HardwareJobService(execution_job_service)
 auth_service = ApiKeyAuthService(settings, api_key_lifecycle_service)
 rate_limiter = RedisRateLimiter(settings)
 jwt_verifier = SupabaseJwtVerifier(settings)
@@ -58,6 +64,9 @@ app = FastAPI(
 app.state.settings = settings
 app.state.database = database
 app.state.api_key_lifecycle_service = api_key_lifecycle_service
+app.state.ibm_profile_service = ibm_profile_service
+app.state.execution_job_service = execution_job_service
+app.state.hardware_job_service = hardware_job_service
 app.state.auth_service = auth_service
 app.state.rate_limiter = rate_limiter
 app.state.jwt_verifier = jwt_verifier

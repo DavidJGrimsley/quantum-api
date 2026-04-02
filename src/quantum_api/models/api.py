@@ -139,6 +139,9 @@ class Amplitude(BaseModel):
 
 CircuitGate = Literal["x", "z", "h", "ry", "cx"]
 BackendProvider = Literal["aer", "ibm"]
+IBMChannel = Literal["ibm_quantum_platform", "ibm_cloud"]
+HardwareJobProvider = Literal["ibm"]
+HardwareJobStatus = Literal["queued", "running", "succeeded", "failed", "cancelling", "cancelled"]
 QasmVersion = Literal["auto", "2", "3"]
 OutputQasmVersion = Literal["2", "3"]
 TranspileInputFormat = Literal["circuit", "qasm"]
@@ -299,6 +302,7 @@ class BackendFiltersApplied(BaseModel):
     provider: BackendProvider | None = None
     simulator_only: bool = False
     min_qubits: int = Field(default=1, ge=1)
+    ibm_profile: str | None = None
 
     model_config = ConfigDict(extra="forbid")
 
@@ -333,6 +337,7 @@ class TranspileRequest(BaseModel):
     qasm: QasmSource | None = None
     backend_name: str = Field(min_length=1)
     provider: BackendProvider | None = None
+    ibm_profile: str | None = Field(default=None, min_length=1)
     optimization_level: int = Field(default=1, ge=0, le=3)
     seed_transpiler: int | None = None
     output_qasm_version: OutputQasmVersion = "3"
@@ -510,6 +515,156 @@ class ApiKeyDeleteResponse(BaseModel):
 
 class ApiKeyDeleteRevokedResponse(BaseModel):
     deleted_count: int = Field(ge=0)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class IBMProfileResponse(BaseModel):
+    profile_id: str
+    owner_user_id: str
+    profile_name: str
+    instance: str
+    channel: IBMChannel
+    masked_token: str
+    is_default: bool
+    verification_status: Literal["unverified", "verified", "invalid"]
+    last_verified_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class IBMProfileListResponse(BaseModel):
+    profiles: list[IBMProfileResponse]
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class IBMProfileCreateRequest(BaseModel):
+    profile_name: str = Field(min_length=1, max_length=128)
+    token: str = Field(min_length=1)
+    instance: str = Field(min_length=1)
+    channel: IBMChannel = "ibm_quantum_platform"
+    is_default: bool = False
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "profile_name": "IBM Open",
+                "token": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+                "instance": "crn:v1:bluemix:public:quantum-computing:us-east:a/example::",
+                "channel": "ibm_quantum_platform",
+                "is_default": True,
+            }
+        },
+    )
+
+
+class IBMProfileUpdateRequest(BaseModel):
+    profile_name: str | None = Field(default=None, min_length=1, max_length=128)
+    token: str | None = Field(default=None, min_length=1)
+    instance: str | None = Field(default=None, min_length=1)
+    channel: IBMChannel | None = None
+    is_default: bool | None = None
+
+    model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def validate_has_update(self) -> IBMProfileUpdateRequest:
+        if (
+            self.profile_name is None
+            and self.token is None
+            and self.instance is None
+            and self.channel is None
+            and self.is_default is None
+        ):
+            raise ValueError("at least one field must be provided")
+        return self
+
+
+class IBMProfileVerifyResponse(BaseModel):
+    profile: IBMProfileResponse
+    verified: bool = True
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class CircuitJobSubmitRequest(BaseModel):
+    provider: HardwareJobProvider = "ibm"
+    backend_name: str = Field(min_length=1)
+    circuit: CircuitDefinition
+    shots: int = Field(default=1024, ge=1)
+    ibm_profile: str | None = Field(default=None, min_length=1)
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "provider": "ibm",
+                "backend_name": "ibm_kyiv",
+                "shots": 1024,
+                "ibm_profile": "IBM Open",
+                "circuit": {
+                    "num_qubits": 2,
+                    "operations": [
+                        {"gate": "h", "target": 0},
+                        {"gate": "cx", "target": 1, "control": 0},
+                    ],
+                },
+            }
+        },
+    )
+
+    @field_validator("shots")
+    @classmethod
+    def validate_shots_limit(cls, value: int) -> int:
+        max_shots = get_settings().max_circuit_shots
+        if value > max_shots:
+            raise ValueError(f"shots exceeds MAX_CIRCUIT_SHOTS ({max_shots})")
+        return value
+
+
+class CircuitJobSubmitResponse(BaseModel):
+    job_id: str
+    provider: HardwareJobProvider
+    backend_name: str
+    ibm_profile: str | None = None
+    remote_job_id: str
+    status: HardwareJobStatus
+    created_at: datetime
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class CircuitJobStatusResponse(BaseModel):
+    job_id: str
+    provider: HardwareJobProvider
+    backend_name: str
+    ibm_profile: str | None = None
+    remote_job_id: str
+    status: HardwareJobStatus
+    created_at: datetime
+    updated_at: datetime
+    completed_at: datetime | None = None
+    error: ErrorResponse | None = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class CircuitJobResultData(BaseModel):
+    num_qubits: int = Field(ge=0)
+    shots: int = Field(ge=1)
+    counts: dict[str, int]
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class CircuitJobResultResponse(BaseModel):
+    job_id: str
+    status: Literal["succeeded"] = "succeeded"
+    result: CircuitJobResultData
 
     model_config = ConfigDict(extra="forbid")
 

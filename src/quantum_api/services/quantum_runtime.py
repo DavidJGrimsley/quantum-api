@@ -16,6 +16,7 @@ class QuantumRuntime:
     qasm2: Any | None
     qasm3: Any | None
     QiskitRuntimeService: Any | None
+    SamplerV2: Any | None
     ibm_runtime_available: bool
     ibm_runtime_import_error: str | None
 
@@ -44,12 +45,13 @@ def build_runtime() -> QuantumRuntime:
         qasm3 = None
 
     try:
-        from qiskit_ibm_runtime import QiskitRuntimeService  # pyright: ignore[reportMissingImports]
+        from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2  # pyright: ignore[reportMissingImports]
 
         ibm_runtime_available = True
         ibm_runtime_import_error = None
     except Exception as exc:  # pragma: no cover - optional dependency
         QiskitRuntimeService = None
+        SamplerV2 = None
         ibm_runtime_available = False
         ibm_runtime_import_error = str(exc)
 
@@ -64,6 +66,7 @@ def build_runtime() -> QuantumRuntime:
         qasm2=qasm2,
         qasm3=qasm3,
         QiskitRuntimeService=QiskitRuntimeService,
+        SamplerV2=SamplerV2,
         ibm_runtime_available=ibm_runtime_available,
         ibm_runtime_import_error=ibm_runtime_import_error,
     )

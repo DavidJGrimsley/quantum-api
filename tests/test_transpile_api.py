@@ -112,8 +112,8 @@ def test_transpile_rejects_legacy_aer_backend_aliases(client):
 
 @requires_qiskit
 def test_transpile_provider_ibm_unavailable_without_config(client, monkeypatch):
-    monkeypatch.delenv("IBM_TOKEN", raising=False)
-    monkeypatch.delenv("IBM_INSTANCE", raising=False)
+    monkeypatch.setenv("IBM_TOKEN", "")
+    monkeypatch.setenv("IBM_INSTANCE", "")
     get_settings.cache_clear()
     clear_backend_catalog_cache()
 
@@ -127,8 +127,8 @@ def test_transpile_provider_ibm_unavailable_without_config(client, monkeypatch):
     )
     assert response.status_code == 503
     payload = response.json()
-    assert payload["error"] == "provider_unavailable"
-    assert payload["details"]["reason"] == "missing_credentials"
+    assert payload["error"] == "provider_credentials_missing"
+    assert payload["details"]["reason"] in {"missing_credentials", "no_default_profile"}
 
     get_settings.cache_clear()
     clear_backend_catalog_cache()

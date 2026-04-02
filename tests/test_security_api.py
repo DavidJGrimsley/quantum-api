@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from quantum_api.main import app, rate_limiter, settings
 from quantum_api.security import RateLimiterUnavailableError, RateLimitResult
 
@@ -33,6 +35,12 @@ def test_key_management_delete_endpoints_require_bearer_jwt(unauth_client):
     assert single.status_code == 401
     assert revoked_batch.json()["error"] == "auth_required"
     assert single.json()["error"] == "auth_required"
+
+
+def test_ibm_profile_endpoints_require_bearer_jwt(unauth_client):
+    response = unauth_client.get("/v1/ibm/profiles")
+    assert response.status_code == 401
+    assert response.json()["error"] == "auth_required"
 
 
 def test_health_endpoint_is_public(unauth_client):
@@ -143,6 +151,58 @@ def test_public_runtime_routes_allow_any_origin_and_expose_runtime_headers(clien
         assert "RateLimit-Remaining" in exposed
         assert "RateLimit-Reset" in exposed
         assert "Retry-After" in exposed
+    finally:
+        settings.app_env = original_env
+        settings.allow_origins = original_allow_origins
+        settings.public_api_cors_allow_all = original_public_runtime_cors
+        settings.dev_rate_limit_bypass = original_bypass
+
+
+def test_runtime_routes_allow_explicit_localhost_origin_in_production(client, monkeypatch):
+    original_env = settings.app_env
+    original_allow_origins = settings.allow_origins
+    original_public_runtime_cors = settings.public_api_cors_allow_all
+    original_bypass = settings.dev_rate_limit_bypass
+    settings.app_env = "production"
+    settings.allow_origins = (
+        "http://localhost:8081,http://127.0.0.1:8081,"
+        "https://davidjgrimsley.com,https://www.davidjgrimsley.com"
+    )
+    settings.public_api_cors_allow_all = False
+    settings.dev_rate_limit_bypass = False
+
+    async def allow_ip(*, client_ip: str) -> RateLimitResult:
+        return RateLimitResult(
+            allowed=True,
+            reason="ip_minute",
+            retry_after_seconds=60,
+            headers={
+                "RateLimit-Limit": "900",
+                "RateLimit-Remaining": "899",
+                "RateLimit-Reset": "60",
+            },
+        )
+
+    async def allow_key(*, key_id: str, policy) -> RateLimitResult:
+        return RateLimitResult(
+            allowed=True,
+            reason="key_minute",
+            retry_after_seconds=60,
+            headers={
+                "RateLimit-Limit": "600",
+                "RateLimit-Remaining": "599",
+                "RateLimit-Reset": "60",
+            },
+        )
+
+    monkeypatch.setattr(rate_limiter, "check_ip", allow_ip)
+    monkeypatch.setattr(rate_limiter, "check_key", allow_key)
+
+    try:
+        response = client.get("/v1/echo-types", headers={"Origin": "http://localhost:8081"})
+        assert response.status_code == 200
+        assert response.headers["Access-Control-Allow-Origin"] == "http://localhost:8081"
+        assert "Origin" in response.headers["Vary"]
     finally:
         settings.app_env = original_env
         settings.allow_origins = original_allow_origins
@@ -386,3 +446,23 @@ def test_delete_preflight_is_allowed_for_local_origin(unauth_client):
     assert response.status_code == 200
     allow_methods = response.headers.get("access-control-allow-methods", "")
     assert "DELETE" in allow_methods
+    assert "PATCH" in allow_methods
+    assert "PUT" in allow_methods
+
+
+def test_api_key_auth_failure_reason_is_logged(unauth_client, caplog):
+    caplog.set_level(logging.WARNING, logger="quantum_api.middleware")
+
+    response = unauth_client.post(
+        "/v1/gates/run",
+        json={"gate_type": "rotation", "rotation_angle_rad": 0.78539816339},
+        headers={"X-API-Key": "not-a-real-key"},
+    )
+
+    assert response.status_code == 401
+    matching = [
+        record for record in caplog.records
+        if record.message == "api_key_auth_failed"
+    ]
+    assert matching
+    assert any(getattr(record, "reason", None) == "invalid_format" for record in matching)

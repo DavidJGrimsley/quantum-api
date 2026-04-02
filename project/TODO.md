@@ -1,4 +1,4 @@
-# Quantum API Master TODO and Roadmap
+ # Quantum API Master TODO and Roadmap
 
 This file is the single source of truth for implementation planning.
 
@@ -131,26 +131,61 @@ Goal: finalize Identerest-authenticated key management from Portfolio through Qu
 
 ## Phase 3.9 - VPS Deploy and Redis setup
 
-## Phase 4 - Runtime and Hardware Integrations
+## Phase 4 - BYO IBM Runtime and Hardware Jobs (V1)
 
-Goal: expand beyond local simulation.
+Goal: expand beyond local simulation without taking on managed-provider billing in the first release.
 
-### Qiskit Runtime and Providers
+### BYO IBM Credentials and Provider Resolution
 
-- [ ] Add IBM Runtime integration path (Sampler/Estimator)
-- [ ] Add provider abstraction for pluggable backends
-- [ ] Add hardware job submission and job-status endpoints
-- [ ] Add asynchronous job model for long-running workloads
+- [x] Add bearer-authenticated IBM credential profile endpoints (`/v1/ibm/profiles*`)
+- [x] Store encrypted IBM tokens plus masked display metadata in Supabase-backed persistence
+- [x] Support multiple named IBM profiles per user with a default profile contract
+- [x] Refactor IBM backend discovery/transpile to resolve the owner's saved IBM profile
+- [x] Keep server-global IBM env vars as local/self-host fallback instead of the primary hosted path
 
-### Advanced Execution Features
+### Async IBM Hardware Jobs
 
+- [x] Add API-key-authenticated hardware job submit/status/result/cancel endpoints
+- [x] Persist local execution jobs with normalized status contracts and remote job ids
+- [x] Use poll-on-read job refresh for V1 instead of introducing a worker queue
+- [x] Keep `/v1/circuits/run` simulator-first and synchronous
+
+### Phase 4 V1 Rollout Workstream
+
+- [x] Extend `/v1/portfolio.json` so the new IBM/profile/job routes appear with the correct auth mode
+- [x] Add backend/API tests for IBM profile CRUD, scoping, masking, and hardware job lifecycle
+- [ ] Run the updated Supabase schema migration in the live Identerest project
+- [ ] Add live smoke validation for the full BYO flow:
+  - [ ] sign in
+  - [ ] save IBM profile
+  - [ ] create Quantum API key
+  - [ ] list IBM backends
+  - [ ] submit hardware job
+  - [ ] poll status
+  - [ ] fetch result or provider error
+
+### External Portfolio and Identerest UI Workstream
+
+- [ ] Modify the Identerest schema migration flow to include `ibm_credential_profiles` and `quantum_execution_jobs`
+- [ ] Update the portfolio API key management component with a collapsible `IBM Credentials` section
+- [ ] Include add/edit/delete/default-selection and verify actions in that IBM credentials panel
+- [ ] Add info copy explaining simulator-only usage vs BYO IBM hardware usage through the same API
+
+### Future Optional Managed IBM Access
+
+- [ ] Managed IBM access requires billing, quotas, abuse controls, cost caps, failed-job handling, and legal/terms review before resale
+
+### Later Runtime Expansion
+
+- [ ] Add `Estimator`-oriented contracts once hardware job primitives are stable
+- [ ] Add provider abstraction beyond IBM where it meaningfully improves product scope
 - [ ] Evaluate dynamic circuits support
 - [ ] Add optional noise model controls for simulator runs
 - [ ] Add basic error-mitigation controls where practical
 
 ### Completion Criteria
 
-- [ ] Users can run both simulator and hardware-backed jobs through stable contracts
+- [ ] Users can save BYO IBM credentials, discover IBM backends, transpile against them, and run hardware-backed jobs through stable contracts
 
 ## Phase 5 - Qiskit Ecosystem Expansion (Advanced)
 

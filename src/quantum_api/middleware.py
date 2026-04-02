@@ -33,7 +33,7 @@ from quantum_api.supabase_auth import JwtVerificationError, SupabaseJwtVerifier
 
 logger = logging.getLogger(__name__)
 
-_CORS_ALLOWED_METHODS = ("GET", "POST", "DELETE", "OPTIONS")
+_CORS_ALLOWED_METHODS = ("GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS")
 
 
 @dataclass(frozen=True)
@@ -278,10 +278,17 @@ class SecurityObservabilityMiddleware(BaseHTTPMiddleware):
                             client_ip=client_ip,
                         )
 
-                auth_key = await self._auth_service.authenticate(
+                api_key_attempt = await self._auth_service.authenticate_with_diagnostics(
                     request.headers.get(self._settings.api_key_header),
                 )
+                auth_key = api_key_attempt.key
                 if auth_key is None:
+                    self._log_api_key_auth_failure(
+                        request=request,
+                        client_ip=client_ip,
+                        reason=api_key_attempt.failure_reason or "unknown",
+                        key_prefix=api_key_attempt.key_prefix,
+                    )
                     AUTH_FAILURES_TOTAL.labels(reason="api_key").inc()
                     response = self._error_response(
                         status_code=401,
@@ -298,6 +305,7 @@ class SecurityObservabilityMiddleware(BaseHTTPMiddleware):
                     )
 
                 request.state.api_key_id = auth_key.key_id
+                request.state.api_key_owner_user_id = auth_key.owner_user_id
                 api_key_id_context.set(auth_key.key_id)
 
                 if self._should_apply_rate_limits():
@@ -468,6 +476,26 @@ class SecurityObservabilityMiddleware(BaseHTTPMiddleware):
         return (
             "Service temporarily unavailable: the rate-limiting backend could not be reached. "
             "Please try again shortly."
+        )
+
+    def _log_api_key_auth_failure(
+        self,
+        *,
+        request: Request,
+        client_ip: str,
+        reason: str,
+        key_prefix: str | None,
+    ) -> None:
+        logger.warning(
+            "api_key_auth_failed",
+            extra={
+                "event": "api_key_auth_failed",
+                "path": request.scope["path"],
+                "method": request.method,
+                "client_ip": client_ip,
+                "reason": reason,
+                "key_prefix": key_prefix,
+            },
         )
 
     @staticmethod
