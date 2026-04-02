@@ -504,6 +504,29 @@ Security defaults and guardrails:
 5. Restart service and validate create/list/revoke/rotate flows.
 6. For BYO IBM rollout, also set `IBM_CREDENTIAL_ENCRYPTION_KEY`, apply the updated Phase 3.5 schema script, and validate `/v1/ibm/profiles*` plus `/v1/jobs*`.
 
+## BYO IBM Live Verification
+
+Use the reusable Phase 4 smoke verifier to validate the real BYO IBM flow end-to-end with a live bearer JWT and live IBM credentials.
+
+```bash
+export VERIFY_API_BASE_URL=https://davidjgrimsley.com/public-facing/api/quantum
+export VERIFY_BEARER_JWT=<supabase_jwt>
+export VERIFY_IBM_TOKEN=<ibm_api_token>
+export VERIFY_IBM_INSTANCE=<ibm_instance_or_crn>
+export VERIFY_IBM_CHANNEL=ibm_quantum_platform
+
+uv run python scripts/verify_byo_ibm_flow.py --timeout-seconds 1800
+```
+
+Notes:
+
+- `VERIFY_API_BASE_URL` may be the service root or the full `/v1` base URL. The script appends `/v1` when missing.
+- `IBM_CREDENTIAL_ENCRYPTION_KEY` must already be configured on the deployed server for stored-profile verification to work.
+- Use `--backend-name <backend>` to force a specific IBM backend.
+- Cleanup is enabled by default. Use `--no-cleanup` if you want to inspect the created verification resources afterward.
+- A passing run proves: IBM profile save + verify, Quantum API key creation, IBM backend listing, IBM transpile, hardware job submission, and a terminal result or structured provider error.
+- Record the run date, environment, backend, terminal job status, result/error artifact, and cleanup outcome in your release notes or roadmap notes.
+
 ## Docker
 
 ```bash

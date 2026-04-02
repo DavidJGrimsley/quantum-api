@@ -28,6 +28,9 @@ jobs:
       - name: Ruff
         run: uv run ruff check .
 
+      - name: Portfolio Contract Smoke
+        run: uv run pytest tests/test_api_contract.py -k portfolio
+
       - name: Pytest
         run: uv run pytest
 

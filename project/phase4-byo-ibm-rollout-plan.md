@@ -97,6 +97,28 @@ Key behavior:
 - Quantum API key identifies the owning user during runtime calls
 - if an IBM profile name is omitted, Quantum API uses the owner's default saved profile
 
+## Automated Live Verifier
+
+Preferred live-smoke command:
+
+```bash
+export VERIFY_API_BASE_URL=https://davidjgrimsley.com/public-facing/api/quantum
+export VERIFY_BEARER_JWT=<supabase_jwt>
+export VERIFY_IBM_TOKEN=<ibm_api_token>
+export VERIFY_IBM_INSTANCE=<ibm_instance_or_crn>
+export VERIFY_IBM_CHANNEL=ibm_quantum_platform
+
+uv run python scripts/verify_byo_ibm_flow.py --timeout-seconds 1800
+```
+
+Important notes:
+
+- `VERIFY_API_BASE_URL` may be the service root or the full `/v1` URL. The verifier appends `/v1` when missing.
+- Stored-profile verification requires `IBM_CREDENTIAL_ENCRYPTION_KEY` on the deployed Quantum API runtime.
+- Use `--backend-name <backend>` if you want to force a specific IBM backend.
+- The verifier cleans up the created key/profile by default. Use `--no-cleanup` if you need to inspect created rows afterward.
+- Record the run date, environment, selected backend, terminal job status, result/error artifact, and cleanup outcome in release notes or `project/TODO.md`.
+
 ## Live Smoke Checklist
 
 1. Sign in through Identerest on the portfolio site.
@@ -105,9 +127,11 @@ Key behavior:
 4. Verify the profile successfully.
 5. Create or reuse a Quantum API key.
 6. Call `GET /v1/list_backends?provider=ibm`.
-7. Submit `POST /v1/jobs/circuits`.
-8. Poll `GET /v1/jobs/{job_id}` until terminal.
-9. Fetch `GET /v1/jobs/{job_id}/result`.
+7. Call `POST /v1/transpile` with `provider=ibm` against one of the returned IBM backends.
+8. Submit `POST /v1/jobs/circuits`.
+9. Poll `GET /v1/jobs/{job_id}` until terminal.
+10. Fetch `GET /v1/jobs/{job_id}/result` for `succeeded`, or capture the structured provider error from `GET /v1/jobs/{job_id}` for `failed` / `cancelled`.
+11. Record date, environment, backend, terminal status, result/error artifact, and cleanup outcome.
 
 ## Deferred Managed IBM Access
 
