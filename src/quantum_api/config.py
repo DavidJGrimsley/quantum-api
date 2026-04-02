@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     app_name: str = "Quantum API"
     app_version: str = "0.1.0"
     app_env: str = Field(default="development", alias="APP_ENV")
+    root_path: str = Field(default="", alias="ROOT_PATH")
     api_prefix: str = Field(default="/v1", alias="API_PREFIX")
     max_text_length: int = Field(default=2000, alias="MAX_TEXT_LENGTH", ge=1, le=20000)
     max_circuit_qubits: int = Field(default=8, alias="MAX_CIRCUIT_QUBITS", ge=1, le=32)
@@ -96,6 +97,7 @@ class Settings(BaseSettings):
     rate_limiting_enabled: bool = Field(default=True, alias="RATE_LIMITING_ENABLED")
     redis_url: str = Field(default="redis://127.0.0.1:6379/0", alias="REDIS_URL")
     dev_rate_limit_bypass: bool = Field(default=True, alias="DEV_RATE_LIMIT_BYPASS")
+    public_api_cors_allow_all: bool = Field(default=False, alias="PUBLIC_API_CORS_ALLOW_ALL")
     ip_rate_limit_per_second: int = Field(default=20, alias="IP_RATE_LIMIT_PER_SECOND", ge=1, le=100000)
     ip_rate_limit_per_minute: int = Field(default=900, alias="IP_RATE_LIMIT_PER_MINUTE", ge=1, le=1000000)
 
@@ -119,6 +121,14 @@ class Settings(BaseSettings):
 
     def is_production_like(self) -> bool:
         return self.app_env_normalized in {"staging", "production"}
+
+    @property
+    def root_path_normalized(self) -> str:
+        value = self.root_path.strip()
+        if not value or value == "/":
+            return ""
+        normalized = "/" + value.strip("/")
+        return normalized
 
     def parsed_allow_origins(self) -> list[str]:
         if self.allow_origins.strip() == "*":

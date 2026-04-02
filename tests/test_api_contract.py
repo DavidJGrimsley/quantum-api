@@ -1,4 +1,7 @@
+from fastapi.testclient import TestClient
+
 from quantum_api.config import get_settings
+from quantum_api.main import app
 from quantum_api.services.quantum_runtime import runtime
 
 
@@ -43,6 +46,48 @@ def test_portfolio_metadata_contract(unauth_client):
     assert by_signature[("GET", "/v1/health")]["auth"] == "public"
     assert by_signature[("GET", "/v1/echo-types")]["auth"] == "api_key"
     assert by_signature[("GET", "/v1/keys")]["auth"] == "bearer_jwt"
+
+
+def test_portfolio_metadata_respects_root_path():
+    with TestClient(
+        app,
+        base_url="https://davidjgrimsley.com",
+        root_path="/public-facing/api/quantum",
+    ) as client:
+        response = client.get("/v1/portfolio.json")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["api"]["baseUrl"] == "https://davidjgrimsley.com/public-facing/api/quantum/v1"
+    assert payload["api"]["docsUrl"] == "https://davidjgrimsley.com/public-facing/api/quantum/docs"
+    assert payload["api"]["healthUrl"] == "https://davidjgrimsley.com/public-facing/api/quantum/v1/health"
+
+
+def test_auth_and_cors_respected_with_root_path():
+    with TestClient(
+        app,
+        base_url="https://davidjgrimsley.com",
+        root_path="/public-facing/api/quantum",
+    ) as client:
+        # /v1/echo-types should still require an API key when mounted under a prefix.
+        echo_response = client.get(
+            "/v1/echo-types",
+            headers={"Origin": "https://davidjgrimsley.com"},
+        )
+        assert echo_response.status_code == 401
+        assert "access-control-allow-origin" in {
+            k.lower() for k in echo_response.headers
+        }
+
+        # Key-management routes (e.g., /v1/keys) should still require JWT when prefixed.
+        keys_response = client.get(
+            "/v1/keys",
+            headers={"Origin": "https://davidjgrimsley.com"},
+        )
+        assert keys_response.status_code == 401
+        assert "access-control-allow-origin" in {
+            k.lower() for k in keys_response.headers
+        }
 
 
 def test_portfolio_request_body_examples_cover_required_fields(client, unauth_client):
