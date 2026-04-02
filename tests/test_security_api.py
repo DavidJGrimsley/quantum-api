@@ -288,13 +288,27 @@ def test_jwt_verifier_backend_failure_returns_503_with_cors(unauth_client, monke
     assert response.headers["access-control-allow-origin"] == "*"
 
 
-def test_key_management_routes_allow_only_configured_browser_origins(unauth_client):
+def test_key_management_routes_allow_only_configured_browser_origins(unauth_client, monkeypatch):
     original_env = settings.app_env
     original_allow_origins = settings.allow_origins
     original_public_runtime_cors = settings.public_api_cors_allow_all
     settings.app_env = "production"
     settings.allow_origins = "https://davidjgrimsley.com,https://www.davidjgrimsley.com"
     settings.public_api_cors_allow_all = True
+
+    async def allow_ip(*, client_ip: str) -> RateLimitResult:
+        return RateLimitResult(
+            allowed=True,
+            reason="ip_minute",
+            retry_after_seconds=60,
+            headers={
+                "RateLimit-Limit": "900",
+                "RateLimit-Remaining": "899",
+                "RateLimit-Reset": "60",
+            },
+        )
+
+    monkeypatch.setattr(rate_limiter, "check_ip", allow_ip)
 
     try:
         allowed = unauth_client.get("/v1/keys", headers={"Origin": "https://davidjgrimsley.com"})
