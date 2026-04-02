@@ -33,7 +33,8 @@ class Settings(BaseSettings):
     require_qiskit: bool = Field(default=False, alias="REQUIRE_QISKIT")
     ibm_token: str = Field(default="", alias="IBM_TOKEN")
     ibm_instance: str = Field(default="", alias="IBM_INSTANCE")
-    ibm_channel: str = Field(default="ibm_quantum", alias="IBM_CHANNEL")
+    ibm_channel: str = Field(default="ibm_quantum_platform", alias="IBM_CHANNEL")
+    ibm_credential_encryption_key: str = Field(default="", alias="IBM_CREDENTIAL_ENCRYPTION_KEY")
 
     auth_enabled: bool = Field(default=True, alias="AUTH_ENABLED")
     api_key_header: str = Field(default="X-API-Key", alias="API_KEY_HEADER")
@@ -161,11 +162,11 @@ class Settings(BaseSettings):
             return False
         if path in {f"{prefix}/health", f"{prefix}/portfolio.json"}:
             return False
-        return not path.startswith(f"{prefix}/keys")
+        return not path.startswith(f"{prefix}/keys") and not path.startswith(f"{prefix}/ibm/profiles")
 
     def requires_user_jwt(self, path: str) -> bool:
         prefix = self.api_prefix.rstrip("/")
-        return path.startswith(f"{prefix}/keys")
+        return path.startswith(f"{prefix}/keys") or path.startswith(f"{prefix}/ibm/profiles")
 
     @property
     def supabase_jwt_issuer_effective(self) -> str:
@@ -217,6 +218,9 @@ class Settings(BaseSettings):
 
     def ibm_is_configured(self) -> bool:
         return bool(self.ibm_token.strip() and self.ibm_instance.strip())
+
+    def ibm_profile_encryption_is_configured(self) -> bool:
+        return bool(self.ibm_credential_encryption_key.strip())
 
 
 @lru_cache

@@ -18,6 +18,7 @@ Planned expansion (tracked in project/TODO.md):
 - runtime/hardware jobs and advanced domain modules
 """
 
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -25,6 +26,14 @@ from fastapi.responses import JSONResponse
 
 from quantum_api.config import get_settings
 from quantum_api.enums import ECHO_TYPE_DESCRIPTIONS
+from quantum_api.execution_jobs import ExecutionJobRecord, QuantumExecutionJobNotFoundError
+from quantum_api.ibm_credentials import (
+    IBMProfileConflictError,
+    IBMProfileEncryptionUnavailableError,
+    IBMProfileMetadata,
+    IBMProfileNotFoundError,
+    ResolvedIbmCredentials,
+)
 from quantum_api.key_management import (
     ApiKeyDeleteConflictError,
     ApiKeyLimitExceededError,
@@ -43,6 +52,10 @@ from quantum_api.models.api import (
     ApiKeyRotateResponse,
     BackendListResponse,
     BackendProvider,
+    CircuitJobResultResponse,
+    CircuitJobStatusResponse,
+    CircuitJobSubmitRequest,
+    CircuitJobSubmitResponse,
     CircuitRunRequest,
     CircuitRunResponse,
     EchoTypeInfo,
@@ -51,6 +64,11 @@ from quantum_api.models.api import (
     GateRunRequest,
     GateRunResponse,
     HealthResponse,
+    IBMProfileCreateRequest,
+    IBMProfileListResponse,
+    IBMProfileResponse,
+    IBMProfileUpdateRequest,
+    IBMProfileVerifyResponse,
     PortfolioApiInfo,
     PortfolioEndpoint,
     PortfolioEndpointParameter,
@@ -69,7 +87,13 @@ from quantum_api.models.api import (
 from quantum_api.services.backend_catalog import list_backends
 from quantum_api.services.circuit_runner import run_circuit
 from quantum_api.services.gate_runner import run_gate
-from quantum_api.services.phase2_errors import Phase2ServiceError
+from quantum_api.services.hardware_jobs import HardwareJobService
+from quantum_api.services.ibm_provider import build_ibm_service, resolve_request_ibm_credentials
+from quantum_api.services.phase2_errors import (
+    JobNotFoundError,
+    Phase2ServiceError,
+    ProviderCredentialsInvalidError,
+)
 from quantum_api.services.quantum_runtime import runtime
 from quantum_api.services.text_transform import transform_text
 from quantum_api.services.transpilation import (
@@ -86,7 +110,7 @@ def _request_id_from(request: Request) -> str:
     return getattr(request.state, "request_id", "unknown")
 
 
-def _phase2_error_response(request: Request, exc: Phase2ServiceError) -> JSONResponse:
+def _service_error_response(request: Request, exc: Phase2ServiceError) -> JSONResponse:
     payload = exc.to_payload()
     payload["request_id"] = _request_id_from(request)
     return JSONResponse(
@@ -112,6 +136,20 @@ def _auth_user_id_from(request: Request) -> str:
     if not isinstance(user_id, str) or not user_id.strip():
         raise HTTPException(status_code=401, detail="Supabase authentication required")
     return user_id
+
+
+def _api_key_owner_user_id_from(request: Request) -> str | None:
+    owner_user_id = getattr(request.state, "api_key_owner_user_id", None)
+    if isinstance(owner_user_id, str) and owner_user_id.strip():
+        return owner_user_id
+    return None
+
+
+def _api_key_id_from(request: Request) -> str:
+    api_key_id = getattr(request.state, "api_key_id", None)
+    if not isinstance(api_key_id, str) or not api_key_id.strip():
+        raise HTTPException(status_code=401, detail="API key authentication required")
+    return api_key_id
 
 
 def _event_metadata_from_request(request: Request) -> dict[str, str]:
@@ -143,6 +181,72 @@ def _key_metadata_response(metadata: KeyMetadata) -> ApiKeyMetadataResponse:
         rotated_to_id=metadata.rotated_to_id,
         last_used_at=metadata.last_used_at,
     )
+
+
+def _ibm_profile_response(metadata: IBMProfileMetadata) -> IBMProfileResponse:
+    return IBMProfileResponse(
+        profile_id=metadata.profile_id,
+        owner_user_id=metadata.owner_user_id,
+        profile_name=metadata.profile_name,
+        instance=metadata.instance,
+        channel=metadata.channel,
+        masked_token=metadata.masked_token,
+        is_default=metadata.is_default,
+        verification_status=metadata.verification_status,
+        last_verified_at=metadata.last_verified_at,
+        created_at=metadata.created_at,
+        updated_at=metadata.updated_at,
+    )
+
+
+def _job_status_response(record: ExecutionJobRecord) -> CircuitJobStatusResponse:
+    error = None
+    if record.error_payload is not None:
+        error = {
+            "error": "provider_job_failed" if record.status == "failed" else "provider_job_error",
+            "message": str(record.error_payload.get("message", "Provider job failed.")),
+            "details": record.error_payload,
+        }
+    return CircuitJobStatusResponse.model_validate(
+        {
+            "job_id": record.job_id,
+            "provider": record.provider,
+            "backend_name": record.backend_name,
+            "ibm_profile": record.ibm_profile_name,
+            "remote_job_id": record.remote_job_id,
+            "status": record.status,
+            "created_at": record.created_at,
+            "updated_at": record.updated_at,
+            "completed_at": record.completed_at,
+            "error": error,
+        }
+    )
+
+
+async def _resolve_ibm_credentials(
+    request: Request,
+    *,
+    profile_name: str | None,
+    required: bool,
+) -> ResolvedIbmCredentials | None:
+    owner_user_id = _api_key_owner_user_id_from(request)
+    return await resolve_request_ibm_credentials(
+        owner_user_id=owner_user_id,
+        profile_name=profile_name,
+        profile_service=request.app.state.ibm_profile_service,
+        required=required,
+        allow_env_fallback=True,
+    )
+
+
+def _decrypt_job_token(request: Request, ciphertext: str) -> str:
+    if not ciphertext:
+        raise HTTPException(
+            status_code=503,
+            detail="Stored provider job credentials are unavailable for this environment.",
+        )
+    profile_service = request.app.state.ibm_profile_service
+    return profile_service.decrypt_token(ciphertext)
 
 
 def _request_base_url(request: Request) -> str:
@@ -549,6 +653,118 @@ async def delete_key(key_id: str, request: Request) -> ApiKeyDeleteResponse:
     return ApiKeyDeleteResponse(deleted_key_id=deleted_key_id)
 
 
+@router.get("/ibm/profiles", response_model=IBMProfileListResponse)
+async def list_ibm_profiles(request: Request) -> IBMProfileListResponse:
+    owner_user_id = _auth_user_id_from(request)
+    profile_service = request.app.state.ibm_profile_service
+    profiles = await profile_service.list_profiles(owner_user_id=owner_user_id)
+    return IBMProfileListResponse(profiles=[_ibm_profile_response(profile) for profile in profiles])
+
+
+@router.post("/ibm/profiles", response_model=IBMProfileResponse)
+async def create_ibm_profile(request: Request, payload: IBMProfileCreateRequest) -> IBMProfileResponse:
+    owner_user_id = _auth_user_id_from(request)
+    profile_service = request.app.state.ibm_profile_service
+    try:
+        profile = await profile_service.create_profile(
+            owner_user_id=owner_user_id,
+            profile_name=payload.profile_name,
+            token=payload.token,
+            instance=payload.instance,
+            channel=payload.channel,
+            is_default=payload.is_default,
+        )
+    except IBMProfileConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except IBMProfileEncryptionUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return _ibm_profile_response(profile)
+
+
+@router.patch("/ibm/profiles/{profile_id}", response_model=IBMProfileResponse)
+async def update_ibm_profile(profile_id: str, request: Request, payload: IBMProfileUpdateRequest) -> IBMProfileResponse:
+    owner_user_id = _auth_user_id_from(request)
+    profile_service = request.app.state.ibm_profile_service
+    try:
+        profile = await profile_service.update_profile(
+            owner_user_id=owner_user_id,
+            profile_id=profile_id,
+            profile_name=payload.profile_name,
+            token=payload.token,
+            instance=payload.instance,
+            channel=payload.channel,
+            is_default=payload.is_default,
+        )
+    except IBMProfileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=f"IBM profile '{exc.identifier}' was not found.") from exc
+    except IBMProfileConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except IBMProfileEncryptionUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return _ibm_profile_response(profile)
+
+
+@router.delete("/ibm/profiles/{profile_id}")
+async def delete_ibm_profile(profile_id: str, request: Request) -> dict[str, object]:
+    owner_user_id = _auth_user_id_from(request)
+    profile_service = request.app.state.ibm_profile_service
+    try:
+        deleted_profile_id = await profile_service.delete_profile(
+            owner_user_id=owner_user_id,
+            profile_id=profile_id,
+        )
+    except IBMProfileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=f"IBM profile '{exc.identifier}' was not found.") from exc
+    return {"deleted": True, "deleted_profile_id": deleted_profile_id}
+
+
+@router.post("/ibm/profiles/{profile_id}/verify", response_model=IBMProfileVerifyResponse)
+async def verify_ibm_profile(profile_id: str, request: Request) -> IBMProfileVerifyResponse | JSONResponse:
+    owner_user_id = _auth_user_id_from(request)
+    profile_service = request.app.state.ibm_profile_service
+    try:
+        credentials = await profile_service.get_profile_credentials_by_id(
+            owner_user_id=owner_user_id,
+            profile_id=profile_id,
+        )
+    except IBMProfileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=f"IBM profile '{exc.identifier}' was not found.") from exc
+    except IBMProfileEncryptionUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    try:
+        service = build_ibm_service(credentials)
+        service.backends()
+    except Phase2ServiceError as exc:
+        if isinstance(exc, ProviderCredentialsInvalidError):
+            await profile_service.set_verification_status(
+                owner_user_id=owner_user_id,
+                profile_id=profile_id,
+                status="invalid",
+                verified_at=None,
+            )
+        return _service_error_response(request, exc)
+    except Exception as exc:
+        await profile_service.set_verification_status(
+            owner_user_id=owner_user_id,
+            profile_id=profile_id,
+            status="invalid",
+            verified_at=None,
+        )
+        return _service_error_response(
+            request,
+            ProviderCredentialsInvalidError(details={"provider": "ibm", "provider_error": str(exc)}),
+        )
+
+    updated = await profile_service.set_verification_status(
+        owner_user_id=owner_user_id,
+        profile_id=profile_id,
+        status="verified",
+        verified_at=datetime.now(UTC),
+    )
+    return IBMProfileVerifyResponse(profile=_ibm_profile_response(updated))
+
+
 @router.post("/gates/run", response_model=GateRunResponse)
 def gates_run(request: GateRunRequest) -> GateRunResponse:
     """Run a single-qubit gate operation and return measurement results.
@@ -587,24 +803,35 @@ def circuits_run(request: CircuitRunRequest) -> CircuitRunResponse:
 
 
 @router.get("/list_backends", response_model=BackendListResponse)
-def get_backends(
+async def get_backends(
     request: Request,
     provider: Annotated[BackendProvider | None, Query()] = None,
     simulator_only: Annotated[bool, Query()] = False,
     min_qubits: Annotated[int, Query(ge=1)] = 1,
+    ibm_profile: Annotated[str | None, Query()] = None,
 ) -> BackendListResponse | JSONResponse:
     """List available backends from Aer and optional IBM providers."""
     if not runtime.qiskit_available:
         return _qiskit_unavailable_response(request)
 
     try:
+        ibm_credentials = await _resolve_ibm_credentials(
+            request,
+            profile_name=ibm_profile,
+            required=provider == "ibm",
+        )
+    except Phase2ServiceError as exc:
+        return _service_error_response(request, exc)
+
+    try:
         backends, warnings = list_backends(
             provider=provider,
             simulator_only=simulator_only,
             min_qubits=min_qubits,
+            ibm_credentials=ibm_credentials,
         )
     except Phase2ServiceError as exc:
-        return _phase2_error_response(request, exc)
+        return _service_error_response(request, exc)
 
     return BackendListResponse.model_validate(
         {
@@ -614,6 +841,7 @@ def get_backends(
                 "provider": provider,
                 "simulator_only": simulator_only,
                 "min_qubits": min_qubits,
+                "ibm_profile": ibm_profile,
             },
             "warnings": warnings or None,
         }
@@ -621,15 +849,24 @@ def get_backends(
 
 
 @router.post("/transpile", response_model=TranspileResponse)
-def transpile(request_data: TranspileRequest, request: Request) -> TranspileResponse | JSONResponse:
+async def transpile(request_data: TranspileRequest, request: Request) -> TranspileResponse | JSONResponse:
     """Transpile a circuit for a selected backend and return normalized output."""
     if not runtime.qiskit_available:
         return _qiskit_unavailable_response(request)
 
     try:
-        payload = transpile_circuit(request_data)
+        ibm_credentials = await _resolve_ibm_credentials(
+            request,
+            profile_name=request_data.ibm_profile,
+            required=request_data.provider == "ibm",
+        )
     except Phase2ServiceError as exc:
-        return _phase2_error_response(request, exc)
+        return _service_error_response(request, exc)
+
+    try:
+        payload = transpile_circuit(request_data, ibm_credentials=ibm_credentials)
+    except Phase2ServiceError as exc:
+        return _service_error_response(request, exc)
 
     return TranspileResponse.model_validate(payload)
 
@@ -643,7 +880,7 @@ def qasm_import(request_data: QasmImportRequest, request: Request) -> QasmImport
     try:
         payload = import_qasm(request_data)
     except Phase2ServiceError as exc:
-        return _phase2_error_response(request, exc)
+        return _service_error_response(request, exc)
 
     return QasmImportResponse.model_validate(payload)
 
@@ -657,9 +894,135 @@ def qasm_export(request_data: QasmExportRequest, request: Request) -> QasmExport
     try:
         payload = export_circuit_to_qasm(request_data)
     except Phase2ServiceError as exc:
-        return _phase2_error_response(request, exc)
+        return _service_error_response(request, exc)
 
     return QasmExportResponse.model_validate(payload)
+
+
+@router.post("/jobs/circuits", response_model=CircuitJobSubmitResponse)
+async def submit_circuit_job(
+    request: Request,
+    request_data: CircuitJobSubmitRequest,
+) -> CircuitJobSubmitResponse | JSONResponse:
+    owner_user_id = _api_key_owner_user_id_from(request)
+    if owner_user_id is None:
+        raise HTTPException(status_code=401, detail="API key authentication required")
+
+    try:
+        ibm_credentials = await _resolve_ibm_credentials(
+            request,
+            profile_name=request_data.ibm_profile,
+            required=True,
+        )
+        assert ibm_credentials is not None
+        if not ibm_credentials.token_ciphertext:
+            ibm_credentials = ResolvedIbmCredentials(
+                owner_user_id=ibm_credentials.owner_user_id,
+                profile_id=ibm_credentials.profile_id,
+                profile_name=ibm_credentials.profile_name,
+                instance=ibm_credentials.instance,
+                channel=ibm_credentials.channel,
+                masked_token=ibm_credentials.masked_token,
+                token=ibm_credentials.token,
+                token_ciphertext=request.app.state.ibm_profile_service.encrypt_token(ibm_credentials.token),
+                source=ibm_credentials.source,
+            )
+        hardware_job_service: HardwareJobService = request.app.state.hardware_job_service
+        record = await hardware_job_service.submit_circuit_job(
+            owner_user_id=owner_user_id,
+            api_key_id=_api_key_id_from(request),
+            request_data=request_data,
+            ibm_credentials=ibm_credentials,
+        )
+    except IBMProfileEncryptionUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Phase2ServiceError as exc:
+        return _service_error_response(request, exc)
+
+    return CircuitJobSubmitResponse.model_validate(
+        {
+            "job_id": record.job_id,
+            "provider": record.provider,
+            "backend_name": record.backend_name,
+            "ibm_profile": record.ibm_profile_name,
+            "remote_job_id": record.remote_job_id,
+            "status": record.status,
+            "created_at": record.created_at,
+        }
+    )
+
+
+@router.get("/jobs/{job_id}", response_model=CircuitJobStatusResponse)
+async def get_circuit_job(job_id: str, request: Request) -> CircuitJobStatusResponse | JSONResponse:
+    owner_user_id = _api_key_owner_user_id_from(request)
+    if owner_user_id is None:
+        raise HTTPException(status_code=401, detail="API key authentication required")
+
+    execution_job_service = request.app.state.execution_job_service
+    hardware_job_service: HardwareJobService = request.app.state.hardware_job_service
+    try:
+        record = await execution_job_service.get_job(owner_user_id=owner_user_id, job_id=job_id)
+        decrypted_token = _decrypt_job_token(request, record.credential_token_ciphertext)
+        record = await hardware_job_service.refresh_job(record=record, decrypted_token=decrypted_token)
+    except QuantumExecutionJobNotFoundError as exc:
+        return _service_error_response(request, JobNotFoundError(job_id=exc.job_id))
+    except IBMProfileEncryptionUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Phase2ServiceError as exc:
+        return _service_error_response(request, exc)
+
+    return _job_status_response(record)
+
+
+@router.get("/jobs/{job_id}/result", response_model=CircuitJobResultResponse)
+async def get_circuit_job_result(job_id: str, request: Request) -> CircuitJobResultResponse | JSONResponse:
+    owner_user_id = _api_key_owner_user_id_from(request)
+    if owner_user_id is None:
+        raise HTTPException(status_code=401, detail="API key authentication required")
+
+    execution_job_service = request.app.state.execution_job_service
+    hardware_job_service: HardwareJobService = request.app.state.hardware_job_service
+    try:
+        record = await execution_job_service.get_job(owner_user_id=owner_user_id, job_id=job_id)
+        decrypted_token = _decrypt_job_token(request, record.credential_token_ciphertext)
+        record = await hardware_job_service.refresh_job(record=record, decrypted_token=decrypted_token)
+        result_payload = hardware_job_service.assert_result_ready(record)
+    except QuantumExecutionJobNotFoundError as exc:
+        return _service_error_response(request, JobNotFoundError(job_id=exc.job_id))
+    except IBMProfileEncryptionUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Phase2ServiceError as exc:
+        return _service_error_response(request, exc)
+
+    return CircuitJobResultResponse.model_validate(
+        {
+            "job_id": record.job_id,
+            "status": "succeeded",
+            "result": result_payload,
+        }
+    )
+
+
+@router.post("/jobs/{job_id}/cancel", response_model=CircuitJobStatusResponse)
+async def cancel_circuit_job(job_id: str, request: Request) -> CircuitJobStatusResponse | JSONResponse:
+    owner_user_id = _api_key_owner_user_id_from(request)
+    if owner_user_id is None:
+        raise HTTPException(status_code=401, detail="API key authentication required")
+
+    execution_job_service = request.app.state.execution_job_service
+    hardware_job_service: HardwareJobService = request.app.state.hardware_job_service
+    try:
+        record = await execution_job_service.get_job(owner_user_id=owner_user_id, job_id=job_id)
+        decrypted_token = _decrypt_job_token(request, record.credential_token_ciphertext)
+        record = await hardware_job_service.cancel_job(record=record, decrypted_token=decrypted_token)
+    except QuantumExecutionJobNotFoundError as exc:
+        return _service_error_response(request, JobNotFoundError(job_id=exc.job_id))
+    except IBMProfileEncryptionUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Phase2ServiceError as exc:
+        return _service_error_response(request, exc)
+
+    return _job_status_response(record)
 
 
 @router.post("/text/transform", response_model=TextTransformResponse)

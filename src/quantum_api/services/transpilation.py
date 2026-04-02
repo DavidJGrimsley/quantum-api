@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from quantum_api.ibm_credentials import ResolvedIbmCredentials
 from quantum_api.models.api import QasmExportRequest, QasmImportRequest, TranspileRequest
 from quantum_api.services.backend_catalog import resolve_backend
 from quantum_api.services.circuit_conversion import (
@@ -13,7 +14,11 @@ from quantum_api.services.circuit_conversion import (
 from quantum_api.services.quantum_runtime import runtime
 
 
-def transpile_circuit(request: TranspileRequest) -> dict[str, object]:
+def transpile_circuit(
+    request: TranspileRequest,
+    *,
+    ibm_credentials: ResolvedIbmCredentials | None = None,
+) -> dict[str, object]:
     if not runtime.qiskit_available:
         raise RuntimeError("qiskit is unavailable for transpilation")
 
@@ -31,6 +36,7 @@ def transpile_circuit(request: TranspileRequest) -> dict[str, object]:
     provider, backend = resolve_backend(
         backend_name=request.backend_name,
         provider=request.provider,
+        ibm_credentials=ibm_credentials,
     )
     transpiled = _run_transpile(
         source_circuit,

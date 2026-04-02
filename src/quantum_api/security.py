@@ -105,6 +105,13 @@ class AuthenticatedApiKey:
 
 
 @dataclass(frozen=True)
+class ApiKeyAuthenticationAttempt:
+    key: AuthenticatedApiKey | None
+    failure_reason: str | None
+    key_prefix: str | None
+
+
+@dataclass(frozen=True)
 class RateLimitResult:
     allowed: bool
     reason: str
@@ -134,27 +141,35 @@ class ApiKeyAuthService:
         await self._discard_redis()
 
     async def authenticate(self, raw_api_key: str | None) -> AuthenticatedApiKey | None:
+        attempt = await self.authenticate_with_diagnostics(raw_api_key)
+        return attempt.key
+
+    async def authenticate_with_diagnostics(self, raw_api_key: str | None) -> ApiKeyAuthenticationAttempt:
         if not raw_api_key:
-            return None
+            return ApiKeyAuthenticationAttempt(key=None, failure_reason="missing_header", key_prefix=None)
 
         prefix = parse_api_key_prefix(raw_api_key, key_format_prefix=self._settings.api_key_format_prefix)
         if prefix is None:
-            return None
+            return ApiKeyAuthenticationAttempt(key=None, failure_reason="invalid_format", key_prefix=None)
 
         runtime_key = await self._runtime_key_by_prefix(prefix=prefix)
         if runtime_key is None:
-            return None
+            return ApiKeyAuthenticationAttempt(key=None, failure_reason="unknown_prefix", key_prefix=prefix)
 
         candidate_hash = self._lifecycle_service.hash_raw_key(raw_api_key)
         if hmac.compare_digest(candidate_hash, runtime_key.key_hash_sha256):
-            return AuthenticatedApiKey(
-                key_id=runtime_key.key_id,
-                owner_user_id=runtime_key.owner_user_id,
+            return ApiKeyAuthenticationAttempt(
+                key=AuthenticatedApiKey(
+                    key_id=runtime_key.key_id,
+                    owner_user_id=runtime_key.owner_user_id,
+                    key_prefix=runtime_key.key_prefix,
+                    policy=runtime_key.policy,
+                ),
+                failure_reason=None,
                 key_prefix=runtime_key.key_prefix,
-                policy=runtime_key.policy,
             )
 
-        return None
+        return ApiKeyAuthenticationAttempt(key=None, failure_reason="hash_mismatch", key_prefix=prefix)
 
     async def invalidate_key_prefix(self, prefix: str) -> None:
         if not await self._ensure_cache_connection():

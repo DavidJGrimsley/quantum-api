@@ -42,10 +42,16 @@ def test_portfolio_metadata_contract(unauth_client):
     assert ("GET", "/v1/health") in by_signature
     assert ("GET", "/v1/echo-types") in by_signature
     assert ("GET", "/v1/keys") in by_signature
+    assert ("GET", "/v1/ibm/profiles") in by_signature
+    assert ("POST", "/v1/jobs/circuits") in by_signature
+    assert ("GET", "/v1/jobs/{job_id}") in by_signature
 
     assert by_signature[("GET", "/v1/health")]["auth"] == "public"
     assert by_signature[("GET", "/v1/echo-types")]["auth"] == "api_key"
     assert by_signature[("GET", "/v1/keys")]["auth"] == "bearer_jwt"
+    assert by_signature[("GET", "/v1/ibm/profiles")]["auth"] == "bearer_jwt"
+    assert by_signature[("POST", "/v1/jobs/circuits")]["auth"] == "api_key"
+    assert by_signature[("GET", "/v1/jobs/{job_id}")]["auth"] == "api_key"
 
 
 def test_portfolio_metadata_respects_root_path():

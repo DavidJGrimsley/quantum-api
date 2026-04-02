@@ -18,6 +18,10 @@ os.environ.setdefault("DEV_BOOTSTRAP_API_KEY_ENABLED", "true")
 os.environ.setdefault("PUBLIC_API_CORS_ALLOW_ALL", "false")
 os.environ.setdefault("SUPABASE_URL", "https://example.supabase.co")
 os.environ.setdefault("SUPABASE_JWT_AUDIENCE", "authenticated")
+os.environ["IBM_TOKEN"] = ""
+os.environ["IBM_INSTANCE"] = ""
+os.environ["IBM_CHANNEL"] = "ibm_quantum_platform"
+os.environ["IBM_CREDENTIAL_ENCRYPTION_KEY"] = "test-ibm-credential-secret"
 
 from quantum_api.main import app  # noqa: E402
 

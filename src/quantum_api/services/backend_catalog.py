@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
-from quantum_api.config import get_settings
+from quantum_api.ibm_credentials import ResolvedIbmCredentials
 from quantum_api.models.api import BackendProvider
-from quantum_api.services.phase2_errors import BackendNotFoundError, ProviderUnavailableError
+from quantum_api.services.ibm_provider import build_ibm_service, clear_ibm_provider_cache
+from quantum_api.services.phase2_errors import (
+    BackendNotFoundError,
+    Phase2ServiceError,
+    ProviderUnavailableError,
+)
 from quantum_api.services.quantum_runtime import runtime
 
 LEGACY_AER_BACKEND_NAMES = {
@@ -30,6 +34,7 @@ def list_backends(
     provider: BackendProvider | None,
     simulator_only: bool,
     min_qubits: int,
+    ibm_credentials: ResolvedIbmCredentials | None = None,
 ) -> tuple[list[dict[str, object]], list[str]]:
     if not runtime.qiskit_available:
         raise RuntimeError("qiskit is unavailable for backend discovery")
@@ -44,8 +49,8 @@ def list_backends(
             continue
 
         try:
-            raw_entries.extend(("ibm", backend) for backend in _list_ibm_backends())
-        except ProviderUnavailableError as exc:
+            raw_entries.extend(("ibm", backend) for backend in _list_ibm_backends(ibm_credentials))
+        except Phase2ServiceError as exc:
             if provider == "ibm":
                 raise
             warnings.append(exc.message)
@@ -70,7 +75,12 @@ def list_backends(
     return filtered, warnings
 
 
-def resolve_backend(backend_name: str, provider: BackendProvider | None) -> tuple[BackendProvider, Any]:
+def resolve_backend(
+    backend_name: str,
+    provider: BackendProvider | None,
+    *,
+    ibm_credentials: ResolvedIbmCredentials | None = None,
+) -> tuple[BackendProvider, Any]:
     if provider in {None, "aer"}:
         aer_backend = _get_aer_backend(backend_name)
         if aer_backend is not None:
@@ -80,7 +90,7 @@ def resolve_backend(backend_name: str, provider: BackendProvider | None) -> tupl
 
     if provider in {None, "ibm"}:
         try:
-            ibm_backend = _get_ibm_backend(backend_name)
+            ibm_backend = _get_ibm_backend(backend_name, ibm_credentials)
         except ProviderUnavailableError:
             if provider == "ibm":
                 raise
@@ -94,7 +104,7 @@ def resolve_backend(backend_name: str, provider: BackendProvider | None) -> tupl
 
 
 def clear_backend_catalog_cache() -> None:
-    _build_ibm_service.cache_clear()
+    clear_ibm_provider_cache()
 
 
 def _list_aer_backends() -> list[Any]:
@@ -136,8 +146,8 @@ def _load_aer_backend(backend_name: str) -> Any | None:
         return None
 
 
-def _list_ibm_backends() -> list[Any]:
-    service = _get_ibm_service()
+def _list_ibm_backends(ibm_credentials: ResolvedIbmCredentials | None) -> list[Any]:
+    service = _get_ibm_service(ibm_credentials)
     try:
         return list(service.backends())
     except Exception as exc:
@@ -147,8 +157,8 @@ def _list_ibm_backends() -> list[Any]:
         ) from exc
 
 
-def _get_ibm_backend(backend_name: str) -> Any | None:
-    service = _get_ibm_service()
+def _get_ibm_backend(backend_name: str, ibm_credentials: ResolvedIbmCredentials | None) -> Any | None:
+    service = _get_ibm_service(ibm_credentials)
     try:
         return service.backend(backend_name)
     except Exception:
@@ -158,54 +168,16 @@ def _get_ibm_backend(backend_name: str) -> Any | None:
     return None
 
 
-def _get_ibm_service() -> Any:
-    settings = get_settings()
-    if not settings.ibm_is_configured():
+def _get_ibm_service(ibm_credentials: ResolvedIbmCredentials | None) -> Any:
+    if ibm_credentials is None:
         raise ProviderUnavailableError(
             provider="ibm",
             details={
                 "reason": "missing_credentials",
-                "message": "Set IBM_TOKEN and IBM_INSTANCE to enable IBM backend discovery.",
+                "message": "Configure IBM profile credentials or server-level IBM_TOKEN/IBM_INSTANCE to enable IBM provider support.",
             },
         )
-
-    if not runtime.ibm_runtime_available or runtime.QiskitRuntimeService is None:
-        raise ProviderUnavailableError(
-            provider="ibm",
-            details={
-                "reason": "missing_dependency",
-                "message": "Install qiskit-ibm-runtime to enable IBM backend discovery.",
-                "import_error": runtime.ibm_runtime_import_error,
-            },
-        )
-
-    try:
-        return _build_ibm_service(
-            token=settings.ibm_token,
-            instance=settings.ibm_instance,
-            channel=settings.ibm_channel,
-        )
-    except ProviderUnavailableError:
-        raise
-    except Exception as exc:
-        raise ProviderUnavailableError(
-            provider="ibm",
-            details={"reason": "service_initialization_failed", "provider_error": str(exc)},
-        ) from exc
-
-
-@lru_cache
-def _build_ibm_service(*, token: str, instance: str, channel: str) -> Any:
-    if runtime.QiskitRuntimeService is None:
-        raise ProviderUnavailableError(
-            provider="ibm",
-            details={"reason": "missing_dependency", "import_error": runtime.ibm_runtime_import_error},
-        )
-    return runtime.QiskitRuntimeService(
-        token=token,
-        instance=instance,
-        channel=channel,
-    )
+    return build_ibm_service(ibm_credentials)
 
 
 def _serialize_backend(provider: BackendProvider, backend: Any) -> dict[str, object]:
