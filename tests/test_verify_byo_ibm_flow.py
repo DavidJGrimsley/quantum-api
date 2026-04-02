@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
@@ -15,7 +16,9 @@ sys.modules[_SPEC.name] = _MODULE
 _SPEC.loader.exec_module(_MODULE)
 
 VerificationConfig = _MODULE.VerificationConfig
+VerificationArtifacts = _MODULE.VerificationArtifacts
 VerificationError = _MODULE.VerificationError
+_redact_sensitive_data = _MODULE._redact_sensitive_data
 run_verification = _MODULE.run_verification
 
 
@@ -44,12 +47,14 @@ def _base_config(*, cleanup: bool) -> VerificationConfig:
 
 def test_verify_byo_ibm_flow_success_path():
     poll_counter = {"count": 0}
+    created_profile_payload: dict[str, object] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
         path = request.url.path
         method = request.method
 
         if method == "POST" and path == "/v1/ibm/profiles":
+            created_profile_payload.update(json.loads(request.content.decode("utf-8")))
             return _json_response(
                 request,
                 200,
@@ -118,6 +123,7 @@ def test_verify_byo_ibm_flow_success_path():
     assert artifacts.terminal_status == "succeeded"
     assert artifacts.result_payload is not None
     assert artifacts.result_payload["result"]["counts"] == {"00": 64, "11": 64}
+    assert created_profile_payload["is_default"] is False
 
 
 def test_verify_byo_ibm_flow_terminal_failure_returns_structured_error():
@@ -360,3 +366,50 @@ def test_verify_byo_ibm_flow_cleans_up_resources_after_partial_failure():
         "deleted key key-123",
         "deleted IBM profile profile-123",
     ]
+
+
+def test_redact_sensitive_data_scrubs_nested_secrets():
+    payload = {
+        "raw_key": "qapi-secret",
+        "token": "ibm-secret",
+        "headers": {
+            "Authorization": "Bearer secret",
+            "X-API-Key": "qapi-header-secret",
+        },
+        "result": [{"token": "nested-token"}, {"safe": "value"}],
+    }
+
+    assert _redact_sensitive_data(payload) == {
+        "raw_key": "<redacted>",
+        "token": "<redacted>",
+        "headers": {
+            "Authorization": "<redacted>",
+            "X-API-Key": "<redacted>",
+        },
+        "result": [{"token": "<redacted>"}, {"safe": "value"}],
+    }
+
+
+def test_main_redacts_sensitive_values_in_error_output(monkeypatch, capsys):
+    config = _base_config(cleanup=False)
+
+    monkeypatch.setattr(_MODULE, "parse_args", lambda: object())
+    monkeypatch.setattr(_MODULE, "build_config_from_args", lambda args: config)
+
+    def fake_run_verification(_config: VerificationConfig) -> VerificationArtifacts:
+        raise VerificationError(
+            "Create Quantum API key failed.",
+            artifacts=VerificationArtifacts(api_base_url=config.api_base_url),
+            response_payload={
+                "raw_key": "qapi-secret",
+                "headers": {"Authorization": "Bearer secret"},
+            },
+        )
+
+    monkeypatch.setattr(_MODULE, "run_verification", fake_run_verification)
+
+    assert _MODULE.main() == 1
+    output = capsys.readouterr().out
+    assert "qapi-secret" not in output
+    assert "Bearer secret" not in output
+    assert "<redacted>" in output

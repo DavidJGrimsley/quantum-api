@@ -13,6 +13,16 @@ from typing import Any
 import httpx
 
 TERMINAL_JOB_STATUSES = {"succeeded", "failed", "cancelled"}
+_REDACTED = "<redacted>"
+_SENSITIVE_KEYS = {
+    "api_key",
+    "apikey",
+    "authorization",
+    "bearer_jwt",
+    "raw_key",
+    "token",
+    "x-api-key",
+}
 DEFAULT_BELL_CIRCUIT = {
     "num_qubits": 2,
     "operations": [
@@ -131,6 +141,21 @@ def _request_json(
     return payload
 
 
+def _redact_sensitive_data(value: Any) -> Any:
+    if isinstance(value, dict):
+        redacted: dict[str, Any] = {}
+        for key, nested_value in value.items():
+            normalized_key = key.strip().lower()
+            if normalized_key in _SENSITIVE_KEYS:
+                redacted[key] = _REDACTED
+            else:
+                redacted[key] = _redact_sensitive_data(nested_value)
+        return redacted
+    if isinstance(value, list):
+        return [_redact_sensitive_data(item) for item in value]
+    return value
+
+
 def _select_backend(
     payload: dict[str, Any],
     *,
@@ -239,7 +264,7 @@ def run_verification(
                 "token": config.ibm_token,
                 "instance": config.ibm_instance,
                 "channel": config.ibm_channel,
-                "is_default": True,
+                "is_default": False,
             },
             action="Create IBM profile",
             artifacts=artifacts,
@@ -518,7 +543,7 @@ def main() -> int:
         print(f"Error: {exc}")
         if exc.response_payload is not None:
             print("Response payload:")
-            print(json.dumps(exc.response_payload, indent=2, sort_keys=True))
+            print(json.dumps(_redact_sensitive_data(exc.response_payload), indent=2, sort_keys=True))
         return 1
     except Exception as exc:
         print("BYO IBM verification: FAIL")

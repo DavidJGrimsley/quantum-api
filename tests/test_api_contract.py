@@ -9,7 +9,7 @@ from quantum_api.services.quantum_runtime import runtime
 from quantum_api.supabase_auth import AuthenticatedUser
 
 _PATH_PARAMETER_RE = re.compile(r"{([^}]+)}")
-_ALLOWED_SMOKE_ERROR_STATUSES = {400, 401, 403, 409, 503}
+_ALLOWED_SMOKE_ERROR_STATUSES = {400, 409, 503}
 
 
 def _mock_bearer_user(
