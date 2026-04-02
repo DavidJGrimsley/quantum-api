@@ -1,9 +1,22 @@
 from __future__ import annotations
 
+from importlib.util import module_from_spec, spec_from_file_location
+from pathlib import Path
+import sys
+
 import httpx
 import pytest
 
-from scripts.verify_byo_ibm_flow import VerificationConfig, VerificationError, run_verification
+_SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "verify_byo_ibm_flow.py"
+_SPEC = spec_from_file_location("verify_byo_ibm_flow_script", _SCRIPT_PATH)
+assert _SPEC is not None and _SPEC.loader is not None
+_MODULE = module_from_spec(_SPEC)
+sys.modules[_SPEC.name] = _MODULE
+_SPEC.loader.exec_module(_MODULE)
+
+VerificationConfig = _MODULE.VerificationConfig
+VerificationError = _MODULE.VerificationError
+run_verification = _MODULE.run_verification
 
 
 def _json_response(request: httpx.Request, status_code: int, payload: dict) -> httpx.Response:
