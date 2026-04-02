@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from dataclasses import dataclass
 from uuid import uuid4
 
 from fastapi import Request
@@ -31,6 +32,132 @@ from quantum_api.security import (
 from quantum_api.supabase_auth import JwtVerificationError, SupabaseJwtVerifier
 
 logger = logging.getLogger(__name__)
+
+_CORS_ALLOWED_METHODS = ("GET", "POST", "DELETE", "OPTIONS")
+
+
+@dataclass(frozen=True)
+class CorsPolicy:
+    allow_all: bool
+    allowed_origins: tuple[str, ...]
+    expose_headers: tuple[str, ...]
+
+
+class RouteAwareCORSMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, *, settings: Settings) -> None:
+        super().__init__(app)
+        self._settings = settings
+        self._default_allow_headers = (
+            "Accept",
+            "Authorization",
+            "Content-Type",
+            "Origin",
+            settings.api_key_header,
+            settings.metrics_token_header,
+            settings.request_id_header,
+        )
+        self._runtime_expose_headers = (
+            settings.request_id_header,
+            "RateLimit-Limit",
+            "RateLimit-Remaining",
+            "RateLimit-Reset",
+            "Retry-After",
+        )
+
+    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
+        policy = self._policy_for_path(request.url.path)
+        if self._is_preflight_request(request):
+            return self._preflight_response(request, policy)
+
+        response = await call_next(request)
+        self._apply_cors_headers(request, response, policy)
+        return response
+
+    @staticmethod
+    def _is_preflight_request(request: Request) -> bool:
+        return (
+            request.method == "OPTIONS"
+            and "origin" in request.headers
+            and "access-control-request-method" in request.headers
+        )
+
+    def _policy_for_path(self, path: str) -> CorsPolicy | None:
+        if path == self._settings.metrics_path:
+            return None
+
+        if (
+            self._settings.public_api_cors_allow_all
+            and path.startswith(self._settings.api_prefix.rstrip("/"))
+            and not self._settings.requires_user_jwt(path)
+        ):
+            return CorsPolicy(
+                allow_all=True,
+                allowed_origins=(),
+                expose_headers=self._runtime_expose_headers,
+            )
+
+        effective_origins = tuple(self._settings.effective_allow_origins())
+        if "*" in effective_origins:
+            expose_headers = self._runtime_expose_headers if path.startswith(self._settings.api_prefix.rstrip("/")) else ()
+            return CorsPolicy(
+                allow_all=True,
+                allowed_origins=(),
+                expose_headers=expose_headers,
+            )
+
+        expose_headers = self._runtime_expose_headers if self._settings.requires_api_key(path) else ()
+        return CorsPolicy(
+            allow_all=False,
+            allowed_origins=effective_origins,
+            expose_headers=expose_headers,
+        )
+
+    def _preflight_response(self, request: Request, policy: CorsPolicy | None) -> Response:
+        if policy is None:
+            return Response(status_code=404)
+
+        origin = request.headers.get("origin", "")
+        if not policy.allow_all and origin not in policy.allowed_origins:
+            return Response(status_code=400)
+
+        headers = self._cors_base_headers(request, policy)
+        headers["Access-Control-Allow-Methods"] = ", ".join(_CORS_ALLOWED_METHODS)
+        headers["Access-Control-Allow-Headers"] = request.headers.get(
+            "access-control-request-headers",
+            ", ".join(self._default_allow_headers),
+        )
+        headers["Access-Control-Max-Age"] = "600"
+        return Response(status_code=200, headers=headers)
+
+    def _apply_cors_headers(self, request: Request, response: Response, policy: CorsPolicy | None) -> None:
+        origin = request.headers.get("origin")
+        if not origin or policy is None:
+            return
+        if not policy.allow_all and origin not in policy.allowed_origins:
+            return
+
+        for name, value in self._cors_base_headers(request, policy).items():
+            response.headers[name] = value
+
+        if policy.expose_headers:
+            response.headers["Access-Control-Expose-Headers"] = ", ".join(policy.expose_headers)
+
+    def _cors_base_headers(self, request: Request, policy: CorsPolicy) -> dict[str, str]:
+        if policy.allow_all:
+            return {"Access-Control-Allow-Origin": "*"}
+
+        vary_values = ["Origin"]
+        requested_headers = request.headers.get("access-control-request-headers")
+        if requested_headers:
+            vary_values.append("Access-Control-Request-Headers")
+        requested_method = request.headers.get("access-control-request-method")
+        if requested_method:
+            vary_values.append("Access-Control-Request-Method")
+
+        return {
+            "Access-Control-Allow-Origin": request.headers["origin"],
+            "Vary": ", ".join(vary_values),
+        }
 
 
 class SecurityObservabilityMiddleware(BaseHTTPMiddleware):

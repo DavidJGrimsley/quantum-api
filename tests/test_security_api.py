@@ -96,6 +96,60 @@ def test_rate_limit_headers_present_on_success(client, monkeypatch):
         settings.dev_rate_limit_bypass = original_bypass
 
 
+def test_public_runtime_routes_allow_any_origin_and_expose_runtime_headers(client, monkeypatch):
+    original_env = settings.app_env
+    original_allow_origins = settings.allow_origins
+    original_public_runtime_cors = settings.public_api_cors_allow_all
+    original_bypass = settings.dev_rate_limit_bypass
+    settings.app_env = "production"
+    settings.allow_origins = "https://davidjgrimsley.com,https://www.davidjgrimsley.com"
+    settings.public_api_cors_allow_all = True
+    settings.dev_rate_limit_bypass = False
+
+    async def allow_ip(*, client_ip: str) -> RateLimitResult:
+        return RateLimitResult(
+            allowed=True,
+            reason="ip_minute",
+            retry_after_seconds=60,
+            headers={
+                "RateLimit-Limit": "900",
+                "RateLimit-Remaining": "899",
+                "RateLimit-Reset": "60",
+            },
+        )
+
+    async def allow_key(*, key_id: str, policy) -> RateLimitResult:
+        return RateLimitResult(
+            allowed=True,
+            reason="key_minute",
+            retry_after_seconds=60,
+            headers={
+                "RateLimit-Limit": "600",
+                "RateLimit-Remaining": "599",
+                "RateLimit-Reset": "60",
+            },
+        )
+
+    monkeypatch.setattr(rate_limiter, "check_ip", allow_ip)
+    monkeypatch.setattr(rate_limiter, "check_key", allow_key)
+
+    try:
+        response = client.get("/v1/echo-types", headers={"Origin": "https://itch.io"})
+        assert response.status_code == 200
+        assert response.headers["Access-Control-Allow-Origin"] == "*"
+        exposed = response.headers["Access-Control-Expose-Headers"]
+        assert "X-Request-ID" in exposed
+        assert "RateLimit-Limit" in exposed
+        assert "RateLimit-Remaining" in exposed
+        assert "RateLimit-Reset" in exposed
+        assert "Retry-After" in exposed
+    finally:
+        settings.app_env = original_env
+        settings.allow_origins = original_allow_origins
+        settings.public_api_cors_allow_all = original_public_runtime_cors
+        settings.dev_rate_limit_bypass = original_bypass
+
+
 def test_rate_limit_429_envelope_and_headers(client, monkeypatch):
     original_bypass = settings.dev_rate_limit_bypass
     settings.dev_rate_limit_bypass = False
@@ -232,6 +286,79 @@ def test_jwt_verifier_backend_failure_returns_503_with_cors(unauth_client, monke
         "unable to verify Supabase JWT at this time."
     )
     assert response.headers["access-control-allow-origin"] == "*"
+
+
+def test_key_management_routes_allow_only_configured_browser_origins(unauth_client):
+    original_env = settings.app_env
+    original_allow_origins = settings.allow_origins
+    original_public_runtime_cors = settings.public_api_cors_allow_all
+    settings.app_env = "production"
+    settings.allow_origins = "https://davidjgrimsley.com,https://www.davidjgrimsley.com"
+    settings.public_api_cors_allow_all = True
+
+    try:
+        allowed = unauth_client.get("/v1/keys", headers={"Origin": "https://davidjgrimsley.com"})
+        assert allowed.status_code == 401
+        assert allowed.headers["Access-Control-Allow-Origin"] == "https://davidjgrimsley.com"
+
+        disallowed = unauth_client.get("/v1/keys", headers={"Origin": "https://itch.io"})
+        assert disallowed.status_code == 401
+        assert "Access-Control-Allow-Origin" not in disallowed.headers
+    finally:
+        settings.app_env = original_env
+        settings.allow_origins = original_allow_origins
+        settings.public_api_cors_allow_all = original_public_runtime_cors
+
+
+def test_key_management_preflight_is_rejected_for_disallowed_origin_in_public_api_mode(unauth_client):
+    original_env = settings.app_env
+    original_allow_origins = settings.allow_origins
+    original_public_runtime_cors = settings.public_api_cors_allow_all
+    settings.app_env = "production"
+    settings.allow_origins = "https://davidjgrimsley.com,https://www.davidjgrimsley.com"
+    settings.public_api_cors_allow_all = True
+
+    try:
+        response = unauth_client.options(
+            "/v1/keys/revoked",
+            headers={
+                "Origin": "https://itch.io",
+                "Access-Control-Request-Method": "DELETE",
+            },
+        )
+        assert response.status_code == 400
+        assert "Access-Control-Allow-Origin" not in response.headers
+    finally:
+        settings.app_env = original_env
+        settings.allow_origins = original_allow_origins
+        settings.public_api_cors_allow_all = original_public_runtime_cors
+
+
+def test_key_management_preflight_is_allowed_for_configured_site_origin_in_public_api_mode(unauth_client):
+    original_env = settings.app_env
+    original_allow_origins = settings.allow_origins
+    original_public_runtime_cors = settings.public_api_cors_allow_all
+    settings.app_env = "production"
+    settings.allow_origins = "https://davidjgrimsley.com,https://www.davidjgrimsley.com"
+    settings.public_api_cors_allow_all = True
+
+    try:
+        response = unauth_client.options(
+            "/v1/keys/revoked",
+            headers={
+                "Origin": "https://davidjgrimsley.com",
+                "Access-Control-Request-Method": "DELETE",
+                "Access-Control-Request-Headers": "authorization",
+            },
+        )
+        assert response.status_code == 200
+        assert response.headers["Access-Control-Allow-Origin"] == "https://davidjgrimsley.com"
+        allow_methods = response.headers.get("Access-Control-Allow-Methods", "")
+        assert "DELETE" in allow_methods
+    finally:
+        settings.app_env = original_env
+        settings.allow_origins = original_allow_origins
+        settings.public_api_cors_allow_all = original_public_runtime_cors
 
 
 def test_delete_preflight_is_allowed_for_local_origin(unauth_client):

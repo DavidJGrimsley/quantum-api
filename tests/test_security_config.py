@@ -19,6 +19,20 @@ def test_production_rejects_wildcard_cors() -> None:
         settings.validate_runtime_configuration()
 
 
+def test_production_accepts_public_runtime_cors_with_explicit_restricted_origins() -> None:
+    settings = Settings(
+        app_env="production",
+        allow_origins="https://davidjgrimsley.com,https://www.davidjgrimsley.com",
+        public_api_cors_allow_all=True,
+        dev_rate_limit_bypass=False,
+        metrics_token="metrics-secret",
+        database_auto_create=False,
+        api_key_hash_secret="prod-secret",
+    )
+
+    settings.validate_runtime_configuration()
+
+
 def test_production_requires_metrics_token_when_enabled() -> None:
     settings = Settings(
         app_env="production",
@@ -103,3 +117,8 @@ def test_non_development_does_not_inject_localhost_origins() -> None:
     settings.validate_runtime_configuration()
     origins = settings.effective_allow_origins()
     assert origins == ["https://davidjgrimsley.com"]
+
+
+def test_root_path_is_normalized() -> None:
+    settings = Settings(root_path="public-facing/api/quantum/")
+    assert settings.root_path_normalized == "/public-facing/api/quantum"

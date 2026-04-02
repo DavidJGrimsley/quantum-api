@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hmac
 import json
 import logging
@@ -116,22 +117,21 @@ class ApiKeyAuthService:
         self._settings = settings
         self._lifecycle_service = lifecycle_service
         self._redis: Any | None = None
+        self._redis_loop: asyncio.AbstractEventLoop | None = None
 
     async def startup_check(self) -> None:
         if not self._settings.redis_url.strip():
             return
-        self._redis = Redis.from_url(self._settings.redis_url, decode_responses=True)
+        await self._ensure_cache_connection()
         try:
+            assert self._redis is not None
             await self._redis.ping()
         except RedisError:
             logger.warning("API key metadata cache is unavailable; falling back to DB lookups.")
-            await self._redis.aclose()
-            self._redis = None
+            await self._discard_redis()
 
     async def close(self) -> None:
-        if self._redis is not None:
-            await self._redis.aclose()
-            self._redis = None
+        await self._discard_redis()
 
     async def authenticate(self, raw_api_key: str | None) -> AuthenticatedApiKey | None:
         if not raw_api_key:
@@ -157,9 +157,10 @@ class ApiKeyAuthService:
         return None
 
     async def invalidate_key_prefix(self, prefix: str) -> None:
-        if self._redis is None:
+        if not await self._ensure_cache_connection():
             return
         try:
+            assert self._redis is not None
             await self._redis.delete(self._cache_key(prefix))
         except RedisError:
             logger.warning("Unable to invalidate API key metadata cache.", exc_info=True)
@@ -175,9 +176,10 @@ class ApiKeyAuthService:
         return runtime_key
 
     async def _read_cache(self, *, prefix: str) -> RuntimeApiKey | None:
-        if self._redis is None:
+        if not await self._ensure_cache_connection():
             return None
         try:
+            assert self._redis is not None
             raw = await self._redis.get(self._cache_key(prefix))
         except RedisError:
             logger.warning("Unable to read API key metadata cache.", exc_info=True)
@@ -204,7 +206,7 @@ class ApiKeyAuthService:
             return None
 
     async def _write_cache(self, runtime_key: RuntimeApiKey) -> None:
-        if self._redis is None:
+        if not await self._ensure_cache_connection():
             return
         payload = json.dumps(
             {
@@ -220,6 +222,7 @@ class ApiKeyAuthService:
             }
         )
         try:
+            assert self._redis is not None
             await self._redis.set(self._cache_key(runtime_key.key_prefix), payload, ex=self._settings.api_key_cache_ttl_seconds)
         except RedisError:
             logger.warning("Unable to write API key metadata cache.", exc_info=True)
@@ -227,11 +230,35 @@ class ApiKeyAuthService:
     def _cache_key(self, prefix: str) -> str:
         return f"api-key-meta:{prefix}"
 
+    async def _ensure_cache_connection(self) -> bool:
+        current_loop = asyncio.get_running_loop()
+        if self._redis is not None and self._redis_loop is current_loop:
+            return True
+        if self._redis is not None:
+            await self._discard_redis()
+        if not self._settings.redis_url.strip():
+            return False
+        self._redis = Redis.from_url(self._settings.redis_url, decode_responses=True)
+        self._redis_loop = current_loop
+        return True
+
+    async def _discard_redis(self) -> None:
+        redis = self._redis
+        self._redis = None
+        self._redis_loop = None
+        if redis is None:
+            return
+        try:
+            await redis.aclose()
+        except (RedisError, RuntimeError):
+            logger.debug("Unable to close API key metadata cache client cleanly.", exc_info=True)
+
 
 class RedisRateLimiter:
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
         self._redis: Any | None = None
+        self._redis_loop: asyncio.AbstractEventLoop | None = None
 
     async def startup_check(self) -> None:
         if not self._settings.rate_limiting_enabled:
@@ -248,9 +275,7 @@ class RedisRateLimiter:
             raise RateLimiterUnavailableError("Unable to ping Redis during startup") from exc
 
     async def close(self) -> None:
-        if self._redis is not None:
-            await self._redis.aclose()
-            self._redis = None
+        await self._discard_redis()
 
     async def check_key(self, *, key_id: str, policy: KeyPolicy) -> RateLimitResult:
         result = await self._evaluate_limit(
@@ -326,11 +351,15 @@ class RedisRateLimiter:
         )
 
     async def _ensure_redis_connection(self) -> None:
-        if self._redis is not None:
+        current_loop = asyncio.get_running_loop()
+        if self._redis is not None and self._redis_loop is current_loop:
             return
+        if self._redis is not None:
+            await self._discard_redis()
         if not self._settings.redis_url.strip():
             raise RateLimiterUnavailableError("REDIS_URL is empty")
         self._redis = Redis.from_url(self._settings.redis_url, decode_responses=True)
+        self._redis_loop = current_loop
 
     def _build_window_values(
         self, *, scope: str, identifier: str
@@ -351,6 +380,17 @@ class RedisRateLimiter:
         minute_key = f"rate:{scope}:{identifier}:minute:{epoch_minute}"
         day_key = f"quota:{scope}:{identifier}:day:{day_bucket}"
         return second_key, minute_key, day_key, second_ttl, minute_ttl, day_ttl
+
+    async def _discard_redis(self) -> None:
+        redis = self._redis
+        self._redis = None
+        self._redis_loop = None
+        if redis is None:
+            return
+        try:
+            await redis.aclose()
+        except (RedisError, RuntimeError):
+            logger.debug("Unable to close Redis rate limiter client cleanly.", exc_info=True)
 
     @staticmethod
     def _with_scope_reason(result: RateLimitResult, scope: str) -> RateLimitResult:

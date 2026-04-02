@@ -29,15 +29,17 @@ class JwtVerificationError(Exception):
 class SupabaseJwtVerifier:
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
-        self._client = httpx.AsyncClient(timeout=5.0)
+        self._client: httpx.AsyncClient | None = None
+        self._client_loop: asyncio.AbstractEventLoop | None = None
         self._jwks_by_kid: dict[str, dict[str, Any]] = {}
         self._jwks_cached_at = 0.0
-        self._lock = asyncio.Lock()
+        self._lock: asyncio.Lock | None = None
         self._jwks_url = f"{settings.supabase_url.rstrip('/')}/auth/v1/.well-known/jwks.json"
 
     async def startup_check(self) -> None:
         if not self._settings.auth_enabled:
             return
+        await self._ensure_http_client()
         try:
             await self._refresh_jwks_if_needed(force=False)
         except Exception:
@@ -46,7 +48,7 @@ class SupabaseJwtVerifier:
             logger.warning("Unable to prefetch Supabase JWKS during startup; will retry on demand.", exc_info=True)
 
     async def close(self) -> None:
-        await self._client.aclose()
+        await self._discard_http_client()
 
     async def verify_authorization_header(self, authorization_header: str | None) -> AuthenticatedUser:
         token = self._extract_bearer_token(authorization_header)
@@ -109,10 +111,12 @@ class SupabaseJwtVerifier:
         return self._jwks_by_kid.get(kid)
 
     async def _refresh_jwks_if_needed(self, *, force: bool) -> None:
+        await self._ensure_http_client()
         now = time.time()
         if not force and self._jwks_by_kid and (now - self._jwks_cached_at) < self._settings.supabase_jwks_cache_seconds:
             return
 
+        assert self._lock is not None
         async with self._lock:
             now = time.time()
             if (
@@ -122,6 +126,7 @@ class SupabaseJwtVerifier:
             ):
                 return
 
+            assert self._client is not None
             response = await self._client.get(self._jwks_url)
             response.raise_for_status()
             payload = response.json()
@@ -144,3 +149,32 @@ class SupabaseJwtVerifier:
             self._jwks_by_kid = parsed
             self._jwks_cached_at = now
             logger.info("Supabase JWKS cache refreshed with %s keys.", len(parsed))
+
+    async def _ensure_http_client(self) -> None:
+        current_loop = asyncio.get_running_loop()
+        if (
+            self._client is not None
+            and not self._client.is_closed
+            and self._client_loop is current_loop
+            and self._lock is not None
+        ):
+            return
+
+        if self._client is not None:
+            await self._discard_http_client()
+
+        self._client = httpx.AsyncClient(timeout=5.0)
+        self._client_loop = current_loop
+        self._lock = asyncio.Lock()
+
+    async def _discard_http_client(self) -> None:
+        client = self._client
+        self._client = None
+        self._client_loop = None
+        self._lock = None
+        if client is None:
+            return
+        try:
+            await client.aclose()
+        except RuntimeError:
+            logger.debug("Unable to close Supabase JWKS HTTP client cleanly.", exc_info=True)

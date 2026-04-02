@@ -8,7 +8,6 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
 from quantum_api.api.router import router
@@ -16,7 +15,7 @@ from quantum_api.config import get_settings
 from quantum_api.key_management import ApiKeyLifecycleService, DatabaseManager
 from quantum_api.logging_config import setup_logging
 from quantum_api.metrics import metrics_response
-from quantum_api.middleware import SecurityObservabilityMiddleware
+from quantum_api.middleware import RouteAwareCORSMiddleware, SecurityObservabilityMiddleware
 from quantum_api.security import ApiKeyAuthService, RedisRateLimiter
 from quantum_api.supabase_auth import SupabaseJwtVerifier
 
@@ -53,6 +52,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=app_lifespan,
+    root_path=settings.root_path_normalized,
 )
 
 app.state.settings = settings
@@ -70,11 +70,8 @@ app.add_middleware(
     jwt_verifier=jwt_verifier,
 )
 app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.effective_allow_origins(),
-    allow_credentials=False,
-    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
+    RouteAwareCORSMiddleware,
+    settings=settings,
 )
 
 

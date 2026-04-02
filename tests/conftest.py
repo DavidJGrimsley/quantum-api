@@ -10,7 +10,12 @@ if _TEST_DB.exists():
 
 os.environ.setdefault("DATABASE_URL", f"sqlite+aiosqlite:///{_TEST_DB.as_posix()}")
 os.environ.setdefault("DATABASE_AUTO_CREATE", "true")
+os.environ.setdefault("APP_ENV", "development")
+os.environ.setdefault("ROOT_PATH", "")
+os.environ.setdefault("ALLOW_ORIGINS", "*")
+os.environ.setdefault("DEV_RATE_LIMIT_BYPASS", "true")
 os.environ.setdefault("DEV_BOOTSTRAP_API_KEY_ENABLED", "true")
+os.environ.setdefault("PUBLIC_API_CORS_ALLOW_ALL", "false")
 os.environ.setdefault("SUPABASE_URL", "https://example.supabase.co")
 os.environ.setdefault("SUPABASE_JWT_AUDIENCE", "authenticated")
 
