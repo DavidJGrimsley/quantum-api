@@ -25,8 +25,8 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
 from quantum_api.config import get_settings
-from quantum_api.execution_jobs import ExecutionJobRecord, QuantumExecutionJobNotFoundError
 from quantum_api.enums import ECHO_TYPE_DESCRIPTIONS
+from quantum_api.execution_jobs import ExecutionJobRecord, QuantumExecutionJobNotFoundError
 from quantum_api.ibm_credentials import (
     IBMProfileConflictError,
     IBMProfileEncryptionUnavailableError,

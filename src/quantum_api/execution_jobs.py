@@ -5,11 +5,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, ForeignKey, String, Text, Uuid, func, select
+from sqlalchemy import JSON, DateTime, ForeignKey, String, Text, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from quantum_api.key_management import Base, DatabaseManager
-
 
 TERMINAL_JOB_STATUSES = {"succeeded", "failed", "cancelled"}
 

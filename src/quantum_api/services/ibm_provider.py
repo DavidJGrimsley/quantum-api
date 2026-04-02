@@ -5,10 +5,10 @@ from typing import Any
 
 from quantum_api.config import Settings, get_settings
 from quantum_api.ibm_credentials import (
+    IbmCredentialProfileService,
     IBMDefaultProfileMissingError,
     IBMProfileEncryptionUnavailableError,
     IBMProfileNotFoundError,
-    IbmCredentialProfileService,
     ResolvedIbmCredentials,
     mask_ibm_token,
 )
@@ -106,7 +106,7 @@ def build_ibm_service(credentials: ResolvedIbmCredentials) -> Any:
 
 def normalize_runtime_job_status(raw_status: object) -> str:
     if hasattr(raw_status, "name"):
-        status_name = str(getattr(raw_status, "name")).upper()
+        status_name = str(raw_status.name).upper()
     else:
         status_name = str(raw_status).upper().split(".")[-1]
 
