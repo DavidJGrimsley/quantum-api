@@ -11,6 +11,7 @@
    - `DEV_RATE_LIMIT_BYPASS=false`
    - valid `REDIS_URL`
    - valid `METRICS_TOKEN`
+   - `IBM_CREDENTIAL_ENCRYPTION_KEY` if BYO IBM stored-profile routes are enabled in this rollout
 3. Confirm alert rules from `docs/operations/alerts.prometheus.yml` are loaded.
 
 ## Canary Rollout
@@ -27,8 +28,9 @@
 1. Increase traffic to 50%, then 100%.
 2. Re-run smoke checks:
    - public health endpoint
-   - protected endpoint with and without API key
+   - protected endpoint with and without a DB-backed Quantum API key
    - metrics endpoint with and without metrics token
+   - if validating BYO IBM rollout, run `uv run python scripts/verify_byo_ibm_flow.py ...` with a real bearer JWT and real IBM credentials
 
 ## Incident and Rollback
 

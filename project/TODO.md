@@ -127,9 +127,13 @@ Goal: finalize Identerest-authenticated key management from Portfolio through Qu
 - [x] Keep `/v1/portfolio.json` public while preserving existing auth rules for protected endpoints.
 - [x] Migrate portfolio/Expo API pages to `/v1` metadata and runtime endpoints only (no legacy route compatibility).
 - [x] Ensure frontend protected demo calls use `EXPO_PUBLIC_QUANTUM_API_KEY` when present with graceful fallback UX.
-- [ ] Add release/CI smoke check proving portfolio examples remain executable as API contracts evolve.
+- [x] Add explicit release/CI smoke check proving portfolio examples remain executable as API contracts evolve.
 
 ## Phase 3.9 - VPS Deploy and Redis setup
+
+- [x] Document VPS Redis/env setup runbook (`project/VPS-redis-plan.md`).
+- [x] Keep staging/production deployment playbooks current (`docs/operations/deploy-staging.md`, `docs/operations/deploy-production.md`).
+- [x] Keep deployed Nginx routing reference for `/public-facing/api/quantum/*` paths (`project/nginx-quantum-api-location.conf`).
 
 ## Phase 4 - BYO IBM Runtime and Hardware Jobs (V1)
 
@@ -154,38 +158,39 @@ Goal: expand beyond local simulation without taking on managed-provider billing 
 
 - [x] Extend `/v1/portfolio.json` so the new IBM/profile/job routes appear with the correct auth mode
 - [x] Add backend/API tests for IBM profile CRUD, scoping, masking, and hardware job lifecycle
-- [ ] Run the updated Supabase schema migration in the live Identerest project
-- [ ] Add live smoke validation for the full BYO flow:
-  - [ ] sign in
-  - [ ] save IBM profile
-  - [ ] create Quantum API key
-  - [ ] list IBM backends
-  - [ ] submit hardware job
-  - [ ] poll status
-  - [ ] fetch result or provider error
+- [x] Add backend/API test coverage proving IBM transpile resolves a stored IBM profile
+- [x] Run the updated Supabase schema migration in the live Identerest project
+- [x] Run live BYO IBM verification against the target environment and capture the result in release notes/TODO:
+  - [x] sign in
+  - [x] save IBM profile
+  - [x] create Quantum API key
+  - [x] list IBM backends
+  - [x] transpile against an IBM backend
+  - [x] submit hardware job
+  - [x] poll status
+  - [x] fetch result or provider error
+  - [x] record date, environment, backend, terminal status, artifact, and cleanup outcome
+  - Live verification note (2026-04-02, production):
+    base URL `https://davidjgrimsley.com/public-facing/api/quantum/v1`
+    profile `Portfolio` verified in the live UI
+    backend `ibm_kingston`
+    local job `28ee0f04-3b7d-4993-9cd4-2d4f72c2d92e`
+    remote job `d778ifohnndc73865a7g`
+    terminal status `succeeded`
+    completed at `2026-04-02T17:10:06.328223Z`
+    result counts `{"0": 490, "1": 22}` for `shots=512`
+    note: `scripts/verify_byo_ibm_flow.py` is available for repeatable future reruns of the same rollout check
 
 ### External Portfolio and Identerest UI Workstream
 
-- [ ] Modify the Identerest schema migration flow to include `ibm_credential_profiles` and `quantum_execution_jobs`
-- [ ] Update the portfolio API key management component with a collapsible `IBM Credentials` section
-- [ ] Include add/edit/delete/default-selection and verify actions in that IBM credentials panel
-- [ ] Add info copy explaining simulator-only usage vs BYO IBM hardware usage through the same API
-
-### Future Optional Managed IBM Access
-
-- [ ] Managed IBM access requires billing, quotas, abuse controls, cost caps, failed-job handling, and legal/terms review before resale
-
-### Later Runtime Expansion
-
-- [ ] Add `Estimator`-oriented contracts once hardware job primitives are stable
-- [ ] Add provider abstraction beyond IBM where it meaningfully improves product scope
-- [ ] Evaluate dynamic circuits support
-- [ ] Add optional noise model controls for simulator runs
-- [ ] Add basic error-mitigation controls where practical
+- [x] Modify the Identerest schema migration flow to include `ibm_credential_profiles` and `quantum_execution_jobs`
+- [x] Update the portfolio API key management component with a collapsible `IBM Credentials` section
+- [x] Include add/edit/delete/default-selection and verify actions in that IBM credentials panel
+- [x] Add info copy explaining simulator-only usage vs BYO IBM hardware usage through the same API
 
 ### Completion Criteria
 
-- [ ] Users can save BYO IBM credentials, discover IBM backends, transpile against them, and run hardware-backed jobs through stable contracts
+- [x] Users can save BYO IBM credentials, discover IBM backends, transpile against them, and run hardware-backed jobs through stable contracts (confirmed by a recorded live verifier run)
 
 ## Phase 5 - Qiskit Ecosystem Expansion (Advanced)
 
@@ -251,7 +256,7 @@ Goal: keep the platform stable as capabilities grow.
 
 - [x] Final-phase cutover: ensure `/v1/portfolio.json` is served by the current deployment stack as a first-class public contract.
 - [x] Treat `portfolio.json` as a release artifact: generate it dynamically from current OpenAPI metadata, docs URL, health URL, and version.
-- [ ] Add a release checklist item (or CI guard) that fails if `portfolio.json` is stale against current API behavior.
+- [x] Add an explicit CI portfolio smoke step that fails if `portfolio.json` examples drift from current API behavior.
 
 ### Release Discipline
 
@@ -264,6 +269,20 @@ Goal: keep the platform stable as capabilities grow.
 - [ ] Expand integration and load tests
 - [ ] Add periodic dependency/security audits
 - [ ] Add cost and performance review cadence
+
+## Deferred Backlog (Post-Phase-5 and Non-Blocking)
+
+### Managed IBM Access (Deferred)
+
+- [ ] Managed IBM access requires billing, quotas, abuse controls, cost caps, failed-job handling, and legal/terms review before resale
+
+### Runtime Expansion (Deferred from Phase 4)
+
+- [ ] Add `Estimator`-oriented contracts once hardware job primitives are stable
+- [ ] Add provider abstraction beyond IBM where it meaningfully improves product scope
+- [ ] Evaluate dynamic circuits support
+- [ ] Add optional noise model controls for simulator runs
+- [ ] Add basic error-mitigation controls where practical
 
 ## Notes on Scope
 

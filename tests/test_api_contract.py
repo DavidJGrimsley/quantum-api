@@ -1,8 +1,87 @@
+import re
+from typing import Any
+
 from fastapi.testclient import TestClient
 
 from quantum_api.config import get_settings
 from quantum_api.main import app
 from quantum_api.services.quantum_runtime import runtime
+from quantum_api.supabase_auth import AuthenticatedUser
+
+_PATH_PARAMETER_RE = re.compile(r"{([^}]+)}")
+_ALLOWED_SMOKE_ERROR_STATUSES = {400, 409, 503}
+
+
+def _mock_bearer_user(
+    monkeypatch,
+    *,
+    user_id: str = "portfolio-smoke-user",
+    expected_token: str = "Bearer portfolio-smoke-token",
+) -> dict[str, str]:
+    async def fake_verify(authorization_header: str | None) -> AuthenticatedUser:
+        assert authorization_header == expected_token
+        return AuthenticatedUser(
+            user_id=user_id,
+            email=f"{user_id}@example.test",
+            claims={"sub": user_id, "aud": "authenticated"},
+        )
+
+    monkeypatch.setattr(app.state.jwt_verifier, "verify_authorization_header", fake_verify)
+    return {"Authorization": expected_token}
+
+
+def _materialize_portfolio_request(
+    endpoint: dict[str, Any],
+) -> tuple[str, dict[str, Any], Any | None] | None:
+    original_path = str(endpoint["path"])
+    path = original_path
+    parameters = endpoint.get("parameters") or []
+    parameters_by_name = {
+        str(parameter["name"]): parameter
+        for parameter in parameters
+        if isinstance(parameter, dict) and "name" in parameter
+    }
+
+    for match in _PATH_PARAMETER_RE.finditer(original_path):
+        parameter_name = match.group(1)
+        parameter = parameters_by_name.get(parameter_name)
+        example = None if parameter is None else parameter.get("example")
+        if example is None:
+            return None
+        path = path.replace(f"{{{parameter_name}}}", str(example))
+
+    query_params: dict[str, Any] = {}
+    for parameter in parameters:
+        if not isinstance(parameter, dict):
+            continue
+        parameter_name = str(parameter.get("name", ""))
+        if not parameter_name or f"{{{parameter_name}}}" in original_path:
+            continue
+
+        example = parameter.get("example")
+        if example is None:
+            if parameter.get("required"):
+                return None
+            continue
+        query_params[parameter_name] = example
+
+    request_body = None
+    request_body_payload = endpoint.get("requestBody")
+    if isinstance(request_body_payload, dict):
+        request_body = request_body_payload.get("example")
+        if request_body is None and str(endpoint["method"]).upper() in {"POST", "PUT", "PATCH"}:
+            return None
+
+    if isinstance(request_body, dict):
+        request_body = dict(request_body)
+        if original_path == "/v1/ibm/profiles" and str(endpoint["method"]).upper() == "POST":
+            request_body["profile_name"] = "IBM Portfolio Smoke"
+        if original_path == "/v1/keys" and str(endpoint["method"]).upper() == "POST":
+            request_body["name"] = "Portfolio smoke key"
+        if original_path in {"/v1/jobs/circuits", "/v1/transpile"}:
+            request_body.pop("ibm_profile", None)
+
+    return path, query_params, request_body
 
 
 def test_health_contract(client):
@@ -96,32 +175,53 @@ def test_auth_and_cors_respected_with_root_path():
         }
 
 
-def test_portfolio_request_body_examples_cover_required_fields(client, unauth_client):
+def test_portfolio_examples_are_route_valid_for_public_api_key_and_bearer_auth(
+    client,
+    unauth_client,
+    monkeypatch,
+):
+    bearer_headers = _mock_bearer_user(monkeypatch)
     response = unauth_client.get("/v1/portfolio.json")
     assert response.status_code == 200
     payload = response.json()
 
-    candidate_endpoints = []
+    exercised_auth_modes: set[str] = set()
     for item in payload["endpoints"]:
-        if item.get("method") != "POST":
+        auth_mode = item.get("auth")
+        if auth_mode not in {"public", "api_key", "bearer_jwt"}:
             continue
-        if item.get("auth") not in {"public", "api_key"}:
-            continue
-        request_body = item.get("requestBody")
-        if not isinstance(request_body, dict):
-            continue
-        if request_body.get("example") is None:
-            continue
-        candidate_endpoints.append(item)
 
-    assert candidate_endpoints, "Expected POST endpoints with requestBody examples."
+        materialized = _materialize_portfolio_request(item)
+        if materialized is None:
+            continue
 
-    for endpoint in candidate_endpoints:
-        post_response = client.post(endpoint["path"], json=endpoint["requestBody"]["example"])
-        assert post_response.status_code != 422, (
-            f"Example payload missing required fields for {endpoint['path']}: "
-            f"{post_response.text}"
+        path, query_params, request_body = materialized
+        request_headers = bearer_headers if auth_mode == "bearer_jwt" else None
+        request_client = client if auth_mode == "api_key" else unauth_client
+
+        request_kwargs: dict[str, Any] = {}
+        if query_params:
+            request_kwargs["params"] = query_params
+        if request_body is not None and item["method"] in {"POST", "PUT", "PATCH", "DELETE"}:
+            request_kwargs["json"] = request_body
+
+        exercised_auth_modes.add(auth_mode)
+        smoke_response = request_client.request(
+            item["method"],
+            path,
+            headers=request_headers,
+            **request_kwargs,
         )
+
+        assert smoke_response.status_code not in {404, 405, 422}, (
+            f"Portfolio smoke drift for {item['method']} {path}: {smoke_response.text}"
+        )
+        assert smoke_response.status_code < 300 or smoke_response.status_code in _ALLOWED_SMOKE_ERROR_STATUSES, (
+            f"Unexpected smoke status for {item['method']} {path}: "
+            f"{smoke_response.status_code} {smoke_response.text}"
+        )
+
+    assert exercised_auth_modes == {"public", "api_key", "bearer_jwt"}
 
 
 def test_gate_run_contract_bit_flip(client):

@@ -3,8 +3,10 @@ from __future__ import annotations
 import pytest
 
 from quantum_api.config import get_settings
+from quantum_api.main import app
 from quantum_api.services.backend_catalog import clear_backend_catalog_cache
 from quantum_api.services.quantum_runtime import runtime
+from quantum_api.supabase_auth import AuthenticatedUser
 
 requires_qiskit = pytest.mark.skipif(
     not runtime.qiskit_available,
@@ -15,6 +17,24 @@ QASM2_BELL = (
     'OPENQASM 2.0; include "qelib1.inc"; '
     "qreg q[2]; creg c[2]; h q[0]; cx q[0],q[1]; measure q -> c;"
 )
+
+
+def _mock_user(
+    monkeypatch,
+    *,
+    user_id: str,
+    expected_token: str = "Bearer test-token",
+) -> dict[str, str]:
+    async def fake_verify(authorization_header: str | None) -> AuthenticatedUser:
+        assert authorization_header == expected_token
+        return AuthenticatedUser(
+            user_id=user_id,
+            email=f"{user_id}@example.test",
+            claims={"sub": user_id, "aud": "authenticated"},
+        )
+
+    monkeypatch.setattr(app.state.jwt_verifier, "verify_authorization_header", fake_verify)
+    return {"Authorization": expected_token}
 
 
 @requires_qiskit
@@ -132,6 +152,62 @@ def test_transpile_provider_ibm_unavailable_without_config(client, monkeypatch):
 
     get_settings.cache_clear()
     clear_backend_catalog_cache()
+
+
+@requires_qiskit
+def test_transpile_provider_ibm_uses_stored_profile(unauth_client, monkeypatch):
+    headers = _mock_user(monkeypatch, user_id="transpile-ibm-user")
+    created_profile = unauth_client.post(
+        "/v1/ibm/profiles",
+        json={
+            "profile_name": "IBM Open",
+            "token": "tok_1234567890abcdef",
+            "instance": "crn:v1:bluemix:public:quantum-computing:us-east:a/test::",
+            "is_default": True,
+        },
+        headers=headers,
+    )
+    assert created_profile.status_code == 200
+
+    created_key = unauth_client.post("/v1/keys", json={"name": "transpile"}, headers=headers)
+    assert created_key.status_code == 200
+    raw_key = created_key.json()["raw_key"]
+
+    def fake_resolve_backend(backend_name, provider, *, ibm_credentials=None):
+        assert backend_name == "ibm_fake_backend"
+        assert provider == "ibm"
+        assert ibm_credentials is not None
+        assert ibm_credentials.owner_user_id == "transpile-ibm-user"
+        assert ibm_credentials.profile_name == "IBM Open"
+        return "ibm", object()
+
+    monkeypatch.setattr("quantum_api.services.transpilation.resolve_backend", fake_resolve_backend)
+    monkeypatch.setattr(
+        "quantum_api.services.transpilation.runtime.transpile",
+        lambda circuit, backend, optimization_level=1, seed_transpiler=None: circuit,
+    )
+
+    response = unauth_client.post(
+        "/v1/transpile",
+        json={
+            "circuit": {
+                "num_qubits": 2,
+                "operations": [
+                    {"gate": "h", "target": 0},
+                    {"gate": "cx", "control": 0, "target": 1},
+                ],
+            },
+            "backend_name": "ibm_fake_backend",
+            "provider": "ibm",
+            "ibm_profile": "IBM Open",
+        },
+        headers={"X-API-Key": raw_key},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["provider"] == "ibm"
+    assert payload["backend_name"] == "ibm_fake_backend"
+    assert payload["input_format"] == "circuit"
 
 
 @requires_qiskit
