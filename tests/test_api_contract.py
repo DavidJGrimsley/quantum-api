@@ -113,9 +113,14 @@ def test_portfolio_metadata_contract(unauth_client):
     assert payload["api"]["baseUrl"].endswith("/v1")
     assert payload["api"]["docsUrl"].endswith("/docs")
     assert payload["api"]["healthUrl"].endswith("/v1/health")
+    assert response.headers["cache-control"] == "no-store"
 
     by_signature = {
         (item["method"], item["path"]): item
+        for item in payload["endpoints"]
+    }
+    by_operation_signature = {
+        (item["method"], item["operationPath"]): item
         for item in payload["endpoints"]
     }
     assert ("GET", "/v1/health") in by_signature
@@ -124,6 +129,15 @@ def test_portfolio_metadata_contract(unauth_client):
     assert ("GET", "/v1/ibm/profiles") in by_signature
     assert ("POST", "/v1/jobs/circuits") in by_signature
     assert ("GET", "/v1/jobs/{job_id}") in by_signature
+    assert ("POST", "/v1/optimization/qaoa") in by_signature
+    assert ("POST", "/v1/optimization/vqe") in by_signature
+    assert ("POST", "/v1/experiments/state_tomography") in by_signature
+    assert ("POST", "/v1/experiments/randomized_benchmarking") in by_signature
+    assert ("POST", "/v1/finance/portfolio_optimization") in by_signature
+    assert ("POST", "/v1/ml/kernel_classifier") in by_signature
+    assert ("POST", "/v1/nature/ground_state_energy") in by_signature
+    assert by_signature == by_operation_signature
+    assert ("GET", "/") not in by_signature
 
     assert by_signature[("GET", "/v1/health")]["auth"] == "public"
     assert by_signature[("GET", "/v1/echo-types")]["auth"] == "api_key"
@@ -131,6 +145,13 @@ def test_portfolio_metadata_contract(unauth_client):
     assert by_signature[("GET", "/v1/ibm/profiles")]["auth"] == "bearer_jwt"
     assert by_signature[("POST", "/v1/jobs/circuits")]["auth"] == "api_key"
     assert by_signature[("GET", "/v1/jobs/{job_id}")]["auth"] == "api_key"
+    assert by_signature[("POST", "/v1/optimization/qaoa")]["auth"] == "api_key"
+    assert by_signature[("POST", "/v1/optimization/vqe")]["auth"] == "api_key"
+    assert by_signature[("POST", "/v1/experiments/state_tomography")]["auth"] == "api_key"
+    assert by_signature[("POST", "/v1/experiments/randomized_benchmarking")]["auth"] == "api_key"
+    assert by_signature[("POST", "/v1/finance/portfolio_optimization")]["auth"] == "api_key"
+    assert by_signature[("POST", "/v1/ml/kernel_classifier")]["auth"] == "api_key"
+    assert by_signature[("POST", "/v1/nature/ground_state_energy")]["auth"] == "api_key"
 
 
 def test_portfolio_metadata_respects_root_path():
@@ -146,6 +167,39 @@ def test_portfolio_metadata_respects_root_path():
     assert payload["api"]["baseUrl"] == "https://davidjgrimsley.com/public-facing/api/quantum/v1"
     assert payload["api"]["docsUrl"] == "https://davidjgrimsley.com/public-facing/api/quantum/docs"
     assert payload["api"]["healthUrl"] == "https://davidjgrimsley.com/public-facing/api/quantum/v1/health"
+    assert response.headers["cache-control"] == "no-store"
+
+    by_signature = {
+        (item["method"], item["path"]): item
+        for item in payload["endpoints"]
+    }
+    assert ("GET", "/public-facing/api/quantum/v1/health") in by_signature
+    assert ("POST", "/public-facing/api/quantum/v1/optimization/qaoa") in by_signature
+    assert ("GET", "/public-facing/api/quantum/") not in by_signature
+    assert by_signature[("GET", "/public-facing/api/quantum/v1/health")]["operationPath"] == "/v1/health"
+    assert by_signature[("POST", "/public-facing/api/quantum/v1/optimization/qaoa")]["operationPath"] == (
+        "/v1/optimization/qaoa"
+    )
+
+
+def test_openapi_declares_security_schemes_for_docs(unauth_client):
+    response = unauth_client.get("/openapi.json")
+    assert response.status_code == 200
+    payload = response.json()
+
+    security_schemes = payload["components"]["securitySchemes"]
+    assert security_schemes["ApiKeyAuth"]["type"] == "apiKey"
+    assert security_schemes["ApiKeyAuth"]["in"] == "header"
+    assert security_schemes["ApiKeyAuth"]["name"] == "X-API-Key"
+    assert security_schemes["BearerAuth"]["type"] == "http"
+    assert security_schemes["BearerAuth"]["scheme"] == "bearer"
+
+    assert payload["paths"]["/v1/echo-types"]["get"]["security"] == [{"ApiKeyAuth": []}]
+    assert payload["paths"]["/v1/optimization/qaoa"]["post"]["security"] == [{"ApiKeyAuth": []}]
+    assert payload["paths"]["/v1/keys"]["get"]["security"] == [{"BearerAuth": []}]
+    assert payload["paths"]["/v1/ibm/profiles"]["get"]["security"] == [{"BearerAuth": []}]
+    assert "security" not in payload["paths"]["/v1/health"]["get"]
+    assert "security" not in payload["paths"]["/v1/portfolio.json"]["get"]
 
 
 def test_auth_and_cors_respected_with_root_path():

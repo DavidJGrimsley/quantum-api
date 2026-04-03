@@ -198,21 +198,21 @@ Goal: cover major Qiskit domain capabilities through focused APIs.
 
 ### Algorithms and Domain Modules
 
-- [ ] Optimization endpoints (QAOA/VQE workflows)
-- [ ] Finance endpoints (portfolio/estimation workflows)
-- [ ] Machine Learning endpoints (kernel/classifier primitives)
-- [ ] Nature endpoints (selected chemistry/physics workflows)
-- [ ] Experiments endpoints (selected benchmarking/tomography flows)
+- [x] Optimization endpoints (QAOA/VQE workflows)
+- [x] Finance endpoints (portfolio/estimation workflows)
+- [x] Machine Learning endpoints (kernel/classifier primitives)
+- [x] Nature endpoints (selected chemistry/physics workflows)
+- [x] Experiments endpoints (selected benchmarking/tomography flows)
 
 ### Product and Contract Design
 
-- [ ] Define per-domain contracts with clear input constraints
-- [ ] Add examples and notebook-style reference docs
-- [ ] Add dedicated test suites per domain module
+- [x] Define per-domain contracts with clear input constraints
+- [x] Add examples and notebook-style reference docs
+- [x] Add dedicated test suites per domain module
 
 ### Completion Criteria
 
-- [ ] Each adopted domain has at least one production-quality endpoint with tests and docs
+- [x] Each adopted domain has at least one production-quality endpoint with tests and docs
 
 ## Phase 6 - Client and Engine Integrations & Migrations (from old quantum-api)
 

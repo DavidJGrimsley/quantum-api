@@ -55,7 +55,7 @@ def test_ibm_profile_crud_and_verify_flow(unauth_client, monkeypatch):
     assert updated.json()["verification_status"] == "unverified"
 
     monkeypatch.setattr(
-        "quantum_api.api.router.build_ibm_service",
+        "quantum_api.api.auth_routes.build_ibm_service",
         lambda credentials: SimpleNamespace(backends=lambda: ["ok"]),
     )
     verified = unauth_client.post(f"/v1/ibm/profiles/{profile_id}/verify", headers=headers)
@@ -161,7 +161,7 @@ def test_ibm_profile_verify_provider_unavailable_does_not_mark_invalid(unauth_cl
     def fail_build(_credentials):
         raise ProviderUnavailableError(provider="ibm", details={"reason": "missing_dependency"})
 
-    monkeypatch.setattr("quantum_api.api.router.build_ibm_service", fail_build)
+    monkeypatch.setattr("quantum_api.api.auth_routes.build_ibm_service", fail_build)
 
     verified = unauth_client.post(f"/v1/ibm/profiles/{profile_id}/verify", headers=headers)
     assert verified.status_code == 503

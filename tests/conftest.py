@@ -5,8 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 _TEST_DB = Path(__file__).resolve().parent / "test_quantum_api.db"
-if _TEST_DB.exists():
-    _TEST_DB.unlink()
+_TEST_DB.unlink(missing_ok=True)
 
 os.environ.setdefault("DATABASE_URL", f"sqlite+aiosqlite:///{_TEST_DB.as_posix()}")
 os.environ.setdefault("DATABASE_AUTO_CREATE", "true")

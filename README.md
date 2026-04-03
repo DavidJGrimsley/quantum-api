@@ -24,6 +24,13 @@ Quantum API is a greenfield FastAPI service for quantum-inspired runtime feature
 - `/v1/keys/revoked` (bulk delete revoked keys)
 - `/v1/keys/{key_id}/revoke`
 - `/v1/keys/{key_id}/rotate`
+- `/v1/optimization/qaoa`
+- `/v1/optimization/vqe`
+- `/v1/experiments/state_tomography`
+- `/v1/experiments/randomized_benchmarking`
+- `/v1/finance/portfolio_optimization`
+- `/v1/ml/kernel_classifier`
+- `/v1/nature/ground_state_energy`
 - `/metrics` (internal metrics endpoint)
 
 This repository is intentionally not backward compatible with the previous `public-facing/api/quantum/*` paths.
@@ -51,6 +58,12 @@ uv run uvicorn quantum_api.main:app --reload
 Open docs at `http://127.0.0.1:8000/docs`.
 
 For local development, use API key `qapi_devlocal_0123456789abcdef0123456789abcdef` with the default `.env.example` values.
+
+Optional Phase 5 extras:
+
+```bash
+uv sync --extra phase5-optimization --extra phase5-experiments --extra phase5-finance --extra phase5-ml --extra phase5-nature --extra phase5-docs
+```
 
 ## API Contract
 
@@ -94,6 +107,10 @@ Response fields:
   - `public`
   - `api_key`
   - `bearer_jwt`
+- When the API is mounted behind a prefix such as `/public-facing/api/quantum`, each endpoint `path` in `portfolio.json` is emitted as a request-ready mounted path.
+- `operationPath` keeps the canonical FastAPI/OpenAPI route such as `/v1/optimization/qaoa`.
+
+For a plain-English live VPS testing walkthrough, see [docs/operations/phase5-beginner-testing.md](docs/operations/phase5-beginner-testing.md).
 
 ### `GET /v1/echo-types`
 Lists canonical transformation categories and descriptions from one enum source.

@@ -19,6 +19,20 @@ class QuantumRuntime:
     SamplerV2: Any | None
     ibm_runtime_available: bool
     ibm_runtime_import_error: str | None
+    qiskit_algorithms_available: bool
+    qiskit_algorithms_import_error: str | None
+    qiskit_optimization_available: bool
+    qiskit_optimization_import_error: str | None
+    qiskit_experiments_available: bool
+    qiskit_experiments_import_error: str | None
+    qiskit_finance_available: bool
+    qiskit_finance_import_error: str | None
+    qiskit_machine_learning_available: bool
+    qiskit_machine_learning_import_error: str | None
+    qiskit_nature_available: bool
+    qiskit_nature_import_error: str | None
+    pyscf_available: bool
+    pyscf_import_error: str | None
 
     @property
     def mode(self) -> str:
@@ -58,6 +72,70 @@ def build_runtime() -> QuantumRuntime:
         ibm_runtime_available = False
         ibm_runtime_import_error = str(exc)
 
+    try:
+        import qiskit_algorithms  # noqa: F401
+
+        qiskit_algorithms_available = True
+        qiskit_algorithms_import_error = None
+    except Exception as exc:  # pragma: no cover - optional dependency
+        qiskit_algorithms_available = False
+        qiskit_algorithms_import_error = str(exc)
+
+    try:
+        import qiskit_optimization  # noqa: F401
+
+        qiskit_optimization_available = True
+        qiskit_optimization_import_error = None
+    except Exception as exc:  # pragma: no cover - optional dependency
+        qiskit_optimization_available = False
+        qiskit_optimization_import_error = str(exc)
+
+    try:
+        import qiskit_experiments  # noqa: F401
+
+        qiskit_experiments_available = True
+        qiskit_experiments_import_error = None
+    except Exception as exc:  # pragma: no cover - optional dependency
+        qiskit_experiments_available = False
+        qiskit_experiments_import_error = str(exc)
+
+    try:
+        import qiskit_finance  # noqa: F401
+
+        qiskit_finance_available = True
+        qiskit_finance_import_error = None
+    except Exception as exc:  # pragma: no cover - optional dependency
+        qiskit_finance_available = False
+        qiskit_finance_import_error = str(exc)
+
+    try:
+        import qiskit_machine_learning  # noqa: F401
+
+        qiskit_machine_learning_available = True
+        qiskit_machine_learning_import_error = None
+    except Exception as exc:  # pragma: no cover - optional dependency
+        qiskit_machine_learning_available = False
+        qiskit_machine_learning_import_error = str(exc)
+
+    try:
+        from qiskit_nature.second_q.drivers import PySCFDriver  # noqa: F401
+        from qiskit_nature.second_q.mappers import JordanWignerMapper  # noqa: F401
+
+        qiskit_nature_available = True
+        qiskit_nature_import_error = None
+    except Exception as exc:  # pragma: no cover - optional dependency
+        qiskit_nature_available = False
+        qiskit_nature_import_error = str(exc)
+
+    try:
+        import pyscf  # noqa: F401
+
+        pyscf_available = True
+        pyscf_import_error = None
+    except Exception as exc:  # pragma: no cover - optional dependency
+        pyscf_available = False
+        pyscf_import_error = str(exc)
+
     return QuantumRuntime(
         qiskit_available=qiskit_available,
         import_error=import_error,
@@ -72,6 +150,20 @@ def build_runtime() -> QuantumRuntime:
         SamplerV2=SamplerV2,
         ibm_runtime_available=ibm_runtime_available,
         ibm_runtime_import_error=ibm_runtime_import_error,
+        qiskit_algorithms_available=qiskit_algorithms_available,
+        qiskit_algorithms_import_error=qiskit_algorithms_import_error,
+        qiskit_optimization_available=qiskit_optimization_available,
+        qiskit_optimization_import_error=qiskit_optimization_import_error,
+        qiskit_experiments_available=qiskit_experiments_available,
+        qiskit_experiments_import_error=qiskit_experiments_import_error,
+        qiskit_finance_available=qiskit_finance_available,
+        qiskit_finance_import_error=qiskit_finance_import_error,
+        qiskit_machine_learning_available=qiskit_machine_learning_available,
+        qiskit_machine_learning_import_error=qiskit_machine_learning_import_error,
+        qiskit_nature_available=qiskit_nature_available,
+        qiskit_nature_import_error=qiskit_nature_import_error,
+        pyscf_available=pyscf_available,
+        pyscf_import_error=pyscf_import_error,
     )
 
 
