@@ -12,6 +12,7 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse, Response
 
 from quantum_api.api.router import router
+from quantum_api.api.shared import endpoint_display_sort_key
 from quantum_api.config import get_settings
 from quantum_api.execution_jobs import QuantumExecutionJobService
 from quantum_api.ibm_credentials import IbmCredentialProfileService
@@ -261,6 +262,13 @@ def custom_openapi() -> dict[str, object]:
                 operation["security"] = [{"ApiKeyAuth": []}]
             else:
                 operation.pop("security", None)
+
+    raw_paths = openapi_schema.get("paths", {})
+    if isinstance(raw_paths, dict):
+        openapi_schema["paths"] = {
+            path: raw_paths[path]
+            for path in sorted(raw_paths.keys(), key=endpoint_display_sort_key)
+        }
 
     app.openapi_schema = openapi_schema
     return openapi_schema

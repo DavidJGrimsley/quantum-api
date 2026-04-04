@@ -178,6 +178,33 @@ def mounted_path_for_request(path: str, *, root_path: str) -> str:
     return f"{normalized_root}{path}"
 
 
+def endpoint_display_sort_key(path: str) -> tuple[int, int, str]:
+    priority_prefixes = (
+        "/v1/gates",
+        "/v1/circuits",
+        "/v1/echo-types",
+        "/v1/list_backends",
+        "/v1/transpile",
+        "/v1/qasm",
+        "/v1/text",
+        "/v1/jobs",
+        "/v1/optimization",
+        "/v1/experiments",
+        "/v1/finance",
+        "/v1/ml",
+        "/v1/nature",
+        "/v1/health",
+        "/v1/portfolio.json",
+        "/v1/keys",
+        "/v1/ibm/profiles",
+        "/",
+    )
+    for index, prefix in enumerate(priority_prefixes):
+        if path == prefix or path.startswith(f"{prefix}/"):
+            return (0, index, path)
+    return (1, len(priority_prefixes), path)
+
+
 def portfolio_auth_mode_for_path(path: str) -> EndpointAuthMode:
     settings = get_settings()
     if settings.requires_user_jwt(path):
@@ -373,7 +400,7 @@ def portfolio_endpoints_from_openapi(openapi_schema: dict[str, Any], *, root_pat
     }
     endpoints: list[PortfolioEndpoint] = []
 
-    for path in sorted(raw_paths.keys()):
+    for path in sorted(raw_paths.keys(), key=endpoint_display_sort_key):
         operations = raw_paths.get(path)
         if not isinstance(operations, dict):
             continue

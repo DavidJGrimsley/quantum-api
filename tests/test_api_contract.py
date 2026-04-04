@@ -202,6 +202,17 @@ def test_openapi_declares_security_schemes_for_docs(unauth_client):
     assert "security" not in payload["paths"]["/v1/portfolio.json"]["get"]
 
 
+def test_openapi_orders_meta_routes_after_runtime_routes(unauth_client):
+    response = unauth_client.get("/openapi.json")
+    assert response.status_code == 200
+    payload = response.json()
+
+    ordered_paths = list(payload["paths"].keys())
+    assert ordered_paths.index("/v1/optimization/qaoa") < ordered_paths.index("/v1/portfolio.json")
+    assert ordered_paths.index("/v1/echo-types") < ordered_paths.index("/v1/keys")
+    assert ordered_paths.index("/v1/nature/ground_state_energy") < ordered_paths.index("/v1/ibm/profiles")
+
+
 def test_auth_and_cors_respected_with_root_path():
     with TestClient(
         app,
