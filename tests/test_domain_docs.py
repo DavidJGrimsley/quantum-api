@@ -31,6 +31,18 @@ _ARTIFACTS = {
         _ROOT / "docs" / "domains" / "optimization-vqe.md",
         _ROOT / "docs" / "notebooks" / "domains" / "optimization-vqe.ipynb",
     ),
+    "/v1/optimization/maxcut": (
+        _ROOT / "docs" / "domains" / "optimization-maxcut.md",
+        _ROOT / "docs" / "notebooks" / "domains" / "optimization-maxcut.ipynb",
+    ),
+    "/v1/optimization/knapsack": (
+        _ROOT / "docs" / "domains" / "optimization-knapsack.md",
+        _ROOT / "docs" / "notebooks" / "domains" / "optimization-knapsack.ipynb",
+    ),
+    "/v1/optimization/tsp": (
+        _ROOT / "docs" / "domains" / "optimization-tsp.md",
+        _ROOT / "docs" / "notebooks" / "domains" / "optimization-tsp.ipynb",
+    ),
     "/v1/experiments/state_tomography": (
         _ROOT / "docs" / "domains" / "experiments-state-tomography.md",
         _ROOT / "docs" / "notebooks" / "domains" / "experiments-state-tomography.ipynb",

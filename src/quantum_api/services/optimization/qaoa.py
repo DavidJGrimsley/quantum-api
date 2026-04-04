@@ -51,10 +51,13 @@ def solve_qaoa(request: OptimizationQaoaRequest) -> dict[str, object]:
 
     from qiskit.primitives import StatevectorSampler
     from qiskit_algorithms.minimum_eigensolvers import QAOA
+    from qiskit_algorithms.utils import algorithm_globals
     from qiskit_optimization.algorithms import MinimumEigenOptimizer
 
     program = quadratic_program_from_problem(request.problem)
     optimizer = build_optimizer(request.optimizer)
+    if request.seed is not None:
+        algorithm_globals.random_seed = request.seed
     min_eigen_solver = QAOA(
         sampler=StatevectorSampler(default_shots=request.shots, seed=request.seed),
         optimizer=optimizer,

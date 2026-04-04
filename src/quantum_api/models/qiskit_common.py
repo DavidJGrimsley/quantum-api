@@ -10,6 +10,7 @@ QiskitDomainProvider = Literal[
     "qiskit-finance",
     "qiskit-machine-learning",
     "qiskit-nature",
+    "qiskit-optimization",
 ]
 
 

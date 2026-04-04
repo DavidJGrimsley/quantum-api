@@ -34,9 +34,12 @@ def solve_vqe(request: OptimizationVqeRequest) -> dict[str, object]:
     from qiskit.circuit.library import real_amplitudes
     from qiskit.primitives import StatevectorEstimator
     from qiskit_algorithms.minimum_eigensolvers import VQE
+    from qiskit_algorithms.utils import algorithm_globals
 
     operator = sparse_pauli_from_request(request)
     optimizer = build_optimizer(request.optimizer)
+    if request.seed is not None:
+        algorithm_globals.random_seed = request.seed
     ansatz = real_amplitudes(
         operator.num_qubits,
         reps=request.ansatz.reps,
