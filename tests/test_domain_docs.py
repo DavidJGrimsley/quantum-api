@@ -75,6 +75,10 @@ _ARTIFACTS = {
         _ROOT / "docs" / "domains" / "nature-ground-state-energy.md",
         _ROOT / "docs" / "notebooks" / "domains" / "nature-ground-state-energy.ipynb",
     ),
+    "/v1/nature/fermionic_mapping_preview": (
+        _ROOT / "docs" / "domains" / "nature-fermionic-mapping-preview.md",
+        _ROOT / "docs" / "notebooks" / "domains" / "nature-fermionic-mapping-preview.ipynb",
+    ),
 }
 
 

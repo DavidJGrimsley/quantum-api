@@ -4,6 +4,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from quantum_api.models.core import Amplitude
 from quantum_api.models.qiskit_common import AnsatzConfig, OptimizerConfig, QiskitDomainProvider
 
 
@@ -16,7 +17,7 @@ class AtomCoordinate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class NatureGroundStateEnergyRequest(BaseModel):
+class NatureProblemRequest(BaseModel):
     atoms: list[AtomCoordinate] = Field(min_length=2, max_length=6)
     basis: str = Field(default="sto3g", min_length=1)
     charge: int = 0
@@ -46,6 +47,10 @@ class NatureGroundStateEnergyRequest(BaseModel):
     )
 
 
+class NatureGroundStateEnergyRequest(NatureProblemRequest):
+    pass
+
+
 class NatureMappedProblemSummary(BaseModel):
     mapper: str
     num_qubits: int
@@ -63,5 +68,36 @@ class NatureGroundStateEnergyResponse(BaseModel):
     solver_metadata: dict[str, Any]
     provider: QiskitDomainProvider = "qiskit-nature"
     backend_mode: str = "statevector_estimator"
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class NatureFermionicMappingPreviewRequest(NatureProblemRequest):
+    pass
+
+
+class NatureMappedOperatorPreviewTerm(BaseModel):
+    pauli: str
+    coefficient: Amplitude
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class NatureMappingPreviewSummary(BaseModel):
+    mapper: str
+    num_qubits: int
+    num_spatial_orbitals: int
+    num_particles: list[int]
+    fermionic_term_count: int
+    mapped_term_count: int
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class NatureFermionicMappingPreviewResponse(BaseModel):
+    mapped_problem_summary: NatureMappingPreviewSummary
+    preview_terms: list[NatureMappedOperatorPreviewTerm]
+    provider: QiskitDomainProvider = "qiskit-nature"
+    backend_mode: str = "mapping_preview"
 
     model_config = ConfigDict(extra="forbid")
