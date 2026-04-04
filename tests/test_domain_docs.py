@@ -7,6 +7,22 @@ import nbformat
 _ROOT = Path(__file__).resolve().parents[1]
 
 _ARTIFACTS = {
+    "/v1/algorithms/grover_search": (
+        _ROOT / "docs" / "domains" / "algorithms-grover-search.md",
+        _ROOT / "docs" / "notebooks" / "domains" / "algorithms-grover-search.ipynb",
+    ),
+    "/v1/algorithms/amplitude_estimation": (
+        _ROOT / "docs" / "domains" / "algorithms-amplitude-estimation.md",
+        _ROOT / "docs" / "notebooks" / "domains" / "algorithms-amplitude-estimation.ipynb",
+    ),
+    "/v1/algorithms/phase_estimation": (
+        _ROOT / "docs" / "domains" / "algorithms-phase-estimation.md",
+        _ROOT / "docs" / "notebooks" / "domains" / "algorithms-phase-estimation.ipynb",
+    ),
+    "/v1/algorithms/time_evolution": (
+        _ROOT / "docs" / "domains" / "algorithms-time-evolution.md",
+        _ROOT / "docs" / "notebooks" / "domains" / "algorithms-time-evolution.ipynb",
+    ),
     "/v1/optimization/qaoa": (
         _ROOT / "docs" / "domains" / "optimization-qaoa.md",
         _ROOT / "docs" / "notebooks" / "domains" / "optimization-qaoa.ipynb",

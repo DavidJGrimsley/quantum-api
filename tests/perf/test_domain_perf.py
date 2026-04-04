@@ -5,16 +5,111 @@ import time
 import pytest
 
 from quantum_api.models.api import (
+    AmplitudeEstimationRequest,
+    GroverSearchRequest,
     OptimizationQaoaRequest,
     OptimizationVqeRequest,
+    PhaseEstimationRequest,
     RandomizedBenchmarkingRequest,
     StateTomographyRequest,
+    TimeEvolutionRequest,
 )
+from quantum_api.services.algorithms.amplitude_estimation import run_amplitude_estimation
+from quantum_api.services.algorithms.grover_search import run_grover_search
+from quantum_api.services.algorithms.phase_estimation import run_phase_estimation
+from quantum_api.services.algorithms.time_evolution import run_time_evolution
 from quantum_api.services.experiments.randomized_benchmarking import run_randomized_benchmarking
 from quantum_api.services.experiments.state_tomography import run_state_tomography
 from quantum_api.services.optimization.qaoa import solve_qaoa
 from quantum_api.services.optimization.vqe import solve_vqe
 from quantum_api.services.quantum_runtime import runtime
+
+
+@pytest.mark.perf
+@pytest.mark.skipif(not runtime.qiskit_algorithms_available, reason="Algorithm dependencies unavailable")
+def test_grover_perf_budget():
+    started = time.perf_counter()
+    run_grover_search(
+        GroverSearchRequest.model_validate(
+            {
+                "marked_bitstrings": ["11"],
+                "iterations": [1],
+                "shots": 128,
+                "seed": 7,
+            }
+        )
+    )
+    assert time.perf_counter() - started < 20
+
+
+@pytest.mark.perf
+@pytest.mark.skipif(not runtime.qiskit_algorithms_available, reason="Algorithm dependencies unavailable")
+def test_amplitude_estimation_perf_budget():
+    started = time.perf_counter()
+    run_amplitude_estimation(
+        AmplitudeEstimationRequest.model_validate(
+            {
+                "variant": "ae",
+                "state_preparation": {
+                    "num_qubits": 1,
+                    "operations": [{"gate": "ry", "target": 0, "theta": 1.2}],
+                },
+                "objective_qubits": [0],
+                "num_eval_qubits": 2,
+                "shots": 128,
+                "seed": 7,
+            }
+        )
+    )
+    assert time.perf_counter() - started < 20
+
+
+@pytest.mark.perf
+@pytest.mark.skipif(not runtime.qiskit_algorithms_available, reason="Algorithm dependencies unavailable")
+def test_phase_estimation_perf_budget():
+    started = time.perf_counter()
+    run_phase_estimation(
+        PhaseEstimationRequest.model_validate(
+            {
+                "variant": "standard",
+                "unitary": {
+                    "num_qubits": 1,
+                    "operations": [{"gate": "z", "target": 0}],
+                },
+                "state_preparation": {
+                    "num_qubits": 1,
+                    "operations": [{"gate": "h", "target": 0}],
+                },
+                "num_evaluation_qubits": 3,
+                "shots": 128,
+                "seed": 7,
+            }
+        )
+    )
+    assert time.perf_counter() - started < 20
+
+
+@pytest.mark.perf
+@pytest.mark.skipif(not runtime.qiskit_algorithms_available, reason="Algorithm dependencies unavailable")
+def test_time_evolution_perf_budget():
+    started = time.perf_counter()
+    run_time_evolution(
+        TimeEvolutionRequest.model_validate(
+            {
+                "variant": "trotter_qrte",
+                "hamiltonian": [{"pauli": "Z", "coefficient": 1.0}],
+                "time": 0.5,
+                "initial_state": {
+                    "num_qubits": 1,
+                    "operations": [{"gate": "h", "target": 0}],
+                },
+                "num_timesteps": 2,
+                "shots": 128,
+                "seed": 7,
+            }
+        )
+    )
+    assert time.perf_counter() - started < 20
 
 
 @pytest.mark.perf

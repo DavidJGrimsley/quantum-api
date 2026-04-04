@@ -5,6 +5,7 @@ from typing import Any
 from quantum_api.models.optimization import OptimizationVqeRequest
 from quantum_api.services.phase2_errors import Phase2ServiceError
 from quantum_api.services.qiskit_common.dependencies import ensure_dependency
+from quantum_api.services.qiskit_common.operators import sparse_pauli_op_from_terms
 from quantum_api.services.qiskit_common.optimizers import (
     build_optimizer,
     optimizer_metadata_from_result,
@@ -13,30 +14,14 @@ from quantum_api.services.quantum_runtime import runtime
 
 
 def sparse_pauli_from_request(request: OptimizationVqeRequest) -> Any:
-    from qiskit.quantum_info import SparsePauliOp
-
-    normalized_terms: list[tuple[str, float]] = []
-    qubit_count: int | None = None
-    for term in request.pauli_sum:
-        pauli = term.pauli.strip().upper()
-        if not pauli or any(symbol not in {"I", "X", "Y", "Z"} for symbol in pauli):
-            raise Phase2ServiceError(
-                error="invalid_pauli_term",
-                message=f"Invalid Pauli string '{term.pauli}'.",
-                status_code=400,
-                details={"pauli": term.pauli},
-            )
-        if qubit_count is None:
-            qubit_count = len(pauli)
-        elif len(pauli) != qubit_count:
-            raise Phase2ServiceError(
-                error="invalid_pauli_term",
-                message="All Pauli strings must have the same length.",
-                status_code=400,
-            )
-        normalized_terms.append((pauli, float(term.coefficient)))
-    assert qubit_count is not None
-    return SparsePauliOp.from_list(normalized_terms)
+    operator = sparse_pauli_op_from_terms(request.pauli_sum)
+    if operator is None:
+        raise Phase2ServiceError(
+            error="invalid_pauli_term",
+            message="Pauli sum must not be empty.",
+            status_code=400,
+        )
+    return operator
 
 
 def solve_vqe(request: OptimizationVqeRequest) -> dict[str, object]:
