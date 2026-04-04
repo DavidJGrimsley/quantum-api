@@ -182,7 +182,6 @@ def endpoint_display_sort_key(path: str) -> tuple[int, int, str]:
     priority_prefixes = (
         "/v1/gates",
         "/v1/circuits",
-        "/v1/echo-types",
         "/v1/list_backends",
         "/v1/transpile",
         "/v1/qasm",
@@ -198,6 +197,7 @@ def endpoint_display_sort_key(path: str) -> tuple[int, int, str]:
         "/v1/portfolio.json",
         "/v1/keys",
         "/v1/ibm/profiles",
+        "/v1/echo-types",
         "/",
     )
     for index, prefix in enumerate(priority_prefixes):

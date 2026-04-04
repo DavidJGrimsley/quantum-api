@@ -35,7 +35,12 @@ def health() -> HealthResponse:
     )
 
 
-@router.get("/echo-types", response_model=EchoTypesResponse)
+@router.get(
+    "/echo-types",
+    response_model=EchoTypesResponse,
+    summary="Echo Types (For a text-based Godot game)",
+    description="Lists the custom text-effect modes used by the Echoes Godot game integration.",
+)
 def echo_types() -> EchoTypesResponse:
     payload = [
         EchoTypeInfo(name=echo_type.value, description=description)
