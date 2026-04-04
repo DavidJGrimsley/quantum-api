@@ -1,29 +1,15 @@
 from __future__ import annotations
 
 from quantum_api.models.experiments import RandomizedBenchmarkingRequest
+from quantum_api.services.experiments.common import build_aer_backend
 from quantum_api.services.phase2_errors import Phase2ServiceError
-from quantum_api.services.qiskit_common.dependencies import ensure_dependency
 from quantum_api.services.qiskit_common.serialization import to_nominal_float
-from quantum_api.services.quantum_runtime import runtime
 
 
 def run_randomized_benchmarking(request: RandomizedBenchmarkingRequest) -> dict[str, object]:
-    ensure_dependency(
-        available=runtime.qiskit_experiments_available,
-        provider="qiskit-experiments",
-        import_error=runtime.qiskit_experiments_import_error,
-    )
-    if runtime.AerSimulator is None:
-        raise Phase2ServiceError(
-            error="provider_unavailable",
-            message="Aer simulator is unavailable for randomized benchmarking.",
-            status_code=503,
-            details={"reason": "missing_aer_simulator"},
-        )
-
     from qiskit_experiments.library import StandardRB
 
-    backend = runtime.AerSimulator(seed_simulator=request.seed) if request.seed is not None else runtime.AerSimulator()
+    backend = build_aer_backend(seed=request.seed, purpose="randomized benchmarking")
     experiment = StandardRB(
         tuple(request.qubits),
         lengths=request.sequence_lengths,

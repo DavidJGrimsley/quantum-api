@@ -51,6 +51,18 @@ _ARTIFACTS = {
         _ROOT / "docs" / "domains" / "experiments-randomized-benchmarking.md",
         _ROOT / "docs" / "notebooks" / "domains" / "experiments-randomized-benchmarking.ipynb",
     ),
+    "/v1/experiments/quantum_volume": (
+        _ROOT / "docs" / "domains" / "experiments-quantum-volume.md",
+        _ROOT / "docs" / "notebooks" / "domains" / "experiments-quantum-volume.ipynb",
+    ),
+    "/v1/experiments/t1": (
+        _ROOT / "docs" / "domains" / "experiments-t1.md",
+        _ROOT / "docs" / "notebooks" / "domains" / "experiments-t1.ipynb",
+    ),
+    "/v1/experiments/t2ramsey": (
+        _ROOT / "docs" / "domains" / "experiments-t2ramsey.md",
+        _ROOT / "docs" / "notebooks" / "domains" / "experiments-t2ramsey.ipynb",
+    ),
     "/v1/finance/portfolio_optimization": (
         _ROOT / "docs" / "domains" / "finance-portfolio-optimization.md",
         _ROOT / "docs" / "notebooks" / "domains" / "finance-portfolio-optimization.ipynb",

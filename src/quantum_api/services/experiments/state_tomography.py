@@ -2,26 +2,12 @@ from __future__ import annotations
 
 from quantum_api.models.experiments import StateTomographyRequest
 from quantum_api.services.circuit_conversion import build_circuit_from_definition
+from quantum_api.services.experiments.common import analysis_results_by_name, build_aer_backend
 from quantum_api.services.phase2_errors import Phase2ServiceError
-from quantum_api.services.qiskit_common.dependencies import ensure_dependency
 from quantum_api.services.qiskit_common.serialization import complex_payload
-from quantum_api.services.quantum_runtime import runtime
 
 
 def run_state_tomography(request: StateTomographyRequest) -> dict[str, object]:
-    ensure_dependency(
-        available=runtime.qiskit_experiments_available,
-        provider="qiskit-experiments",
-        import_error=runtime.qiskit_experiments_import_error,
-    )
-    if runtime.AerSimulator is None:
-        raise Phase2ServiceError(
-            error="provider_unavailable",
-            message="Aer simulator is unavailable for state tomography.",
-            status_code=503,
-            details={"reason": "missing_aer_simulator"},
-        )
-
     from qiskit.quantum_info import Statevector
     from qiskit_experiments.library import StateTomography
 
@@ -32,14 +18,10 @@ def run_state_tomography(request: StateTomographyRequest) -> dict[str, object]:
             [complex(amplitude.real, amplitude.imag) for amplitude in request.target_statevector]
         )
 
-    backend = runtime.AerSimulator(seed_simulator=request.seed) if request.seed is not None else runtime.AerSimulator()
+    backend = build_aer_backend(seed=request.seed, purpose="state tomography")
     experiment = StateTomography(circuit, target=target if target is not None else "default")
     experiment_data = experiment.run(backend, shots=request.shots).block_for_results()
-
-    analysis_results = {
-        result.name: result
-        for result in experiment_data.analysis_results()
-    }
+    analysis_results = analysis_results_by_name(experiment_data)
     state_result = analysis_results.get("state")
     if state_result is None:
         raise Phase2ServiceError(

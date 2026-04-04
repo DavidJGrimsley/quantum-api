@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from quantum_api.config import get_settings
@@ -123,6 +125,143 @@ class RandomizedBenchmarkingResponse(BaseModel):
     alpha: float
     epc: float
     fit_metrics: dict[str, float | None]
+    provider: QiskitDomainProvider = "qiskit-experiments"
+    backend_mode: str = "aer_simulator"
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class QuantumVolumeRequest(BaseModel):
+    qubits: list[int] = Field(min_length=2, max_length=4)
+    trials: int = Field(default=5, ge=3, le=20)
+    shots: int = Field(default=256, ge=1)
+    seed: int | None = None
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "qubits": [0, 1],
+                "trials": 5,
+                "shots": 128,
+                "seed": 7,
+            }
+        },
+    )
+
+    @field_validator("shots")
+    @classmethod
+    def validate_shots_limit(cls, value: int) -> int:
+        max_shots = get_settings().max_circuit_shots
+        if value > max_shots:
+            raise ValueError(f"shots exceeds MAX_CIRCUIT_SHOTS ({max_shots})")
+        return value
+
+    @field_validator("qubits")
+    @classmethod
+    def validate_qubits(cls, value: list[int]) -> list[int]:
+        if len(set(value)) != len(value):
+            raise ValueError("qubits must be unique")
+        return value
+
+
+class QuantumVolumeResponse(BaseModel):
+    quantum_volume: int
+    mean_heavy_output_probability: float | None = None
+    analysis_metadata: dict[str, Any]
+    provider: QiskitDomainProvider = "qiskit-experiments"
+    backend_mode: str = "aer_simulator"
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class T1ExperimentRequest(BaseModel):
+    qubits: list[int] = Field(min_length=1, max_length=1)
+    delays: list[float] = Field(min_length=4, max_length=16)
+    shots: int = Field(default=256, ge=1)
+    seed: int | None = None
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "qubits": [0],
+                "delays": [0.000001, 0.000002, 0.000003, 0.000004],
+                "shots": 128,
+                "seed": 7,
+            }
+        },
+    )
+
+    @field_validator("shots")
+    @classmethod
+    def validate_shots_limit(cls, value: int) -> int:
+        max_shots = get_settings().max_circuit_shots
+        if value > max_shots:
+            raise ValueError(f"shots exceeds MAX_CIRCUIT_SHOTS ({max_shots})")
+        return value
+
+    @field_validator("delays")
+    @classmethod
+    def validate_delays(cls, value: list[float]) -> list[float]:
+        if any(item <= 0 for item in value):
+            raise ValueError("delays must be positive")
+        if sorted(value) != value:
+            raise ValueError("delays must be sorted ascending")
+        return value
+
+
+class T1ExperimentResponse(BaseModel):
+    t1_seconds: float
+    fit_metrics: dict[str, Any]
+    provider: QiskitDomainProvider = "qiskit-experiments"
+    backend_mode: str = "aer_simulator"
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class T2RamseyExperimentRequest(BaseModel):
+    qubits: list[int] = Field(min_length=1, max_length=1)
+    delays: list[float] = Field(min_length=5, max_length=16)
+    osc_freq: float = Field(default=100000.0, ge=0.0)
+    shots: int = Field(default=256, ge=1)
+    seed: int | None = None
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "qubits": [0],
+                "delays": [0.000001, 0.000002, 0.000003, 0.000004, 0.000005],
+                "osc_freq": 100000.0,
+                "shots": 128,
+                "seed": 7,
+            }
+        },
+    )
+
+    @field_validator("shots")
+    @classmethod
+    def validate_shots_limit(cls, value: int) -> int:
+        max_shots = get_settings().max_circuit_shots
+        if value > max_shots:
+            raise ValueError(f"shots exceeds MAX_CIRCUIT_SHOTS ({max_shots})")
+        return value
+
+    @field_validator("delays")
+    @classmethod
+    def validate_delays(cls, value: list[float]) -> list[float]:
+        if any(item <= 0 for item in value):
+            raise ValueError("delays must be positive")
+        if sorted(value) != value:
+            raise ValueError("delays must be sorted ascending")
+        return value
+
+
+class T2RamseyExperimentResponse(BaseModel):
+    t2star_seconds: float
+    oscillation_frequency_hz: float | None = None
+    fit_metrics: dict[str, Any]
     provider: QiskitDomainProvider = "qiskit-experiments"
     backend_mode: str = "aer_simulator"
 

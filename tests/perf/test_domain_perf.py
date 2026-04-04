@@ -14,16 +14,22 @@ from quantum_api.models.api import (
     OptimizationTspRequest,
     OptimizationVqeRequest,
     PhaseEstimationRequest,
+    QuantumVolumeRequest,
     RandomizedBenchmarkingRequest,
     StateTomographyRequest,
+    T1ExperimentRequest,
+    T2RamseyExperimentRequest,
     TimeEvolutionRequest,
 )
 from quantum_api.services.algorithms.amplitude_estimation import run_amplitude_estimation
 from quantum_api.services.algorithms.grover_search import run_grover_search
 from quantum_api.services.algorithms.phase_estimation import run_phase_estimation
 from quantum_api.services.algorithms.time_evolution import run_time_evolution
+from quantum_api.services.experiments.quantum_volume import run_quantum_volume
 from quantum_api.services.experiments.randomized_benchmarking import run_randomized_benchmarking
 from quantum_api.services.experiments.state_tomography import run_state_tomography
+from quantum_api.services.experiments.t1 import run_t1_experiment
+from quantum_api.services.experiments.t2ramsey import run_t2ramsey_experiment
 from quantum_api.services.finance.portfolio_diversification import solve_portfolio_diversification
 from quantum_api.services.optimization.knapsack import solve_knapsack
 from quantum_api.services.optimization.maxcut import solve_maxcut
@@ -303,6 +309,58 @@ def test_randomized_benchmarking_perf_budget():
                 "sequence_lengths": [1, 2, 4],
                 "num_samples": 2,
                 "shots": 128,
+                "seed": 7,
+            }
+        )
+    )
+    assert time.perf_counter() - started < 20
+
+
+@pytest.mark.perf
+@pytest.mark.skipif(not runtime.qiskit_experiments_available, reason="Experiment dependencies unavailable")
+def test_quantum_volume_perf_budget():
+    started = time.perf_counter()
+    run_quantum_volume(
+        QuantumVolumeRequest.model_validate(
+            {
+                "qubits": [0, 1],
+                "trials": 3,
+                "shots": 64,
+                "seed": 7,
+            }
+        )
+    )
+    assert time.perf_counter() - started < 20
+
+
+@pytest.mark.perf
+@pytest.mark.skipif(not runtime.qiskit_experiments_available, reason="Experiment dependencies unavailable")
+def test_t1_perf_budget():
+    started = time.perf_counter()
+    run_t1_experiment(
+        T1ExperimentRequest.model_validate(
+            {
+                "qubits": [0],
+                "delays": [0.000001, 0.000002, 0.000003, 0.000004],
+                "shots": 64,
+                "seed": 7,
+            }
+        )
+    )
+    assert time.perf_counter() - started < 20
+
+
+@pytest.mark.perf
+@pytest.mark.skipif(not runtime.qiskit_experiments_available, reason="Experiment dependencies unavailable")
+def test_t2ramsey_perf_budget():
+    started = time.perf_counter()
+    run_t2ramsey_experiment(
+        T2RamseyExperimentRequest.model_validate(
+            {
+                "qubits": [0],
+                "delays": [0.000001, 0.000002, 0.000003, 0.000004, 0.000005],
+                "osc_freq": 100000.0,
+                "shots": 64,
                 "seed": 7,
             }
         )
