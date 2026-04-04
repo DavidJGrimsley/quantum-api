@@ -109,3 +109,27 @@ Content-Type: application/json
 - Missing/invalid API key on protected calls does not crash the page and shows fallback behavior.
 - Rotation call uses `rotation_angle_rad` and succeeds.
 - UI displays `/v1` URLs (no legacy `public-facing/api/quantum/*` references).
+
+## 8. Testing Instructions
+
+Use this order so failures are easy to isolate:
+
+1. Verify the shared JS SDK first:
+   - `npm --prefix sdk/js install`
+   - `npm --prefix sdk/js run check`
+   - `npm --prefix sdk/js run build`
+   - `npm --prefix sdk/js run test`
+2. Point the upstream Expo app at either:
+   - local API: `http://127.0.0.1:8000`
+   - mounted deployment: `https://<your-domain>/public-facing/api/quantum`
+3. Set Expo env vars:
+   - `EXPO_PUBLIC_QUANTUM_API_BASE_URL`
+   - `EXPO_PUBLIC_QUANTUM_API_KEY`
+4. Start the app with the normal Expo dev flow for that project.
+5. Run a manual smoke pass:
+   - open the API detail/index screens and confirm `portfolio.json` content renders
+   - trigger the animation path that calls `POST /v1/gates/run`
+   - remove or invalidate the API key and confirm fallback UX still works
+   - confirm no UI copy or request logging still references legacy `quantum_gate` or `quantum_echo_types` routes
+
+If you want a quick SDK-only live smoke before touching the Expo app, build `sdk/js/` and run a tiny Node script against `sdk/js/dist/index.js` with a real base URL and key.

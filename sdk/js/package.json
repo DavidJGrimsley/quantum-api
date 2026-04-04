@@ -1,11 +1,49 @@
 {
   "name": "@quantum-api/sdk",
   "version": "0.1.0",
-  "private": true,
+  "description": "Package-ready TypeScript client for the Quantum API /v1 contract",
+  "license": "Apache-2.0",
   "type": "module",
-  "main": "src/index.ts",
-  "types": "src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "quantum",
+    "api",
+    "sdk",
+    "typescript",
+    "expo"
+  ],
+  "homepage": "https://github.com/davidjgrimsley/quantum-api",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/davidjgrimsley/quantum-api.git"
+  },
+  "bugs": {
+    "url": "https://github.com/davidjgrimsley/quantum-api/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
-    "check": "tsc --noEmit"
+    "build": "tsc -p tsconfig.build.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test tests/*.test.mjs",
+    "prepack": "npm run build"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
   }
 }
