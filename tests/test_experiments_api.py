@@ -3,15 +3,13 @@ from __future__ import annotations
 import pytest
 
 from quantum_api.models.api import RandomizedBenchmarkingRequest, StateTomographyRequest
-from quantum_api.services.phase5_experiments import (
-    run_randomized_benchmarking,
-    run_state_tomography,
-)
+from quantum_api.services.experiments.randomized_benchmarking import run_randomized_benchmarking
+from quantum_api.services.experiments.state_tomography import run_state_tomography
 from quantum_api.services.quantum_runtime import runtime
 
-requires_phase5_experiments = pytest.mark.skipif(
+requires_experiments = pytest.mark.skipif(
     not runtime.qiskit_experiments_available,
-    reason="Phase 5 experiment dependencies unavailable",
+    reason="Experiment dependencies unavailable",
 )
 
 
@@ -40,7 +38,7 @@ def _rb_body() -> dict[str, object]:
     }
 
 
-@requires_phase5_experiments
+@requires_experiments
 def test_state_tomography_service_returns_density_matrix():
     payload = run_state_tomography(StateTomographyRequest.model_validate(_tomography_body()))
     assert len(payload["reconstructed_density_matrix"]) == 2
@@ -48,14 +46,14 @@ def test_state_tomography_service_returns_density_matrix():
     assert payload["positivity"]["positive"] is True
 
 
-@requires_phase5_experiments
+@requires_experiments
 def test_randomized_benchmarking_service_returns_alpha_and_epc():
     payload = run_randomized_benchmarking(RandomizedBenchmarkingRequest.model_validate(_rb_body()))
     assert isinstance(payload["alpha"], float)
     assert "EPC" in payload["fit_metrics"]
 
 
-@requires_phase5_experiments
+@requires_experiments
 def test_experiment_endpoints_contract(client):
     tomography = client.post("/v1/experiments/state_tomography", json=_tomography_body())
     assert tomography.status_code == 200

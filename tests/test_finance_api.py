@@ -3,12 +3,12 @@ from __future__ import annotations
 import pytest
 
 from quantum_api.models.api import FinancePortfolioOptimizationRequest
-from quantum_api.services.phase5_finance import solve_portfolio_optimization
+from quantum_api.services.finance.portfolio_optimization import solve_portfolio_optimization
 from quantum_api.services.quantum_runtime import runtime
 
-requires_phase5_finance = pytest.mark.skipif(
+requires_finance = pytest.mark.skipif(
     not (runtime.qiskit_finance_available and runtime.qiskit_optimization_available and runtime.qiskit_algorithms_available),
-    reason="Phase 5 finance dependencies unavailable",
+    reason="Finance dependencies unavailable",
 )
 
 
@@ -30,14 +30,14 @@ def _finance_body(*, solver: str = "qaoa") -> dict[str, object]:
     }
 
 
-@requires_phase5_finance
+@requires_finance
 def test_finance_service_returns_allocation_for_exact_solver():
     payload = solve_portfolio_optimization(FinancePortfolioOptimizationRequest.model_validate(_finance_body(solver="exact")))
     assert sum(payload["selected_allocation"]) == 2
     assert payload["backend_mode"] == "numpy_minimum_eigensolver"
 
 
-@requires_phase5_finance
+@requires_finance
 def test_finance_endpoint_contract(client):
     response = client.post("/v1/finance/portfolio_optimization", json=_finance_body())
     assert response.status_code == 200

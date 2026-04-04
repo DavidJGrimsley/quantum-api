@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import numpy as np
 
-from quantum_api.models.phase5 import KernelClassifierRequest
+from quantum_api.models.machine_learning import KernelClassifierRequest
 from quantum_api.services.phase2_errors import Phase2ServiceError
-from quantum_api.services.phase5_common import ensure_dependency
+from quantum_api.services.qiskit_common.dependencies import ensure_dependency
 from quantum_api.services.quantum_runtime import runtime
 
 

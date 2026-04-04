@@ -3,12 +3,12 @@ from __future__ import annotations
 import pytest
 
 from quantum_api.models.api import KernelClassifierRequest
-from quantum_api.services.phase5_machine_learning import run_kernel_classifier
+from quantum_api.services.machine_learning.kernel_classifier import run_kernel_classifier
 from quantum_api.services.quantum_runtime import runtime
 
-requires_phase5_ml = pytest.mark.skipif(
+requires_machine_learning = pytest.mark.skipif(
     not runtime.qiskit_machine_learning_available,
-    reason="Phase 5 machine learning dependencies unavailable",
+    reason="Machine-learning dependencies unavailable",
 )
 
 
@@ -22,7 +22,7 @@ def _ml_body() -> dict[str, object]:
     }
 
 
-@requires_phase5_ml
+@requires_machine_learning
 def test_ml_service_returns_predictions_and_training_score():
     payload = run_kernel_classifier(KernelClassifierRequest.model_validate(_ml_body()))
     assert len(payload["predictions"]) == 2
@@ -30,7 +30,7 @@ def test_ml_service_returns_predictions_and_training_score():
     assert payload["training_score"] >= 0.0
 
 
-@requires_phase5_ml
+@requires_machine_learning
 def test_ml_endpoint_contract(client):
     response = client.post("/v1/ml/kernel_classifier", json=_ml_body())
     assert response.status_code == 200

@@ -3,12 +3,12 @@ from __future__ import annotations
 import pytest
 
 from quantum_api.models.api import NatureGroundStateEnergyRequest
-from quantum_api.services.phase5_nature import compute_ground_state_energy
+from quantum_api.services.nature.ground_state_energy import compute_ground_state_energy
 from quantum_api.services.quantum_runtime import runtime
 
-requires_phase5_nature = pytest.mark.skipif(
+requires_nature = pytest.mark.skipif(
     not (runtime.qiskit_nature_available and runtime.pyscf_available and runtime.qiskit_algorithms_available),
-    reason="Phase 5 nature dependencies unavailable",
+    reason="Nature dependencies unavailable",
 )
 
 
@@ -28,7 +28,7 @@ def _nature_body() -> dict[str, object]:
     }
 
 
-@requires_phase5_nature
+@requires_nature
 def test_nature_service_returns_ground_state_summary():
     payload = compute_ground_state_energy(NatureGroundStateEnergyRequest.model_validate(_nature_body()))
     assert isinstance(payload["ground_state_energy"], float)
@@ -36,7 +36,7 @@ def test_nature_service_returns_ground_state_summary():
     assert payload["solver_metadata"]["optimizer"]["name"] == "cobyla"
 
 
-@requires_phase5_nature
+@requires_nature
 def test_nature_endpoint_contract(client):
     response = client.post("/v1/nature/ground_state_energy", json=_nature_body())
     assert response.status_code == 200

@@ -10,18 +10,17 @@ from quantum_api.models.api import (
     RandomizedBenchmarkingRequest,
     StateTomographyRequest,
 )
-from quantum_api.services.phase5_experiments import (
-    run_randomized_benchmarking,
-    run_state_tomography,
-)
-from quantum_api.services.phase5_optimization import solve_qaoa, solve_vqe
+from quantum_api.services.experiments.randomized_benchmarking import run_randomized_benchmarking
+from quantum_api.services.experiments.state_tomography import run_state_tomography
+from quantum_api.services.optimization.qaoa import solve_qaoa
+from quantum_api.services.optimization.vqe import solve_vqe
 from quantum_api.services.quantum_runtime import runtime
 
 
 @pytest.mark.perf
 @pytest.mark.skipif(
     not (runtime.qiskit_algorithms_available and runtime.qiskit_optimization_available),
-    reason="Phase 5 optimization dependencies unavailable",
+    reason="Optimization dependencies unavailable",
 )
 def test_qaoa_perf_budget():
     started = time.perf_counter()

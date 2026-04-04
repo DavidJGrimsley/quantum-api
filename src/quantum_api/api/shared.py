@@ -188,6 +188,7 @@ def endpoint_display_sort_key(path: str) -> tuple[int, int, str]:
         "/v1/qasm",
         "/v1/text",
         "/v1/jobs",
+        "/v1/algorithms",
         "/v1/optimization",
         "/v1/experiments",
         "/v1/finance",

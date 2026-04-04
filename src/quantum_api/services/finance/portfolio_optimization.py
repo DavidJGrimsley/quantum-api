@@ -4,13 +4,13 @@ from typing import Any
 
 import numpy as np
 
-from quantum_api.models.phase5 import FinancePortfolioOptimizationRequest
-from quantum_api.services.phase5_common import (
-    bitstring_from_vector,
+from quantum_api.models.finance import FinancePortfolioOptimizationRequest
+from quantum_api.services.qiskit_common.dependencies import ensure_dependency
+from quantum_api.services.qiskit_common.optimizers import (
     build_optimizer,
-    ensure_dependency,
     optimizer_metadata_from_result,
 )
+from quantum_api.services.qiskit_common.serialization import bitstring_from_vector
 from quantum_api.services.quantum_runtime import runtime
 
 

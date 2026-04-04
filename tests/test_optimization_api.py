@@ -3,12 +3,13 @@ from __future__ import annotations
 import pytest
 
 from quantum_api.models.api import OptimizationQaoaRequest, OptimizationVqeRequest
-from quantum_api.services.phase5_optimization import solve_qaoa, solve_vqe
+from quantum_api.services.optimization.qaoa import solve_qaoa
+from quantum_api.services.optimization.vqe import solve_vqe
 from quantum_api.services.quantum_runtime import runtime
 
-requires_phase5_optimization = pytest.mark.skipif(
+requires_optimization = pytest.mark.skipif(
     not (runtime.qiskit_algorithms_available and runtime.qiskit_optimization_available),
-    reason="Phase 5 optimization dependencies unavailable",
+    reason="Optimization dependencies unavailable",
 )
 
 
@@ -41,7 +42,7 @@ def _vqe_body() -> dict[str, object]:
     }
 
 
-@requires_phase5_optimization
+@requires_optimization
 def test_qaoa_service_returns_best_solution_and_samples():
     payload = solve_qaoa(OptimizationQaoaRequest.model_validate(_qaoa_body()))
     assert payload["best_bitstring"] in {"01", "10", "00", "11"}
@@ -49,7 +50,7 @@ def test_qaoa_service_returns_best_solution_and_samples():
     assert payload["optimizer_metadata"]["name"] == "cobyla"
 
 
-@requires_phase5_optimization
+@requires_optimization
 def test_vqe_service_returns_eigenvalue_and_parameters():
     payload = solve_vqe(OptimizationVqeRequest.model_validate(_vqe_body()))
     assert isinstance(payload["minimum_eigenvalue"], float)
@@ -57,7 +58,7 @@ def test_vqe_service_returns_eigenvalue_and_parameters():
     assert payload["convergence"]["name"] == "cobyla"
 
 
-@requires_phase5_optimization
+@requires_optimization
 def test_optimization_endpoints_contract(client):
     qaoa = client.post("/v1/optimization/qaoa", json=_qaoa_body())
     assert qaoa.status_code == 200
