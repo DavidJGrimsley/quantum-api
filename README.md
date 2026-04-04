@@ -558,6 +558,12 @@ uv run ruff check .
 uv run pytest
 ```
 
+Tooling note:
+
+- This repo assumes `uv` for Python workflows.
+- JS SDK verification also needs Node.js, npm, and the TypeScript toolchain.
+- Engine deliverables require their native toolchains for real packaging validation.
+
 Optional performance benchmarks (non-blocking, not run in CI by default):
 
 ```bash
@@ -568,8 +574,11 @@ RUN_PERF_BENCHMARKS=true uv run pytest tests/perf -s
 
 - `src/quantum_api/` - backend app, routers, models, services
 - `tests/` - contract, unit, determinism, and validation tests
-- `sdk/js/` - TypeScript SDK scaffold
-- `sdk/python/` - Python SDK scaffold
+- `sdk/js/` - TypeScript SDK package-ready client work
+- `sdk/python/` - Python SDK package-ready client work
+- `sdk/godot/` - promoted reusable Godot addon/client for runtime `/v1` integration
+- `sdk/unreal/` - Unreal runtime plugin scaffold for the gameplay subset
+- `docs/sdk/` - SDK release governance and compatibility tracking
 - `docs/migrations/` - external client migration plans (Godot, Expo, Unreal, Unity)
 - `project/` - planning, style, and implementation docs
 
@@ -578,8 +587,15 @@ RUN_PERF_BENCHMARKS=true uv run pytest tests/perf -s
 1. Phase 1 delivered: multi-qubit execution (`/v1/circuits/run`) with strict limits.
 2. Phase 2 delivered: backend discovery + transpilation + QASM interop.
 3. Phase 3 delivered: production auth/rate-limiting/observability hardening.
-4. Phase 3.5/3.75 active: Identerest-authenticated key lifecycle rollout and portfolio integration.
-5. Next major engineering focus after rollout: Phase 4 runtime/hardware integrations.
+4. Phase 4 delivered: BYO IBM runtime profiles and hardware-job lifecycle.
+5. Phase 5 delivered: expanded Qiskit domain coverage across algorithms, optimization, experiments, finance, ML, and nature.
+6. Current engineering focus: Phase 6 SDK productization, Godot migration, and follow-on engine integrations.
+
+## Client Packaging
+
+- `sdk/js/` is the package that would become the published npm package later in the roadmap.
+- `sdk/python/` is the package that would become the published PyPI package later in the roadmap.
+- `sdk/godot/` and `sdk/unreal/` are engine-specific delivery artifacts, not npm packages.
 
 ## License
 

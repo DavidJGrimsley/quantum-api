@@ -1,0 +1,19 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "Quantum API",
+  "Description": "Runtime HTTP client for the Quantum API mounted /v1 contract.",
+  "Category": "Networking",
+  "CreatedBy": "Quantum API",
+  "EnabledByDefault": false,
+  "CanContainContent": false,
+  "Installed": false,
+  "Modules": [
+    {
+      "Name": "QuantumApi",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    }
+  ]
+}

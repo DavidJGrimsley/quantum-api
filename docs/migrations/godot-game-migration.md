@@ -67,6 +67,17 @@ New response is stable:
 
 Create a single source for base URL in the game codebase.
 
+Recommended implementation:
+
+- introduce a shared runtime client at `addons/quantum_api_client/quantum_api_client.gd`
+- keep the promoted reusable copy in this repo at `sdk/godot/addons/quantum_api_client/`
+- let that client normalize both:
+  - `https://<your-domain>/public-facing/api/quantum`
+  - `https://<your-domain>/public-facing/api/quantum/v1`
+- support both:
+  - backend-proxy mode for shipped builds
+  - optional direct `X-API-Key` mode for local/dev/demo workflows
+
 Recommended convention:
 
 - `const QUANTUM_API_BASE = "https://<your-domain>/v1"`
@@ -119,12 +130,13 @@ Recommended convention:
 
 ## 5. Suggested Migration Order
 
-1. Introduce centralized base URL constant.
-2. Migrate gate endpoint callers.
-3. Migrate text transform callers.
-4. Migrate health and echo-types calls.
-5. Update test scripts.
-6. Run end-to-end dialogue path checks.
+1. Introduce the shared Godot Quantum API client/addon.
+2. Centralize base URL and auth mode handling there.
+3. Migrate gate endpoint callers.
+4. Migrate text transform callers.
+5. Migrate health and echo-types calls.
+6. Update test scripts.
+7. Run end-to-end dialogue path checks.
 
 ## 6. Validation Scenarios
 

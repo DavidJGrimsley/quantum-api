@@ -272,19 +272,31 @@ Goal: make adoption easy across game and app stacks.
 
 ### SDK Productization
 
-- [ ] Promote `sdk/js` scaffold to publishable package
-- [ ] Promote `sdk/python` scaffold to publishable package
-- [ ] Add semantic versioning and changelog policies
+- [x] Promote `sdk/js` scaffold to package-ready ESM package
+- [x] Expand `sdk/js` coverage to the full current `/v1` surface
+- [x] Add SDK auth support for both `X-API-Key` and bearer-token flows with per-request override
+- [x] Add structured SDK error handling (`error`, `message`, `details`, `request_id`, status, headers)
+- [x] Normalize SDK base URL handling for both local `/v1` and mounted `/public-facing/api/quantum/v1`
+- [x] Promote `sdk/python` scaffold to package-ready wheel
+- [x] Expand `sdk/python` coverage to the full current `/v1` surface
+- [x] Add Python SDK context-manager ergonomics and stronger typing metadata
+- [x] Add semantic versioning and changelog policies
+- [x] Add SDK bootstrap/setup docs so `uv`, `tsc`, and related tooling are explicit instead of assumed
 
 ### Godot
 
-- [ ] Build reusable Godot addon client (`addons/quantum_api_client/`)
-- [ ] Add install docs and sample scene integration
+- [x] Build reusable Godot addon client (`addons/quantum_api_client/`)
+- [x] Support both backend-proxy mode and optional direct API-key mode in the Godot client
+- [x] Migrate legacy Godot runtime calls to mounted `/v1` endpoints
+- [x] Add install docs and sample scene integration
 
 ### Unreal
 
-- [ ] Build runtime HTTP wrapper (C++ + Blueprint callable layer)
-- [ ] Keep Python usage restricted to editor tooling
+- [x] Build runtime HTTP wrapper (C++ + Blueprint callable layer)
+- [x] Scope the first Unreal plugin to `health`, `text/transform`, and `gates/run` before optional `circuits/run` and `jobs/*`
+- [x] Default Unreal docs to backend-proxy mode and keep direct API-key mode as dev/demo only
+- [x] Keep Python usage restricted to editor tooling
+- [x] Add a future public Unreal release milestone so setup stays easy for external game developers
 
 ### Unity
 
@@ -293,7 +305,9 @@ Goal: make adoption easy across game and app stacks.
 
 ### Completion Criteria
 
-- [ ] All four client paths (JS, Python, Godot, Unreal, Unity) have maintained reference integrations
+- [ ] All five client paths (JS, Python, Godot, Unreal, Unity) have maintained reference integrations
+- [ ] Godot migration acts as the first validated reference integration for the reusable addon/client path
+- [x] JS/Python SDKs are package-ready even if public publishing remains deferred
 
 ### Migrations
 - [x] Expo animation
@@ -315,9 +329,16 @@ Goal: keep the platform stable as capabilities grow.
 
 ### Release Discipline
 
-- [ ] Enforce semantic versioning rules across API and SDKs
+- [x] Enforce semantic versioning rules across API and SDKs
 - [ ] Add deprecation policy and sunset timelines
-- [ ] Add compatibility matrix (API versions vs SDK versions)
+- [x] Add compatibility matrix (API versions vs SDK versions)
+- [x] Split "package-ready" from "public publishing" in release checklists so external publication remains an explicit follow-up decision
+
+### Future Distribution Follow-On
+
+- [ ] Publish JS SDK package after Phase 6 validation gates are green
+- [ ] Publish Python SDK package after Phase 6 validation gates are green
+- [ ] Package and publish Unreal runtime plugin after Godot reference migration is stable
 
 ### Quality and Reliability
 
