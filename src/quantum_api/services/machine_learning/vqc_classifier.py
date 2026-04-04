@@ -24,6 +24,11 @@ def run_vqc_classifier(request: VqcClassifierRequest) -> dict[str, object]:
         provider="qiskit-machine-learning",
         import_error=runtime.qiskit_machine_learning_import_error,
     )
+    ensure_dependency(
+        available=runtime.qiskit_algorithms_available,
+        provider="qiskit-algorithms",
+        import_error=runtime.qiskit_algorithms_import_error,
+    )
 
     from qiskit.primitives import StatevectorSampler
     from qiskit_machine_learning.algorithms import VQC

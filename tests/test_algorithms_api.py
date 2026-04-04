@@ -155,6 +155,21 @@ def test_amplitude_estimation_validation_rejects_missing_variant_fields(client):
     assert response.status_code == 422
 
 
+def test_phase_estimation_hamiltonian_variant_rejects_empty_hamiltonian(client):
+    response = client.post(
+        "/v1/algorithms/phase_estimation",
+        json={
+            "variant": "hamiltonian",
+            "hamiltonian": [],
+            "num_evaluation_qubits": 3,
+            "shots": 128,
+            "seed": 7,
+        },
+    )
+    assert response.status_code == 400
+    assert response.json()["error"] == "invalid_hamiltonian"
+
+
 def test_time_evolution_validation_rejects_missing_initial_state_for_trotter(client):
     payload = _time_body()
     payload.pop("initial_state")

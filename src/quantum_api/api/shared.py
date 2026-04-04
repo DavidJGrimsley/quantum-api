@@ -208,6 +208,8 @@ def endpoint_display_sort_key(path: str) -> tuple[int, int, str]:
 
 def portfolio_auth_mode_for_path(path: str) -> EndpointAuthMode:
     settings = get_settings()
+    if not settings.auth_enabled:
+        return "public"
     if settings.requires_user_jwt(path):
         return "bearer_jwt"
     if settings.requires_api_key(path):

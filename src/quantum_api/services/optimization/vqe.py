@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 from quantum_api.models.optimization import OptimizationVqeRequest
-from quantum_api.services.phase2_errors import Phase2ServiceError
 from quantum_api.services.qiskit_common.dependencies import ensure_dependency
 from quantum_api.services.qiskit_common.operators import sparse_pauli_op_from_terms
 from quantum_api.services.qiskit_common.optimizers import (
@@ -14,14 +13,7 @@ from quantum_api.services.quantum_runtime import runtime
 
 
 def sparse_pauli_from_request(request: OptimizationVqeRequest) -> Any:
-    operator = sparse_pauli_op_from_terms(request.pauli_sum)
-    if operator is None:
-        raise Phase2ServiceError(
-            error="invalid_pauli_term",
-            message="Pauli sum must not be empty.",
-            status_code=400,
-        )
-    return operator
+    return sparse_pauli_op_from_terms(request.pauli_sum)
 
 
 def solve_vqe(request: OptimizationVqeRequest) -> dict[str, object]:

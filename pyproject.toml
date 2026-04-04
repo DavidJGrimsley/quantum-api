@@ -47,6 +47,7 @@ phase5-finance = [
   "qiskit-optimization>=0.7.0",
 ]
 phase5-ml = [
+  "qiskit-algorithms>=0.4.0",
   "qiskit-machine-learning>=0.9.0",
   "scikit-learn>=1.8.0",
 ]

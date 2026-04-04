@@ -202,6 +202,33 @@ def test_openapi_declares_security_schemes_for_docs(unauth_client):
     assert "security" not in payload["paths"]["/v1/portfolio.json"]["get"]
 
 
+def test_openapi_and_portfolio_drop_auth_requirements_when_auth_is_disabled(unauth_client):
+    settings = get_settings()
+    original = settings.auth_enabled
+    app.openapi_schema = None
+    settings.auth_enabled = False
+    try:
+        openapi_response = unauth_client.get("/openapi.json")
+        assert openapi_response.status_code == 200
+        openapi_payload = openapi_response.json()
+        assert "security" not in openapi_payload["paths"]["/v1/echo-types"]["get"]
+        assert "security" not in openapi_payload["paths"]["/v1/optimization/qaoa"]["post"]
+        assert "security" not in openapi_payload["paths"]["/v1/keys"]["get"]
+
+        portfolio_response = unauth_client.get("/v1/portfolio.json")
+        assert portfolio_response.status_code == 200
+        by_signature = {
+            (item["method"], item["path"]): item
+            for item in portfolio_response.json()["endpoints"]
+        }
+        assert by_signature[("GET", "/v1/echo-types")]["auth"] == "public"
+        assert by_signature[("POST", "/v1/optimization/qaoa")]["auth"] == "public"
+        assert by_signature[("GET", "/v1/keys")]["auth"] == "public"
+    finally:
+        settings.auth_enabled = original
+        app.openapi_schema = None
+
+
 def test_openapi_orders_meta_routes_after_runtime_routes(unauth_client):
     response = unauth_client.get("/openapi.json")
     assert response.status_code == 200

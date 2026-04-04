@@ -105,6 +105,24 @@ def test_ml_dependency_missing_returns_503(client, monkeypatch):
     assert response.json()["error"] == "provider_unavailable"
 
 
+def test_ml_seeded_kernel_classifier_dependency_missing_returns_503(client, monkeypatch):
+    monkeypatch.setattr(runtime, "qiskit_algorithms_available", False)
+    monkeypatch.setattr(runtime, "qiskit_algorithms_import_error", "missing for test")
+
+    response = client.post("/v1/ml/kernel_classifier", json=_ml_body())
+    assert response.status_code == 503
+    assert response.json()["error"] == "provider_unavailable"
+
+
+def test_vqc_dependency_missing_returns_503(client, monkeypatch):
+    monkeypatch.setattr(runtime, "qiskit_algorithms_available", False)
+    monkeypatch.setattr(runtime, "qiskit_algorithms_import_error", "missing for test")
+
+    response = client.post("/v1/ml/vqc_classifier", json=_vqc_body())
+    assert response.status_code == 503
+    assert response.json()["error"] == "provider_unavailable"
+
+
 def test_qsvr_validation_rejects_mismatched_target_count(client):
     payload = _qsvr_body()
     payload["training_targets"] = [0.0, 1.0]

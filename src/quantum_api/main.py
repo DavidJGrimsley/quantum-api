@@ -237,7 +237,7 @@ def custom_openapi() -> dict[str, object]:
         "type": "apiKey",
         "in": "header",
         "name": settings.api_key_header,
-        "description": "Send a valid Quantum API key in the X-API-Key header.",
+        "description": f"Send a valid Quantum API key in the {settings.api_key_header} header.",
     }
     security_schemes["BearerAuth"] = {
         "type": "http",
@@ -256,7 +256,9 @@ def custom_openapi() -> dict[str, object]:
             if not isinstance(operation, dict):
                 continue
 
-            if settings.requires_user_jwt(str(path)):
+            if not settings.auth_enabled:
+                operation.pop("security", None)
+            elif settings.requires_user_jwt(str(path)):
                 operation["security"] = [{"BearerAuth": []}]
             elif settings.requires_api_key(str(path)):
                 operation["security"] = [{"ApiKeyAuth": []}]
