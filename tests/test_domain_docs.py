@@ -55,6 +55,10 @@ _ARTIFACTS = {
         _ROOT / "docs" / "domains" / "finance-portfolio-optimization.md",
         _ROOT / "docs" / "notebooks" / "domains" / "finance-portfolio-optimization.ipynb",
     ),
+    "/v1/finance/portfolio_diversification": (
+        _ROOT / "docs" / "domains" / "finance-portfolio-diversification.md",
+        _ROOT / "docs" / "notebooks" / "domains" / "finance-portfolio-diversification.ipynb",
+    ),
     "/v1/ml/kernel_classifier": (
         _ROOT / "docs" / "domains" / "ml-kernel-classifier.md",
         _ROOT / "docs" / "notebooks" / "domains" / "ml-kernel-classifier.ipynb",

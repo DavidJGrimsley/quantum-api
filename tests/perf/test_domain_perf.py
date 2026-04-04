@@ -6,6 +6,7 @@ import pytest
 
 from quantum_api.models.api import (
     AmplitudeEstimationRequest,
+    FinancePortfolioDiversificationRequest,
     GroverSearchRequest,
     OptimizationKnapsackRequest,
     OptimizationMaxcutRequest,
@@ -23,6 +24,7 @@ from quantum_api.services.algorithms.phase_estimation import run_phase_estimatio
 from quantum_api.services.algorithms.time_evolution import run_time_evolution
 from quantum_api.services.experiments.randomized_benchmarking import run_randomized_benchmarking
 from quantum_api.services.experiments.state_tomography import run_state_tomography
+from quantum_api.services.finance.portfolio_diversification import solve_portfolio_diversification
 from quantum_api.services.optimization.knapsack import solve_knapsack
 from quantum_api.services.optimization.maxcut import solve_maxcut
 from quantum_api.services.optimization.qaoa import solve_qaoa
@@ -235,6 +237,34 @@ def test_vqe_perf_budget():
                 ],
                 "optimizer": {"name": "cobyla", "maxiter": 5},
                 "ansatz": {"type": "real_amplitudes", "reps": 1},
+                "shots": 128,
+                "seed": 7,
+            }
+        )
+    )
+    assert time.perf_counter() - started < 20
+
+
+@pytest.mark.perf
+@pytest.mark.skipif(
+    not (runtime.qiskit_finance_available and runtime.qiskit_optimization_available and runtime.qiskit_algorithms_available),
+    reason="Finance dependencies unavailable",
+)
+def test_portfolio_diversification_perf_budget():
+    started = time.perf_counter()
+    solve_portfolio_diversification(
+        FinancePortfolioDiversificationRequest.model_validate(
+            {
+                "similarity_matrix": [
+                    [1.0, 0.2, 0.3],
+                    [0.2, 1.0, 0.4],
+                    [0.3, 0.4, 1.0],
+                ],
+                "num_clusters": 2,
+                "asset_labels": ["ALPHA", "BETA", "GAMMA"],
+                "solver": "exact",
+                "optimizer": {"name": "cobyla", "maxiter": 5},
+                "reps": 1,
                 "shots": 128,
                 "seed": 7,
             }
