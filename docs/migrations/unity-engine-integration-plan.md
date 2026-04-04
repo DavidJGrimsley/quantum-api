@@ -2,6 +2,8 @@
 
 This plan adds Unity runtime support for the Quantum API `/v1` contract.
 
+The initial package-style scaffold now lives in `sdk/unity/`.
+
 ## 1. Runtime Approach
 
 - Use `UnityWebRequest` for API communication in runtime gameplay.
@@ -82,6 +84,11 @@ Keep URL and timeout in config:
 4. Add adapter layer for systems that consume transformed text/quantum gates.
 5. Run playmode and build smoke tests.
 
+Current status:
+
+- `sdk/unity/` now contains the initial `UnityWebRequest` client scaffold.
+- Local Unity editor/package validation still needs to happen in a real Unity project.
+
 ## 6. Validation Checklist
 
 - Health endpoint reachable at runtime.
@@ -89,3 +96,28 @@ Keep URL and timeout in config:
 - Rotation validation errors handled gracefully in gameplay.
 - Text transform responses parse correctly.
 - API-down mode falls back without freezing gameplay.
+
+## 7. Testing Instructions
+
+Use a real Unity editor project for validation:
+
+1. Copy `sdk/unity/` into the Unity project's `Packages/` folder, or add it by local path in Package Manager.
+2. Confirm the package imports cleanly and the `QuantumApi.Unity` assembly appears without compile errors.
+3. Create a simple test scene:
+   - add an empty `GameObject`
+   - attach a MonoBehaviour that creates `QuantumApiClient`
+   - or start from `sdk/unity/Samples~/BasicUsage/QuantumApiExample.cs`
+4. Configure:
+   - `BaseUrl` to local or mounted production URL
+   - `BackendProxyMode = true` for shipped-like testing
+   - direct API key only for local/dev/demo validation
+5. Run Play Mode checks:
+   - `HealthAsync()` succeeds
+   - `GetEchoTypesAsync()` succeeds when auth is configured correctly
+   - `RunGateAsync()` succeeds for `bit_flip`, `phase_flip`, and `rotation`
+   - `RunGateAsync()` with `gate_type = "rotation"` and no angle yields a clean API error
+   - `TransformTextAsync()` parses `transformed`, `coverage_percent`, and `category_counts`
+   - `TransformTextWithFallbackAsync()` returns fallback text when the API is down
+6. Build one standalone player and repeat at least `health` plus one protected call so runtime networking matches Editor behavior.
+
+This repo does not have Unity CI or editor automation yet, so treat the current Unity helper as package-ready until a real Unity project smoke test is complete.

@@ -145,3 +145,28 @@ Recommended convention:
 - Text transform with mixed-category sentence.
 - Service-down fallback behavior.
 - Long text rejection behavior from API.
+
+## 7. Testing Instructions
+
+Recommended test order:
+
+1. Make sure the API itself is reachable:
+   - local: `http://127.0.0.1:8000/v1/health`
+   - mounted: `https://<your-domain>/public-facing/api/quantum/v1/health`
+2. Copy `sdk/godot/addons/quantum_api_client/` into the target Godot project as `addons/quantum_api_client/`.
+3. Configure the client in a test scene:
+   - backend-proxy mode for shipped-like testing
+   - direct mode plus `X-API-Key` only for local/dev/demo testing
+4. Use the promoted test script or an equivalent scene harness:
+   - `temp/quantum-jam-2025-choose-your-own-adventure/godot_project/source/dialogue/quantum_dialogue_test.gd`
+5. Run these manual checks in the Godot editor:
+   - `health_check` succeeds
+   - `run_gate("bit_flip")` succeeds
+   - `run_gate("phase_flip")` succeeds
+   - `run_gate("rotation", 0.5)` succeeds
+   - `run_gate("rotation")` without `rotation_angle_rad` returns a clear validation error
+   - `transform_text("memory signal and quantum circuit")` returns a parsed `transformed` field
+   - API-down mode falls back without freezing the scene
+6. Repeat one pass against a mounted production-like URL so base URL normalization is proven.
+
+This repo does not include automated Godot CI validation, so the expected test outcome for now is a manual editor smoke pass plus one packaged-build sanity check on a machine with Godot installed.

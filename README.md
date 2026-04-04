@@ -578,8 +578,9 @@ RUN_PERF_BENCHMARKS=true uv run pytest tests/perf -s
 - `sdk/python/` - Python SDK package-ready client work
 - `sdk/godot/` - promoted reusable Godot addon/client for runtime `/v1` integration
 - `sdk/unreal/` - Unreal runtime plugin scaffold for the gameplay subset
+- `sdk/unity/` - Unity runtime helper/package scaffold for gameplay `/v1` integration
 - `docs/sdk/` - SDK release governance and compatibility tracking
-- `docs/migrations/` - external client migration plans (Godot, Expo, Unreal, Unity)
+- `docs/migrations/` - external client migration plans (Godot, Expo, Unreal, Unity, JS SDK, Python SDK)
 - `project/` - planning, style, and implementation docs
 
 ## Roadmap Status
@@ -595,7 +596,7 @@ RUN_PERF_BENCHMARKS=true uv run pytest tests/perf -s
 
 - `sdk/js/` is the package that would become the published npm package later in the roadmap.
 - `sdk/python/` is the package that would become the published PyPI package later in the roadmap.
-- `sdk/godot/` and `sdk/unreal/` are engine-specific delivery artifacts, not npm packages.
+- `sdk/godot/`, `sdk/unreal/`, and `sdk/unity/` are engine-specific delivery artifacts, not npm packages.
 
 ## License
 

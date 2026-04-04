@@ -300,14 +300,19 @@ Goal: make adoption easy across game and app stacks.
 
 ### Unity
 
-- [ ] Build runtime C# client wrapper (`UnityWebRequest`)
-- [ ] Add coroutine/async usage examples and fallback modes
+- [x] Build runtime C# client wrapper (`UnityWebRequest`)
+- [x] Add coroutine/async usage examples and fallback modes
 
 ### Completion Criteria
 
 - [ ] All five client paths (JS, Python, Godot, Unreal, Unity) have maintained reference integrations
 - [ ] Godot migration acts as the first validated reference integration for the reusable addon/client path
 - [x] JS/Python SDKs are package-ready even if public publishing remains deferred
+- [ ] JS SDK tested
+- [ ] Python SDK tested
+- [ ] Unreal Engine local plugin tested
+- [ ] Godot local plugin tested
+- [ ] Unity local plugin tested
 
 ### Migrations
 - [x] Expo animation
