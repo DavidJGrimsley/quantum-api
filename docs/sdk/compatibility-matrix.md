@@ -9,7 +9,7 @@ This matrix tracks first-party client readiness against the current `Quantum API
 | Python SDK | Phase 6 package-ready target | Full `/v1` | `X-API-Key`, bearer JWT, per-request override | Sync-first client with context-manager ergonomics |
 | Godot addon/client | Phase 6 reference integration | `health`, `text/transform`, `gates/run` first; expand from there | Backend proxy by default, optional direct `X-API-Key` dev mode | Mounted `/v1` base required |
 | Unreal plugin | Phase 6 scaffold and follow-on integration | `health`, `text/transform`, `gates/run` first; optional `circuits/run` and `jobs/*` later | Backend proxy by default, optional direct `X-API-Key` dev mode | Packaged runtime uses HTTP, not Unreal Python |
-| Unity client | Planned | Runtime subset first | Backend proxy by default, optional direct `X-API-Key` dev mode | Pending implementation |
+| Unity client | Phase 6 scaffold/package-ready helper | `health`, `text/transform`, `gates/run` first; optional `circuits/run` and `jobs/*` later | Backend proxy by default, optional direct `X-API-Key` dev mode | Runtime helper scaffold added in Phase 6; Unity editor smoke test and package publishing not yet validated |
 
 ## Update rules
 

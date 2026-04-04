@@ -9,6 +9,10 @@ namespace QuantumApi.Unity
     {
         public static string Serialize(object value)
         {
+            if (value is string rawJson)
+            {
+                return rawJson;
+            }
             return JsonUtility.ToJson(value);
         }
 

@@ -58,6 +58,8 @@ namespace QuantumApi.Unity
     public sealed class GateRunRequest
     {
         public string gate_type = "";
+        [NonSerialized]
+        public bool sendRotationAngle;
         public float rotation_angle_rad;
     }
 

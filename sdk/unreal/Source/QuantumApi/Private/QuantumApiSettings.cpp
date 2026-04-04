@@ -7,5 +7,9 @@ FString UQuantumApiSettings::GetNormalizedBaseUrl() const
     {
         Normalized.LeftChopInline(1, false);
     }
+    if (!Normalized.EndsWith(TEXT("/v1")))
+    {
+        Normalized += TEXT("/v1");
+    }
     return Normalized;
 }

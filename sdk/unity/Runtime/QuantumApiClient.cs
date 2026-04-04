@@ -52,7 +52,7 @@ namespace QuantumApi.Unity
                 return FailTask<GateRunResponse>("invalid_request", "Quantum API gate execution requires a payload.");
             }
 
-            return SendAsync<GateRunResponse>("/gates/run", UnityWebRequest.kHttpVerbPOST, request, requestOptions);
+            return SendAsync<GateRunResponse>("/gates/run", UnityWebRequest.kHttpVerbPOST, BuildGateRunJson(request), requestOptions);
         }
 
         public Task<TextTransformResponse> TransformTextAsync(
@@ -115,7 +115,7 @@ namespace QuantumApi.Unity
                 yield break;
             }
 
-            yield return SendCoroutine("/gates/run", UnityWebRequest.kHttpVerbPOST, request, onSuccess, onError, requestOptions);
+            yield return SendCoroutine("/gates/run", UnityWebRequest.kHttpVerbPOST, BuildGateRunJson(request), onSuccess, onError, requestOptions);
         }
 
         public IEnumerator TransformTextCoroutine(
@@ -382,6 +382,50 @@ namespace QuantumApi.Unity
         private static bool IsSuccessStatusCode(long statusCode)
         {
             return statusCode >= 200 && statusCode < 300;
+        }
+
+        private static string BuildGateRunJson(GateRunRequest request)
+        {
+            var escapedGateType = EscapeJsonString(request.gate_type ?? string.Empty);
+            if (request.sendRotationAngle)
+            {
+                return string.Format(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    "{{\"gate_type\":\"{0}\",\"rotation_angle_rad\":{1:R}}}",
+                    escapedGateType,
+                    request.rotation_angle_rad);
+            }
+
+            return $"{{\"gate_type\":\"{escapedGateType}\"}}";
+        }
+
+        private static string EscapeJsonString(string value)
+        {
+            var sb = new StringBuilder(value.Length);
+            foreach (var c in value)
+            {
+                switch (c)
+                {
+                    case '"':  sb.Append("\\\""); break;
+                    case '\\': sb.Append("\\\\"); break;
+                    case '\b': sb.Append("\\b");  break;
+                    case '\f': sb.Append("\\f");  break;
+                    case '\n': sb.Append("\\n");  break;
+                    case '\r': sb.Append("\\r");  break;
+                    case '\t': sb.Append("\\t");  break;
+                    default:
+                        if (c < 0x20)
+                        {
+                            sb.Append($"\\u{(int)c:x4}");
+                        }
+                        else
+                        {
+                            sb.Append(c);
+                        }
+                        break;
+                }
+            }
+            return sb.ToString();
         }
 
         private static string NormalizeBaseUrl(string baseUrl)
