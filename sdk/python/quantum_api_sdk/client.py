@@ -31,6 +31,7 @@ from quantum_api_sdk.types import (
     IBMProfileResponse,
     IBMProfileVerifyResponse,
     JsonDict,
+    KernelClassifierResponse,
     NatureFermionicMappingPreviewResponse,
     NatureGroundStateEnergyResponse,
     OptimizationKnapsackResponse,
@@ -42,8 +43,8 @@ from quantum_api_sdk.types import (
     PortfolioMetadata,
     QasmExportResponse,
     QasmImportResponse,
-    QuantumVolumeResponse,
     QsvrRegressorResponse,
+    QuantumVolumeResponse,
     RandomizedBenchmarkingResponse,
     StateTomographyResponse,
     T1ExperimentResponse,
@@ -52,7 +53,6 @@ from quantum_api_sdk.types import (
     TimeEvolutionResponse,
     TranspileResponse,
     VqcClassifierResponse,
-    KernelClassifierResponse,
 )
 
 HttpMethod = Literal["GET", "POST", "PATCH", "DELETE"]
