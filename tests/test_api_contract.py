@@ -211,6 +211,7 @@ def test_openapi_orders_meta_routes_after_runtime_routes(unauth_client):
     assert ordered_paths.index("/v1/algorithms/grover_search") < ordered_paths.index("/v1/portfolio.json")
     assert ordered_paths.index("/v1/optimization/maxcut") < ordered_paths.index("/v1/portfolio.json")
     assert ordered_paths.index("/v1/finance/portfolio_diversification") < ordered_paths.index("/v1/portfolio.json")
+    assert ordered_paths.index("/v1/ml/vqc_classifier") < ordered_paths.index("/v1/portfolio.json")
     assert ordered_paths.index("/v1/optimization/qaoa") < ordered_paths.index("/v1/portfolio.json")
     assert ordered_paths.index("/v1/echo-types") < ordered_paths.index("/v1/keys")
     assert ordered_paths.index("/v1/nature/ground_state_energy") < ordered_paths.index("/v1/ibm/profiles")

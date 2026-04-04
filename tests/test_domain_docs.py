@@ -63,6 +63,14 @@ _ARTIFACTS = {
         _ROOT / "docs" / "domains" / "ml-kernel-classifier.md",
         _ROOT / "docs" / "notebooks" / "domains" / "ml-kernel-classifier.ipynb",
     ),
+    "/v1/ml/vqc_classifier": (
+        _ROOT / "docs" / "domains" / "ml-vqc-classifier.md",
+        _ROOT / "docs" / "notebooks" / "domains" / "ml-vqc-classifier.ipynb",
+    ),
+    "/v1/ml/qsvr_regressor": (
+        _ROOT / "docs" / "domains" / "ml-qsvr-regressor.md",
+        _ROOT / "docs" / "notebooks" / "domains" / "ml-qsvr-regressor.ipynb",
+    ),
     "/v1/nature/ground_state_energy": (
         _ROOT / "docs" / "domains" / "nature-ground-state-energy.md",
         _ROOT / "docs" / "notebooks" / "domains" / "nature-ground-state-energy.ipynb",
