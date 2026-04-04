@@ -8,9 +8,11 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
+from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse, Response
 
 from quantum_api.api.router import router
+from quantum_api.api.shared import endpoint_display_sort_key
 from quantum_api.config import get_settings
 from quantum_api.execution_jobs import QuantumExecutionJobService
 from quantum_api.ibm_credentials import IbmCredentialProfileService
@@ -214,6 +216,67 @@ def metrics() -> Response:
 
 
 app.include_router(router)
+
+
+def custom_openapi() -> dict[str, object]:
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title=settings.app_name,
+        version=settings.app_version,
+        routes=app.routes,
+    )
+
+    if settings.root_path_normalized:
+        openapi_schema["servers"] = [{"url": settings.root_path_normalized}]
+
+    components = openapi_schema.setdefault("components", {})
+    security_schemes = components.setdefault("securitySchemes", {})
+    security_schemes["ApiKeyAuth"] = {
+        "type": "apiKey",
+        "in": "header",
+        "name": settings.api_key_header,
+        "description": f"Send a valid Quantum API key in the {settings.api_key_header} header.",
+    }
+    security_schemes["BearerAuth"] = {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Send a Supabase bearer token in the Authorization header.",
+    }
+
+    for path, operations in openapi_schema.get("paths", {}).items():
+        if not isinstance(operations, dict):
+            continue
+
+        for method, operation in operations.items():
+            if method.lower() not in {"get", "post", "put", "patch", "delete", "options", "head"}:
+                continue
+            if not isinstance(operation, dict):
+                continue
+
+            if not settings.auth_enabled:
+                operation.pop("security", None)
+            elif settings.requires_user_jwt(str(path)):
+                operation["security"] = [{"BearerAuth": []}]
+            elif settings.requires_api_key(str(path)):
+                operation["security"] = [{"ApiKeyAuth": []}]
+            else:
+                operation.pop("security", None)
+
+    raw_paths = openapi_schema.get("paths", {})
+    if isinstance(raw_paths, dict):
+        openapi_schema["paths"] = {
+            path: raw_paths[path]
+            for path in sorted(raw_paths.keys(), key=endpoint_display_sort_key)
+        }
+
+    app.openapi_schema = openapi_schema
+    return openapi_schema
+
+
+app.openapi = custom_openapi
 
 
 def run() -> None:

@@ -196,23 +196,75 @@ Goal: expand beyond local simulation without taking on managed-provider billing 
 
 Goal: cover major Qiskit domain capabilities through focused APIs.
 
-### Algorithms and Domain Modules
+### Phase 5.1 - Structural Refactor
 
-- [ ] Optimization endpoints (QAOA/VQE workflows)
-- [ ] Finance endpoints (portfolio/estimation workflows)
-- [ ] Machine Learning endpoints (kernel/classifier primitives)
-- [ ] Nature endpoints (selected chemistry/physics workflows)
-- [ ] Experiments endpoints (selected benchmarking/tomography flows)
+- [x] Replace the single advanced-domain router with domain routers (`algorithms`, `optimization`, `experiments`, `finance`, `machine_learning`, `nature`)
+- [x] Split advanced-domain models into domain modules plus shared Qiskit-facing schemas
+- [x] Replace `services/phase5_*` and `services/phase5_common.py` with domain packages plus `services/qiskit_common/*`
+- [x] Rename stage-prefixed tests and notebook/docs asset paths so `phase5` does not leak into runtime code
+- [x] Preserve existing public `/v1` paths, auth rules, examples, and portfolio/OpenAPI behavior during the refactor
+
+### Phase 5.2 - Algorithms Namespace
+
+- [x] Add `POST /v1/algorithms/grover_search`
+- [x] Add `POST /v1/algorithms/amplitude_estimation`
+- [x] Add `POST /v1/algorithms/phase_estimation`
+- [x] Add `POST /v1/algorithms/time_evolution`
+- [x] Add docs, notebooks, API tests, and perf coverage for the new `/v1/algorithms/*` routes
+
+### Phase 5.3 - Optimization Expansion
+
+- [x] Keep `POST /v1/optimization/qaoa`
+- [x] Keep `POST /v1/optimization/vqe`
+- [x] Add `POST /v1/optimization/maxcut`
+- [x] Add `POST /v1/optimization/knapsack`
+- [x] Add `POST /v1/optimization/tsp`
+- [x] Add docs, notebooks, API tests, and perf coverage for the optimization application routes
+
+### Phase 5.4 - Finance Expansion
+
+- [x] Keep `POST /v1/finance/portfolio_optimization`
+- [x] Add `POST /v1/finance/portfolio_diversification`
+- [x] Keep finance payloads caller-supplied only (no live market-data provider integration)
+- [x] Add docs, notebooks, and API/perf coverage for the finance routes
+
+### Phase 5.5 - Machine Learning Expansion
+
+- [x] Keep `POST /v1/ml/kernel_classifier`
+- [x] Add `POST /v1/ml/vqc_classifier`
+- [x] Add `POST /v1/ml/qsvr_regressor`
+- [x] Keep ML workflows request-scoped only (no persisted models or async training jobs)
+- [x] Add docs, notebooks, and API coverage for the ML routes
+
+### Phase 5.6 - Nature Expansion
+
+- [x] Keep `POST /v1/nature/ground_state_energy`
+- [x] Add `POST /v1/nature/fermionic_mapping_preview`
+- [ ] Add `POST /v1/nature/excited_state_energy`
+  Note: deferred for now because `qiskit-nature 0.7.2` excited-state imports still fail against `qiskit 2.3.x` in the current environment (`BaseEstimator` vs V2 primitives). Track upstream compatibility or a maintained fork/PR before exposing this route.
+- [x] Add docs, notebooks, and API coverage for the currently supported Nature routes
+
+### Phase 5.7 - Experiments Expansion
+
+- [x] Keep `POST /v1/experiments/state_tomography`
+- [x] Keep `POST /v1/experiments/randomized_benchmarking`
+- [x] Add `POST /v1/experiments/quantum_volume`
+- [x] Add `POST /v1/experiments/t1`
+- [x] Add `POST /v1/experiments/t2ramsey`
+- [x] Add docs, notebooks, API tests, and perf coverage for the experiment routes
 
 ### Product and Contract Design
 
-- [ ] Define per-domain contracts with clear input constraints
-- [ ] Add examples and notebook-style reference docs
-- [ ] Add dedicated test suites per domain module
+- [x] Define per-domain contracts with clear input constraints
+- [x] Add examples and notebook-style reference docs
+- [x] Add dedicated test suites per domain module
 
 ### Completion Criteria
 
-- [ ] Each adopted domain has at least one production-quality endpoint with tests and docs
+- [x] Each adopted domain has at least one production-quality endpoint with tests and docs
+- [x] Add algorithm-first endpoints alongside the domain modules without changing the existing `/v1` contract style
+- [x] Keep mixed optional-dependency behavior with normalized `503 provider_unavailable` responses
+- [ ] Close the final Nature excited-state gap once upstream Qiskit Nature compatibility lands or we contribute a maintained fix
 
 ## Phase 6 - Client and Engine Integrations & Migrations (from old quantum-api)
 
@@ -245,9 +297,12 @@ Goal: make adoption easy across game and app stacks.
 
 ### Migrations
 - [x] Expo animation
-- [x] Portfolio website (endpoint that drives the info page)
-- [ ] Godot Game
-
+- [x] Portfolio website (endpoint that drives the info page and animation)
+- [ ] Godot Game - Echoes
+- [ ] Unreal Engine game - Entanglement
+- [ ] Create Unity Game
+- [ ] Create Roblox, Minecraft, Fortnite game
+ 
 ## Phase 7 - Release Governance and Long-Term Maintenance
 
 Goal: keep the platform stable as capabilities grow.
@@ -283,6 +338,10 @@ Goal: keep the platform stable as capabilities grow.
 - [ ] Evaluate dynamic circuits support
 - [ ] Add optional noise model controls for simulator runs
 - [ ] Add basic error-mitigation controls where practical
+
+### Upstream Ecosystem Contributions (Deferred)
+
+- [ ] Investigate and, if appropriate, contribute a `qiskit-nature` Qiskit-2 compatibility fix for excited-state solvers (`QEOM` / `ExcitedStatesEigensolver`) so `/v1/nature/excited_state_energy` can be added cleanly later
 
 ## Notes on Scope
 

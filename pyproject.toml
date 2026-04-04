@@ -34,6 +34,32 @@ dev = [
   "fakeredis>=2.31.0",
   "ruff>=0.11.2"
 ]
+phase5-optimization = [
+  "qiskit-algorithms>=0.4.0",
+  "qiskit-optimization>=0.7.0",
+]
+phase5-experiments = [
+  "qiskit-experiments>=0.13.0",
+]
+phase5-finance = [
+  "qiskit-algorithms>=0.4.0",
+  "qiskit-finance>=0.4.1",
+  "qiskit-optimization>=0.7.0",
+]
+phase5-ml = [
+  "qiskit-algorithms>=0.4.0",
+  "qiskit-machine-learning>=0.9.0",
+  "scikit-learn>=1.8.0",
+]
+phase5-nature = [
+  "pyscf>=2.12.1",
+  "qiskit-algorithms>=0.4.0",
+  "qiskit-nature>=0.7.2",
+  "qiskit-nature-pyscf>=0.4.0",
+]
+phase5-docs = [
+  "nbformat>=5.10.4",
+]
 
 [project.scripts]
 quantum-api = "quantum_api.main:run"
