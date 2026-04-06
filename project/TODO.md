@@ -351,6 +351,19 @@ Goal: keep the platform stable as capabilities grow.
 - [ ] Add periodic dependency/security audits
 - [ ] Add cost and performance review cadence
 
+### Extra Features - Quantum Echo and Gameplay APIs
+
+- [x] Quantum Gate API - RY rotation gates for true randomness
+- [x] Quantum Text Transformation - Unicode effects powered by quantum randomness
+- [x] Portfolio Integration - live quantum animation in Quantum Echo project
+- [x] Multi-qubit circuits for more complex quantum states
+- [ ] Quantum entanglement demonstration API
+- [x] Grover's algorithm for quantum search
+- [ ] Quantum random number generator (QRNG) endpoint
+- [ ] Quantum game mechanics for procedural generation
+- [ ] Quantum circuit visualization in the API response
+- [x] Real quantum hardware access via IBM Quantum cloud (BYO credentials)
+
 ## Deferred Backlog (Post-Phase-5 and Non-Blocking)
 
 ### Managed IBM Access (Deferred)

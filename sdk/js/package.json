@@ -1,6 +1,6 @@
 {
-  "name": "@quantum-api/sdk",
-  "version": "0.1.0",
+  "name": "@mr.dj2u/quantum-api",
+  "version": "0.1.2",
   "description": "Package-ready TypeScript client for the Quantum API /v1 contract",
   "license": "Apache-2.0",
   "type": "module",
@@ -41,6 +41,7 @@
     "build": "tsc -p tsconfig.build.json",
     "check": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && node --test tests/*.test.mjs",
+    "pack:dry-run": "npm pack --dry-run",
     "prepack": "npm run build"
   },
   "devDependencies": {

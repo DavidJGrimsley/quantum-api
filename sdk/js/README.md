@@ -3,6 +3,7 @@
 Package-ready TypeScript client for the Quantum API `/v1` contract.
 
 This SDK is designed to be the primary frontend-friendly client for browser, Expo, and other TypeScript apps that already use `fetch`.
+The default runtime fetch is browser-safe: it binds `window.fetch` in browser-like environments and falls back to `globalThis.fetch` in other runtimes. You can still override this with `fetchImpl` when needed.
 
 ## Current Scope
 
@@ -16,11 +17,12 @@ This SDK is designed to be the primary frontend-friendly client for browser, Exp
   - bearer-token `/keys*` and `/ibm/profiles*` flows
   - per-request auth override
 - Structured `QuantumApiError` with normalized error data and response headers
+- Browser-safe default fetch binding with `fetchImpl` override support
 
 ## Install
 
 ```bash
-npm install @quantum-api/sdk
+npm install @mr.dj2u/quantum-api
 ```
 
 For local development in this repo:
@@ -33,7 +35,7 @@ npm --prefix sdk/js run build
 ## Basic Usage
 
 ```ts
-import { QuantumApiClient } from "@quantum-api/sdk";
+import { QuantumApiClient } from "@mr.dj2u/quantum-api";
 
 const client = new QuantumApiClient({
   baseUrl: process.env.EXPO_PUBLIC_QUANTUM_API_BASE_URL ?? "http://127.0.0.1:8000",
@@ -47,6 +49,8 @@ const gate = await client.runGate({
   rotation_angle_rad: Math.PI / 2,
 });
 ```
+
+Use direct `apiKey` client configuration for local development, prototypes, and trusted internal tooling. For shipped production clients, keep API keys server-side and call a server proxy.
 
 ## Auth Modes
 
@@ -67,7 +71,7 @@ await client.listKeys({ auth: "bearer" });
 ## Expo Example
 
 ```ts
-import { QuantumApiClient, QuantumApiError } from "@quantum-api/sdk";
+import { QuantumApiClient, QuantumApiError } from "@mr.dj2u/quantum-api";
 
 const quantum = new QuantumApiClient({
   baseUrl: process.env.EXPO_PUBLIC_QUANTUM_API_BASE_URL ?? "https://example.com/public-facing/api/quantum",
@@ -86,7 +90,13 @@ try {
 
 ## Production Recommendation
 
-For shipped game or app clients, prefer a backend-proxy flow so long-lived API keys are not embedded in distributable builds. Direct API-key mode is best kept for local, prototype, demo workflows, or game jams.
+For shipped game or app clients, use a backend-proxy pattern so long-lived API keys are never embedded in distributable builds.
+
+- Client app authenticates users and calls your backend.
+- Your backend injects `X-API-Key` for runtime routes and enforces your own quota/abuse controls.
+- Bearer-token flows (`/keys*`, `/ibm/profiles*`) stay server-mediated for key lifecycle and profile management.
+
+Direct API-key mode is best kept for local development, prototypes, demos, or game jams.
 
 ## Method Surface
 
@@ -152,3 +162,21 @@ npm --prefix sdk/js run check
 npm --prefix sdk/js run build
 npm --prefix sdk/js run test
 ```
+
+## npm Release Flow
+
+1. Bump `version` in `sdk/js/package.json` (semantic versioning).
+2. Ensure dependencies are current (`npm --prefix sdk/js install`).
+3. Run local gates:
+
+```bash
+npm --prefix sdk/js run check
+npm --prefix sdk/js run build
+npm --prefix sdk/js run test
+npm --prefix sdk/js run pack:dry-run
+```
+
+4. Publish with GitHub Actions using `.github/workflows/publish-sdk.yml`:
+  - run manually with `workflow_dispatch`, or
+  - push a tag like `sdk-v0.1.2`.
+5. Ensure repository secret `NPM_TOKEN` exists with publish access for `@mr.dj2u/quantum-api`.
