@@ -317,7 +317,7 @@ Goal: make adoption easy across game and app stacks.
 ### Migrations
 - [x] Expo animation
 - [x] Portfolio website (endpoint that drives the info page and animation)
-- [ ] Godot Game - Echoes
+- [x] Godot Game - Echoes of Light
 - [ ] Unreal Engine game - Entanglement
 - [ ] Create Unity Game
 - [ ] Create Roblox, Minecraft, Fortnite game

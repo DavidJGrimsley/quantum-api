@@ -24,6 +24,25 @@ Planned follow-on once the base layer is stable:
 - Direct API-key mode is supported for local/dev/demo/game jam use only.
 - The plugin runtime also supports an optional bearer token field for proxy-authenticated requests.
 
+## IBM Profiles (Per-User IBM Credentials)
+
+How a normal hosted user gets credentials:
+
+1. Open `https://davidjgrimsley.com/public-facing/api/quantum` and sign in with an Identerest account.
+2. In the `Api Keys` panel, create a Quantum API key and copy the raw key immediately (it is shown once).
+3. In the `IBM Credentials` panel, create an IBM profile (`profile_name`, IBM API token, IBM instance/CRN, channel), then click verify.
+4. Optionally mark one profile as default on that same public page.
+
+This first Unreal plugin pass currently focuses on gameplay endpoints, so profile lifecycle calls are expected to run through your backend.
+
+Backend responsibilities:
+
+- call `/v1/ibm/profiles*` using `Authorization: Bearer <jwt_from_identerest_sign_in>`.
+- return profile status/list data to the Unreal UI.
+- submit IBM jobs with `ibm_profile` set to the selected profile name (or omit it to use the default profile).
+
+If you need direct profile calls before dedicated plugin wrappers are added, send HTTP requests from Unreal to `/v1/ibm/profiles*` with `Authorization: Bearer <token>`.
+
 ## Layout
 
 - `QuantumApi.uplugin` - plugin descriptor
