@@ -18,10 +18,12 @@ This folder is the promoted home for the reusable Godot addon/client.
 
 ## Install
 
-1. Copy the `addons/` folder from this directory into your Godot project root.
+1. Install this folder as `addons/quantum_api_client/` in your Godot project.
+  If installing from this repository root, copy `addons/quantum_api_client/` into your game project.
 2. In your game script, preload `res://addons/quantum_api_client/quantum_api_client.gd`.
 3. Create the client as a child node at runtime.
 4. Call `apply_project_settings()` at startup (or set values manually via setters).
+5. If you plan to use direct mode, go to https://davidjgrimsley.com/public-facing/api/quantum/ to sign up and create an API key for `direct_api_key`.
 
 ## Project Settings
 
@@ -29,7 +31,7 @@ Add this to your `project.godot`:
 
 ```ini
 [quantum_api]
-base_url="https://davidjgrimsley.com/public-facing/api/quantum"
+base_url="https://davidjgrimsley.com/public-facing/api/quantum/v1"
 backend_proxy_mode=true
 direct_api_key=""
 default_ibm_profile=""
@@ -51,7 +53,7 @@ Field usage:
 Use these values for the current AssetLib submission form:
 
 - Asset Name: Quantum API Client
-- Category: Network
+- Category: Addons > Scripts
 - Godot Version: 4.x
 - License: Apache-2.0
 - Repository URL: https://github.com/DavidJGrimsley/quantum-api
@@ -96,7 +98,7 @@ var quantum_api_client: QuantumApiClient
 func _ready() -> void:
     quantum_api_client = QuantumApiClientScript.new()
     add_child(quantum_api_client)
-  quantum_api_client.apply_project_settings()
+    quantum_api_client.apply_project_settings()
 ```
 
 Direct API usage:
