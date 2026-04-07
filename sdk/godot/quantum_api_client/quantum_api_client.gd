@@ -225,7 +225,7 @@ func _build_headers(requires_api_key: bool, include_json_content_type: bool) -> 
 	var headers: PackedStringArray = []
 	if include_json_content_type:
 		headers.append("Content-Type: application/json")
-	if requires_api_key and !api_key.is_empty():
+	if requires_api_key and !backend_proxy_mode and !api_key.is_empty():
 		headers.append("X-API-Key: " + api_key)
 	return headers
 
