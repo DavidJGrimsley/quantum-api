@@ -28,6 +28,7 @@ dist/
 
 # Node (SDK)
 node_modules/
+dist-cjs/
 
 # Local notes
 *.log

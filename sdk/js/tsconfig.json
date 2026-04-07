@@ -13,5 +13,5 @@
     "skipLibCheck": true
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["dist", "node_modules", "examples"]
+  "exclude": ["dist", "dist-cjs", "node_modules", "examples"]
 }
