@@ -44,7 +44,7 @@
   "scripts": {
     "build": "npm run build:esm && npm run build:cjs && npm run build:cjs:meta",
     "build:esm": "tsc -p tsconfig.build.json",
-    "build:cjs": "tsc -p tsconfig.build.cjs.json",
+    "build:cjs": "node ./scripts/build-cjs.cjs",
     "build:cjs:meta": "node ./scripts/write-cjs-package-json.cjs",
     "check": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && node --test tests/*.test.mjs tests/*.test.cjs",
