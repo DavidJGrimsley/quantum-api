@@ -63,6 +63,87 @@ client.echo_types(auth="api_key")
 client.list_keys(auth="bearer")
 ```
 
+## Account Setup (Public Identerest Sign-In)
+
+If you are using the hosted Quantum API account flow (not self-hosting), credentials come from signing in at `https://davidjgrimsley.com/public-facing/api/quantum`.
+
+1. Open `https://davidjgrimsley.com/public-facing/api/quantum` and sign in with an Identerest account.
+2. In the `Api Keys` panel, create a Quantum API key and copy it immediately (raw key is shown once).
+3. In the `IBM Credentials` panel, create an IBM profile (`profile_name`, IBM API token, IBM instance/CRN, channel), then verify it.
+4. Optionally set one IBM profile as default on that same public page.
+
+How those values map into the SDK:
+
+- bearer token from that Identerest-backed sign-in session -> `bearer_token` (used for `/keys*` and `/ibm/profiles*`).
+- created Quantum API key -> `api_key` (used for protected runtime `/v1` routes).
+- selected IBM profile name -> `ibm_profile` in IBM backend/transpile/job requests.
+
+## IBM Profiles (Per-User IBM Credentials)
+
+This is the flow behind profile cards/actions like Verify, Set Default, Edit, and Delete.
+
+The Python SDK exposes full profile lifecycle methods:
+
+- `list_ibm_profiles()`
+- `create_ibm_profile(payload)`
+- `update_ibm_profile(profile_id, payload)`
+- `verify_ibm_profile(profile_id)`
+- `delete_ibm_profile(profile_id)`
+
+Profile routes use bearer auth, so pass the bearer token issued after signing in at `https://davidjgrimsley.com/public-facing/api/quantum` with Identerest.
+
+```python
+from quantum_api_sdk import QuantumApiClient
+
+with QuantumApiClient(
+  base_url="https://davidjgrimsley.com/public-facing/api/quantum",
+  bearer_token=user_access_token,
+) as client:
+  created = client.create_ibm_profile(
+    {
+      "profile_name": "Echo Text Adventure Godot Game",
+      "token": "your-ibm-token",
+      "instance": "crn:v1:bluemix:public:quantum-computing:us-east:a/1234567890abcdef::",
+      "channel": "ibm_quantum_platform",
+      "is_default": True,
+    }
+  )
+
+  verify_result = client.verify_ibm_profile(created["profile_id"])
+  profiles = client.list_ibm_profiles()
+
+  client.update_ibm_profile(
+    created["profile_id"],
+    {
+      "profile_name": "Echo Text Adventure Godot Game (Prod)",
+      "is_default": True,
+    },
+  )
+
+  # Later, if needed:
+  # client.delete_ibm_profile(created["profile_id"])
+```
+
+When you submit IBM jobs, pass `ibm_profile` as the selected saved profile name.
+If omitted, the backend can use the default profile.
+
+```python
+job = client.submit_circuit_job(
+  {
+    "provider": "ibm",
+    "backend_name": "ibm_brisbane",
+    "ibm_profile": created["profile_name"],
+    "circuit": {
+      "qubits": 1,
+      "operations": [{"gate": "h", "target": 0}],
+    },
+    "shots": 1024,
+  }
+)
+```
+
+For shipped production clients, keep IBM tokens server-side and run profile create/update/delete through your backend proxy.
+
 ## Production Recommendation
 
 For distributed apps and games, prefer a backend-proxy flow so secrets are not embedded in shipped clients. Direct API-key usage is best kept for local, prototype, demo workflows, or game jams.

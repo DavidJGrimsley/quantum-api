@@ -108,6 +108,25 @@ Default behavior:
 
 If your own backend proxy expects bearer auth, pass a default bearer token and set `DefaultAuthMode = QuantumApiAuthMode.Bearer`, or override auth per request.
 
+## IBM Profiles (Per-User IBM Credentials)
+
+How a normal hosted user gets credentials:
+
+1. Open `https://davidjgrimsley.com/public-facing/api/quantum` and sign in with an Identerest account.
+2. In the `Api Keys` panel, create a Quantum API key and copy the raw key immediately (it is shown once).
+3. In the `IBM Credentials` panel, create an IBM profile (`profile_name`, IBM API token, IBM instance/CRN, channel), then click verify.
+4. Optionally mark one profile as default on that same public page.
+
+This Unity helper currently wraps gameplay endpoints only, so profile lifecycle calls are expected to run through your backend.
+
+Backend responsibilities:
+
+- call `/v1/ibm/profiles*` using `Authorization: Bearer <jwt_from_identerest_sign_in>`.
+- return profile status/list data to the Unity UI.
+- submit IBM jobs with `ibm_profile` set to the selected profile name (or omit it to use the default profile).
+
+If you need direct profile calls in Unity before dedicated helper methods are added, issue custom `UnityWebRequest` calls to `/v1/ibm/profiles*` with `Authorization: Bearer <token>`.
+
 ## Publishing Direction
 
 This folder is intentionally shaped like a Unity package first.

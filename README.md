@@ -601,3 +601,6 @@ RUN_PERF_BENCHMARKS=true uv run pytest tests/perf -s
 ## License
 
 Apache-2.0.
+
+## Logo
+Photo by Markus Winkler: https://www.pexels.com/photo/quantum-computing-is-the-future-of-computing-18475683/
