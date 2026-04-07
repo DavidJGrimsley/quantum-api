@@ -98,7 +98,7 @@ export class QuantumApiClient {
     this.apiKey = options.apiKey;
     this.bearerToken = options.bearerToken;
     this.defaultAuthMode = options.defaultAuthMode ?? "auto";
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    this.fetchImpl = options.fetchImpl ?? resolveDefaultFetchImpl();
   }
 
   health(options?: RequestOptions): Promise<HealthResponse> {
@@ -413,6 +413,16 @@ function normalizeBaseUrl(baseUrl: string): string {
     throw new Error("QuantumApiClient requires a non-empty baseUrl");
   }
   return trimmed.endsWith("/v1") ? trimmed : `${trimmed}/v1`;
+}
+
+function resolveDefaultFetchImpl(): typeof fetch {
+  if (typeof window !== "undefined" && typeof window.fetch === "function") {
+    return window.fetch.bind(window);
+  }
+  if (typeof globalThis.fetch === "function") {
+    return globalThis.fetch.bind(globalThis);
+  }
+  throw new Error("QuantumApiClient requires fetch support. Provide options.fetchImpl in this runtime.");
 }
 
 async function buildApiError(response: Response): Promise<QuantumApiError> {
