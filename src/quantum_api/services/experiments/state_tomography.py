@@ -3,8 +3,8 @@ from __future__ import annotations
 from quantum_api.models.experiments import StateTomographyRequest
 from quantum_api.services.circuit_conversion import build_circuit_from_definition
 from quantum_api.services.experiments.common import analysis_results_by_name, build_aer_backend
-from quantum_api.services.service_errors import QuantumApiServiceError
 from quantum_api.services.qiskit_common.serialization import complex_payload
+from quantum_api.services.service_errors import QuantumApiServiceError
 
 
 def run_state_tomography(request: StateTomographyRequest) -> dict[str, object]:

@@ -3,7 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 from quantum_api.ibm_credentials import ResolvedIbmCredentials
-from quantum_api.models.api import QasmExportRequest, QasmImportRequest, QasmRunRequest, TranspileRequest
+from quantum_api.models.api import (
+    QasmExportRequest,
+    QasmImportRequest,
+    QasmRunRequest,
+    TranspileRequest,
+)
 from quantum_api.services.backend_catalog import resolve_backend
 from quantum_api.services.circuit_conversion import (
     build_circuit_from_definition,

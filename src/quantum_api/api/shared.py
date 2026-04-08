@@ -21,8 +21,8 @@ from quantum_api.models.api import (
     PortfolioEndpointResponse,
 )
 from quantum_api.services.ibm_provider import resolve_request_ibm_credentials
-from quantum_api.services.service_errors import QuantumApiServiceError
 from quantum_api.services.quantum_runtime import runtime
+from quantum_api.services.service_errors import QuantumApiServiceError
 
 
 def request_id_from(request: Request) -> str:

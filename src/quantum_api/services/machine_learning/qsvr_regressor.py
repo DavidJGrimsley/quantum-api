@@ -7,9 +7,9 @@ from quantum_api.services.machine_learning.common import (
     build_feature_map,
     set_algorithm_seed,
 )
-from quantum_api.services.service_errors import QuantumApiServiceError
 from quantum_api.services.qiskit_common.dependencies import ensure_dependency
 from quantum_api.services.quantum_runtime import runtime
+from quantum_api.services.service_errors import QuantumApiServiceError
 
 
 def run_qsvr_regressor(request: QsvrRegressorRequest) -> dict[str, object]:

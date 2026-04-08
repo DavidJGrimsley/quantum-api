@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from quantum_api.models.experiments import QuantumVolumeRequest
 from quantum_api.services.experiments.common import analysis_results_by_name, build_aer_backend
-from quantum_api.services.service_errors import QuantumApiServiceError
 from quantum_api.services.qiskit_common.serialization import to_nominal_float
+from quantum_api.services.service_errors import QuantumApiServiceError
 
 
 def run_quantum_volume(request: QuantumVolumeRequest) -> dict[str, object]:

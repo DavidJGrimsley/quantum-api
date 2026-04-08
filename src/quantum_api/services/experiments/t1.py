@@ -4,8 +4,8 @@ import math
 
 from quantum_api.models.experiments import T1ExperimentRequest
 from quantum_api.services.experiments.common import analysis_results_by_name, build_aer_backend
-from quantum_api.services.service_errors import QuantumApiServiceError
 from quantum_api.services.qiskit_common.serialization import to_nominal_float
+from quantum_api.services.service_errors import QuantumApiServiceError
 
 
 def run_t1_experiment(request: T1ExperimentRequest) -> dict[str, object]:
