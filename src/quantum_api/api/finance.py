@@ -12,7 +12,7 @@ from quantum_api.models.api import (
 )
 from quantum_api.services.finance.portfolio_diversification import solve_portfolio_diversification
 from quantum_api.services.finance.portfolio_optimization import solve_portfolio_optimization
-from quantum_api.services.phase2_errors import Phase2ServiceError
+from quantum_api.services.service_errors import QuantumApiServiceError
 
 router = APIRouter()
 
@@ -24,7 +24,7 @@ def finance_portfolio_optimization(
 ) -> FinancePortfolioOptimizationResponse | JSONResponse:
     try:
         payload = solve_portfolio_optimization(request_data)
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
         return service_error_response(request, exc)
     return FinancePortfolioOptimizationResponse.model_validate(payload)
 
@@ -36,6 +36,6 @@ def finance_portfolio_diversification(
 ) -> FinancePortfolioDiversificationResponse | JSONResponse:
     try:
         payload = solve_portfolio_diversification(request_data)
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
         return service_error_response(request, exc)
     return FinancePortfolioDiversificationResponse.model_validate(payload)

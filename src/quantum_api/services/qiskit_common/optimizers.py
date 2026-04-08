@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from quantum_api.models.qiskit_common import OptimizerConfig, OptimizerMetadata
-from quantum_api.services.phase2_errors import Phase2ServiceError
+from quantum_api.services.service_errors import QuantumApiServiceError
 
 
 def build_optimizer(config: OptimizerConfig) -> Any:
@@ -15,7 +15,7 @@ def build_optimizer(config: OptimizerConfig) -> Any:
         return SLSQP(maxiter=config.maxiter, tol=config.tol)
     if config.name == "spsa":
         return SPSA(maxiter=config.maxiter)
-    raise Phase2ServiceError(
+    raise QuantumApiServiceError(
         error="unsupported_optimizer",
         message=f"Unsupported optimizer '{config.name}'.",
         status_code=400,

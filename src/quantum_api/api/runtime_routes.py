@@ -17,15 +17,18 @@ from quantum_api.models.api import (
     QasmExportResponse,
     QasmImportRequest,
     QasmImportResponse,
+    QasmRunRequest,
+    QasmRunResponse,
     TranspileRequest,
     TranspileResponse,
 )
 from quantum_api.services.backend_catalog import list_backends
-from quantum_api.services.phase2_errors import Phase2ServiceError
+from quantum_api.services.service_errors import QuantumApiServiceError
 from quantum_api.services.quantum_runtime import runtime
 from quantum_api.services.transpilation import (
     export_circuit_to_qasm,
     import_qasm,
+    run_qasm,
     transpile_circuit,
 )
 
@@ -49,7 +52,7 @@ async def get_backends(
             profile_name=ibm_profile,
             required=provider == "ibm",
         )
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
         return service_error_response(request, exc)
 
     try:
@@ -59,7 +62,7 @@ async def get_backends(
             min_qubits=min_qubits,
             ibm_credentials=ibm_credentials,
         )
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
         return service_error_response(request, exc)
 
     return BackendListResponse.model_validate(
@@ -88,12 +91,12 @@ async def transpile(request_data: TranspileRequest, request: Request) -> Transpi
             profile_name=request_data.ibm_profile,
             required=request_data.provider == "ibm",
         )
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
         return service_error_response(request, exc)
 
     try:
         payload = transpile_circuit(request_data, ibm_credentials=ibm_credentials)
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
         return service_error_response(request, exc)
 
     return TranspileResponse.model_validate(payload)
@@ -106,7 +109,7 @@ def qasm_import(request_data: QasmImportRequest, request: Request) -> QasmImport
 
     try:
         payload = import_qasm(request_data)
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
         return service_error_response(request, exc)
 
     return QasmImportResponse.model_validate(payload)
@@ -119,7 +122,20 @@ def qasm_export(request_data: QasmExportRequest, request: Request) -> QasmExport
 
     try:
         payload = export_circuit_to_qasm(request_data)
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
         return service_error_response(request, exc)
 
     return QasmExportResponse.model_validate(payload)
+
+
+@router.post("/qasm/run", response_model=QasmRunResponse)
+def qasm_run(request_data: QasmRunRequest, request: Request) -> QasmRunResponse | JSONResponse:
+    if not runtime.qiskit_available:
+        return qiskit_unavailable_response(request)
+
+    try:
+        payload = run_qasm(request_data)
+    except QuantumApiServiceError as exc:
+        return service_error_response(request, exc)
+
+    return QasmRunResponse.model_validate(payload)

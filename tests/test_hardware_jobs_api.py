@@ -13,6 +13,12 @@ requires_qiskit = pytest.mark.skipif(
     reason="qiskit runtime unavailable",
 )
 
+QASM2_BELL = (
+    'OPENQASM 2.0; include "qelib1.inc"; '
+    "qreg q[2]; creg c[2]; h q[0]; cx q[0],q[1]; "
+    "measure q[0] -> c[0]; measure q[1] -> c[1];"
+)
+
 
 def _mock_user(monkeypatch, *, user_id: str, expected_token: str = "Bearer test-token") -> dict[str, str]:
     async def fake_verify(authorization_header: str | None) -> AuthenticatedUser:
@@ -137,6 +143,53 @@ def test_hardware_job_submit_status_result_and_cancel_flow(unauth_client, monkey
     result = unauth_client.get(f"/v1/jobs/{job_id}/result", headers={"X-API-Key": raw_key})
     assert result.status_code == 200
     assert result.json()["result"]["counts"] == {"00": 300, "11": 724}
+
+    cancelled = unauth_client.post(f"/v1/jobs/{job_id}/cancel", headers={"X-API-Key": raw_key})
+    assert cancelled.status_code == 200
+    assert cancelled.json()["status"] == "succeeded"
+
+
+@requires_qiskit
+def test_hardware_qasm_job_submit_status_result_and_cancel_flow(unauth_client, monkeypatch):
+    headers = _mock_user(monkeypatch, user_id="hardware-qasm-user")
+    _create_profile(unauth_client, headers=headers)
+    raw_key = _create_runtime_key(unauth_client, headers=headers)
+
+    monkeypatch.setattr("quantum_api.services.hardware_jobs.resolve_backend", lambda *args, **kwargs: ("ibm", object()))
+    monkeypatch.setattr("quantum_api.services.hardware_jobs.runtime.transpile", lambda circuit, backend: circuit)
+    monkeypatch.setattr("quantum_api.services.hardware_jobs.runtime.SamplerV2", _FakeSampler)
+
+    remote_job = _FakeRemoteJob(status_value="DONE", counts={"00": 256, "11": 768})
+
+    class _FakeService:
+        def job(self, job_id):
+            assert job_id == "remote-job-123"
+            return remote_job
+
+    monkeypatch.setattr("quantum_api.services.hardware_jobs.build_ibm_service", lambda credentials: _FakeService())
+
+    submitted = unauth_client.post(
+        "/v1/jobs/qasm",
+        json={
+            "provider": "ibm",
+            "backend_name": "ibm_fake_backend",
+            "qasm": QASM2_BELL,
+            "qasm_version": "auto",
+            "shots": 1024,
+        },
+        headers={"X-API-Key": raw_key},
+    )
+    assert submitted.status_code == 200
+    job_id = submitted.json()["job_id"]
+    assert submitted.json()["status"] == "queued"
+
+    status = unauth_client.get(f"/v1/jobs/{job_id}", headers={"X-API-Key": raw_key})
+    assert status.status_code == 200
+    assert status.json()["status"] == "succeeded"
+
+    result = unauth_client.get(f"/v1/jobs/{job_id}/result", headers={"X-API-Key": raw_key})
+    assert result.status_code == 200
+    assert result.json()["result"]["counts"] == {"00": 256, "11": 768}
 
     cancelled = unauth_client.post(f"/v1/jobs/{job_id}/cancel", headers={"X-API-Key": raw_key})
     assert cancelled.status_code == 200

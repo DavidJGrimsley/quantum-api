@@ -18,9 +18,10 @@ from quantum_api.models.api import (
     CircuitJobStatusResponse,
     CircuitJobSubmitRequest,
     CircuitJobSubmitResponse,
+    QasmJobSubmitRequest,
 )
 from quantum_api.services.hardware_jobs import HardwareJobService
-from quantum_api.services.phase2_errors import JobNotFoundError, Phase2ServiceError
+from quantum_api.services.service_errors import JobNotFoundError, QuantumApiServiceError
 
 router = APIRouter()
 
@@ -62,7 +63,60 @@ async def submit_circuit_job(
         )
     except IBMProfileEncryptionUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
+        return service_error_response(request, exc)
+
+    return CircuitJobSubmitResponse.model_validate(
+        {
+            "job_id": record.job_id,
+            "provider": record.provider,
+            "backend_name": record.backend_name,
+            "ibm_profile": record.ibm_profile_name,
+            "remote_job_id": record.remote_job_id,
+            "status": record.status,
+            "created_at": record.created_at,
+        }
+    )
+
+
+@router.post("/jobs/qasm", response_model=CircuitJobSubmitResponse)
+async def submit_qasm_job(
+    request: Request,
+    request_data: QasmJobSubmitRequest,
+) -> CircuitJobSubmitResponse | JSONResponse:
+    owner_user_id = api_key_owner_user_id_from(request)
+    if owner_user_id is None:
+        raise HTTPException(status_code=401, detail="API key authentication required")
+
+    try:
+        ibm_credentials = await resolve_ibm_credentials(
+            request,
+            profile_name=request_data.ibm_profile,
+            required=True,
+        )
+        assert ibm_credentials is not None
+        if not ibm_credentials.token_ciphertext:
+            ibm_credentials = ResolvedIbmCredentials(
+                owner_user_id=ibm_credentials.owner_user_id,
+                profile_id=ibm_credentials.profile_id,
+                profile_name=ibm_credentials.profile_name,
+                instance=ibm_credentials.instance,
+                channel=ibm_credentials.channel,
+                masked_token=ibm_credentials.masked_token,
+                token=ibm_credentials.token,
+                token_ciphertext=request.app.state.ibm_profile_service.encrypt_token(ibm_credentials.token),
+                source=ibm_credentials.source,
+            )
+        hardware_job_service: HardwareJobService = request.app.state.hardware_job_service
+        record = await hardware_job_service.submit_qasm_job(
+            owner_user_id=owner_user_id,
+            api_key_id=api_key_id_from(request),
+            request_data=request_data,
+            ibm_credentials=ibm_credentials,
+        )
+    except IBMProfileEncryptionUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except QuantumApiServiceError as exc:
         return service_error_response(request, exc)
 
     return CircuitJobSubmitResponse.model_validate(
@@ -94,7 +148,7 @@ async def get_circuit_job(job_id: str, request: Request) -> CircuitJobStatusResp
         return service_error_response(request, JobNotFoundError(job_id=exc.job_id))
     except IBMProfileEncryptionUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
         return service_error_response(request, exc)
 
     return job_status_response(record)
@@ -117,7 +171,7 @@ async def get_circuit_job_result(job_id: str, request: Request) -> CircuitJobRes
         return service_error_response(request, JobNotFoundError(job_id=exc.job_id))
     except IBMProfileEncryptionUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
         return service_error_response(request, exc)
 
     return CircuitJobResultResponse.model_validate(
@@ -145,7 +199,7 @@ async def cancel_circuit_job(job_id: str, request: Request) -> CircuitJobStatusR
         return service_error_response(request, JobNotFoundError(job_id=exc.job_id))
     except IBMProfileEncryptionUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
         return service_error_response(request, exc)
 
     return job_status_response(record)

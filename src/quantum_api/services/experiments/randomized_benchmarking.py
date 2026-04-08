@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from quantum_api.models.experiments import RandomizedBenchmarkingRequest
 from quantum_api.services.experiments.common import build_aer_backend
-from quantum_api.services.phase2_errors import Phase2ServiceError
+from quantum_api.services.service_errors import QuantumApiServiceError
 from quantum_api.services.qiskit_common.serialization import to_nominal_float
 
 
@@ -24,7 +24,7 @@ def run_randomized_benchmarking(request: RandomizedBenchmarkingRequest) -> dict[
     alpha = metrics.get("alpha")
     epc = metrics.get("EPC")
     if alpha is None or epc is None:
-        raise Phase2ServiceError(
+        raise QuantumApiServiceError(
             error="benchmarking_failed",
             message="Randomized benchmarking did not produce alpha/EPC metrics.",
             status_code=500,

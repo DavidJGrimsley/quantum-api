@@ -3,7 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from quantum_api.main import app
-from quantum_api.services.phase2_errors import ProviderUnavailableError
+from quantum_api.services.service_errors import ProviderUnavailableError
 from quantum_api.supabase_auth import AuthenticatedUser
 
 

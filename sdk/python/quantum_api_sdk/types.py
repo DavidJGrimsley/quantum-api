@@ -167,6 +167,23 @@ class QasmExportResponse(TypedDict):
     size: int
 
 
+class QasmRunRequest(TypedDict, total=False):
+    qasm: str
+    qasm_version: Literal["auto", "2", "3"]
+    shots: int | None
+    include_statevector: bool
+    seed: int
+
+
+class QasmRunResponse(TypedDict, total=False):
+    detected_qasm_version: Literal["2", "3"]
+    num_qubits: int
+    shots: int | None
+    counts: dict[str, int] | None
+    backend_mode: str
+    statevector: list[Amplitude] | None
+
+
 class ApiKeyPolicyResponse(TypedDict):
     rate_limit_per_second: int
     rate_limit_per_minute: int
@@ -265,6 +282,15 @@ class CircuitJobSubmitRequest(TypedDict, total=False):
     provider: Literal["ibm"]
     backend_name: str
     circuit: CircuitDefinition
+    shots: int
+    ibm_profile: str
+
+
+class QasmJobSubmitRequest(TypedDict, total=False):
+    provider: Literal["ibm"]
+    backend_name: str
+    qasm: str
+    qasm_version: Literal["auto", "2", "3"]
     shots: int
     ibm_profile: str
 

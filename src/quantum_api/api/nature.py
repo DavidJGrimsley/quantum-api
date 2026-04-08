@@ -12,7 +12,7 @@ from quantum_api.models.api import (
 )
 from quantum_api.services.nature.fermionic_mapping_preview import preview_fermionic_mapping
 from quantum_api.services.nature.ground_state_energy import compute_ground_state_energy
-from quantum_api.services.phase2_errors import Phase2ServiceError
+from quantum_api.services.service_errors import QuantumApiServiceError
 
 router = APIRouter()
 
@@ -24,7 +24,7 @@ def nature_ground_state_energy(
 ) -> NatureGroundStateEnergyResponse | JSONResponse:
     try:
         payload = compute_ground_state_energy(request_data)
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
         return service_error_response(request, exc)
     return NatureGroundStateEnergyResponse.model_validate(payload)
 
@@ -36,6 +36,6 @@ def nature_fermionic_mapping_preview(
 ) -> NatureFermionicMappingPreviewResponse | JSONResponse:
     try:
         payload = preview_fermionic_mapping(request_data)
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
         return service_error_response(request, exc)
     return NatureFermionicMappingPreviewResponse.model_validate(payload)

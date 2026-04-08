@@ -12,7 +12,7 @@ from quantum_api.ibm_credentials import (
     ResolvedIbmCredentials,
     mask_ibm_token,
 )
-from quantum_api.services.phase2_errors import (
+from quantum_api.services.service_errors import (
     ProfileNotFoundError,
     ProviderCredentialsInvalidError,
     ProviderCredentialsMissingError,

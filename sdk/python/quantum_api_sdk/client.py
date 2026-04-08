@@ -43,6 +43,7 @@ from quantum_api_sdk.types import (
     PortfolioMetadata,
     QasmExportResponse,
     QasmImportResponse,
+    QasmRunResponse,
     QsvrRegressorResponse,
     QuantumVolumeResponse,
     RandomizedBenchmarkingResponse,
@@ -114,6 +115,9 @@ class QuantumApiClient:
     def export_qasm(self, payload: Mapping[str, Any], **kwargs: Any) -> QasmExportResponse:
         return cast(QasmExportResponse, self._request("POST", "/qasm/export", payload=payload, **kwargs))
 
+    def run_qasm(self, payload: Mapping[str, Any], **kwargs: Any) -> QasmRunResponse:
+        return cast(QasmRunResponse, self._request("POST", "/qasm/run", payload=payload, **kwargs))
+
     def list_keys(self, **kwargs: Any) -> ApiKeyListResponse:
         return cast(ApiKeyListResponse, self._request("GET", "/keys", auth="bearer", **kwargs))
 
@@ -170,6 +174,9 @@ class QuantumApiClient:
 
     def submit_circuit_job(self, payload: Mapping[str, Any], **kwargs: Any) -> CircuitJobSubmitResponse:
         return cast(CircuitJobSubmitResponse, self._request("POST", "/jobs/circuits", payload=payload, **kwargs))
+
+    def submit_qasm_job(self, payload: Mapping[str, Any], **kwargs: Any) -> CircuitJobSubmitResponse:
+        return cast(CircuitJobSubmitResponse, self._request("POST", "/jobs/qasm", payload=payload, **kwargs))
 
     def get_circuit_job(self, job_id: str, **kwargs: Any) -> CircuitJobStatusResponse:
         return cast(CircuitJobStatusResponse, self._request("GET", f"/jobs/{job_id}", **kwargs))

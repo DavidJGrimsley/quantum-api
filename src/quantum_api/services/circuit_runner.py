@@ -30,6 +30,10 @@ def _normalize_counts(raw_counts: dict[str, int], num_qubits: int) -> dict[str, 
     return dict(sorted(normalized_counts.items()))
 
 
+def normalize_counts(raw_counts: dict[str, int], num_qubits: int) -> dict[str, int]:
+    return _normalize_counts(raw_counts, num_qubits)
+
+
 def _serialize_statevector(statevector: Any) -> list[dict[str, float]]:
     raw_values = getattr(statevector, "data", statevector)
     amplitudes: list[dict[str, float]] = []
@@ -42,6 +46,10 @@ def _serialize_statevector(statevector: Any) -> list[dict[str, float]]:
             }
         )
     return amplitudes
+
+
+def serialize_statevector(statevector: Any) -> list[dict[str, float]]:
+    return _serialize_statevector(statevector)
 
 
 def run_circuit(request: CircuitRunRequest) -> dict[str, object]:

@@ -37,7 +37,7 @@ from quantum_api.models.api import (
     IBMProfileVerifyResponse,
 )
 from quantum_api.services.ibm_provider import build_ibm_service
-from quantum_api.services.phase2_errors import Phase2ServiceError, ProviderCredentialsInvalidError
+from quantum_api.services.service_errors import QuantumApiServiceError, ProviderCredentialsInvalidError
 
 router = APIRouter()
 
@@ -226,7 +226,7 @@ async def verify_ibm_profile(profile_id: str, request: Request) -> IBMProfileVer
     try:
         service = build_ibm_service(credentials)
         service.backends()
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
         if isinstance(exc, ProviderCredentialsInvalidError):
             await profile_service.set_verification_status(
                 owner_user_id=owner_user_id,

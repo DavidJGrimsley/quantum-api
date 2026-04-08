@@ -162,6 +162,7 @@ For distributed apps and games, prefer a backend-proxy flow so secrets are not e
   - `transpile`
   - `import_qasm`
   - `export_qasm`
+  - `run_qasm`
 - Auth:
   - `list_keys`
   - `create_key`
@@ -176,6 +177,7 @@ For distributed apps and games, prefer a backend-proxy flow so secrets are not e
   - `verify_ibm_profile`
 - Jobs:
   - `submit_circuit_job`
+  - `submit_qasm_job`
   - `get_circuit_job`
   - `get_circuit_job_result`
   - `cancel_circuit_job`

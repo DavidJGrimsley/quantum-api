@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from quantum_api.models.qiskit_common import PauliTerm
-from quantum_api.services.phase2_errors import Phase2ServiceError
+from quantum_api.services.service_errors import QuantumApiServiceError
 
 
 def sparse_pauli_op_from_terms(terms: Sequence[PauliTerm]) -> object:
@@ -14,7 +14,7 @@ def sparse_pauli_op_from_terms(terms: Sequence[PauliTerm]) -> object:
     for term in terms:
         pauli = term.pauli.strip().upper()
         if not pauli or any(symbol not in {"I", "X", "Y", "Z"} for symbol in pauli):
-            raise Phase2ServiceError(
+            raise QuantumApiServiceError(
                 error="invalid_pauli_term",
                 message=f"Invalid Pauli string '{term.pauli}'.",
                 status_code=400,
@@ -23,7 +23,7 @@ def sparse_pauli_op_from_terms(terms: Sequence[PauliTerm]) -> object:
         if qubit_count is None:
             qubit_count = len(pauli)
         elif len(pauli) != qubit_count:
-            raise Phase2ServiceError(
+            raise QuantumApiServiceError(
                 error="invalid_pauli_term",
                 message="All Pauli strings must have the same length.",
                 status_code=400,

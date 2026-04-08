@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 
-class Phase2ServiceError(Exception):
+class QuantumApiServiceError(Exception):
     def __init__(
         self,
         *,
@@ -28,7 +28,7 @@ class Phase2ServiceError(Exception):
         return payload
 
 
-class QasmParseError(Phase2ServiceError):
+class QasmParseError(QuantumApiServiceError):
     def __init__(self, *, message: str, details: dict[str, Any] | None = None) -> None:
         super().__init__(
             error="qasm_parse_error",
@@ -38,7 +38,7 @@ class QasmParseError(Phase2ServiceError):
         )
 
 
-class Qasm3DependencyMissingError(Phase2ServiceError):
+class Qasm3DependencyMissingError(QuantumApiServiceError):
     def __init__(self, *, details: dict[str, Any] | None = None) -> None:
         super().__init__(
             error="qasm3_dependency_missing",
@@ -51,7 +51,7 @@ class Qasm3DependencyMissingError(Phase2ServiceError):
         )
 
 
-class BackendNotFoundError(Phase2ServiceError):
+class BackendNotFoundError(QuantumApiServiceError):
     def __init__(self, *, backend_name: str, provider: str | None = None) -> None:
         super().__init__(
             error="backend_not_found",
@@ -64,7 +64,7 @@ class BackendNotFoundError(Phase2ServiceError):
         )
 
 
-class ProviderUnavailableError(Phase2ServiceError):
+class ProviderUnavailableError(QuantumApiServiceError):
     def __init__(self, *, provider: str, details: dict[str, Any] | None = None) -> None:
         super().__init__(
             error="provider_unavailable",
@@ -74,7 +74,7 @@ class ProviderUnavailableError(Phase2ServiceError):
         )
 
 
-class ProfileNotFoundError(Phase2ServiceError):
+class ProfileNotFoundError(QuantumApiServiceError):
     def __init__(self, *, profile_name: str) -> None:
         super().__init__(
             error="profile_not_found",
@@ -84,7 +84,7 @@ class ProfileNotFoundError(Phase2ServiceError):
         )
 
 
-class ProviderCredentialsMissingError(Phase2ServiceError):
+class ProviderCredentialsMissingError(QuantumApiServiceError):
     def __init__(self, *, details: dict[str, Any] | None = None) -> None:
         super().__init__(
             error="provider_credentials_missing",
@@ -94,7 +94,7 @@ class ProviderCredentialsMissingError(Phase2ServiceError):
         )
 
 
-class ProviderCredentialsInvalidError(Phase2ServiceError):
+class ProviderCredentialsInvalidError(QuantumApiServiceError):
     def __init__(self, *, details: dict[str, Any] | None = None) -> None:
         super().__init__(
             error="provider_credentials_invalid",
@@ -104,7 +104,7 @@ class ProviderCredentialsInvalidError(Phase2ServiceError):
         )
 
 
-class JobNotFoundError(Phase2ServiceError):
+class JobNotFoundError(QuantumApiServiceError):
     def __init__(self, *, job_id: str) -> None:
         super().__init__(
             error="job_not_found",
@@ -114,7 +114,7 @@ class JobNotFoundError(Phase2ServiceError):
         )
 
 
-class ResultNotReadyError(Phase2ServiceError):
+class ResultNotReadyError(QuantumApiServiceError):
     def __init__(self, *, job_id: str, status: str) -> None:
         super().__init__(
             error="result_not_ready",

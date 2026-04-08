@@ -78,7 +78,7 @@ def _materialize_portfolio_request(
             request_body["profile_name"] = "IBM Portfolio Smoke"
         if original_path == "/v1/keys" and str(endpoint["method"]).upper() == "POST":
             request_body["name"] = "Portfolio smoke key"
-        if original_path in {"/v1/jobs/circuits", "/v1/transpile"}:
+        if original_path in {"/v1/jobs/circuits", "/v1/jobs/qasm", "/v1/transpile"}:
             request_body.pop("ibm_profile", None)
 
     return path, query_params, request_body
@@ -128,7 +128,9 @@ def test_portfolio_metadata_contract(unauth_client):
     assert ("GET", "/v1/keys") in by_signature
     assert ("GET", "/v1/ibm/profiles") in by_signature
     assert ("POST", "/v1/jobs/circuits") in by_signature
+    assert ("POST", "/v1/jobs/qasm") in by_signature
     assert ("GET", "/v1/jobs/{job_id}") in by_signature
+    assert ("POST", "/v1/qasm/run") in by_signature
     assert ("POST", "/v1/optimization/qaoa") in by_signature
     assert ("POST", "/v1/optimization/vqe") in by_signature
     assert ("POST", "/v1/experiments/state_tomography") in by_signature
@@ -144,7 +146,9 @@ def test_portfolio_metadata_contract(unauth_client):
     assert by_signature[("GET", "/v1/keys")]["auth"] == "bearer_jwt"
     assert by_signature[("GET", "/v1/ibm/profiles")]["auth"] == "bearer_jwt"
     assert by_signature[("POST", "/v1/jobs/circuits")]["auth"] == "api_key"
+    assert by_signature[("POST", "/v1/jobs/qasm")]["auth"] == "api_key"
     assert by_signature[("GET", "/v1/jobs/{job_id}")]["auth"] == "api_key"
+    assert by_signature[("POST", "/v1/qasm/run")]["auth"] == "api_key"
     assert by_signature[("POST", "/v1/optimization/qaoa")]["auth"] == "api_key"
     assert by_signature[("POST", "/v1/optimization/vqe")]["auth"] == "api_key"
     assert by_signature[("POST", "/v1/experiments/state_tomography")]["auth"] == "api_key"

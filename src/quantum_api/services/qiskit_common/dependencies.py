@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from quantum_api.services.phase2_errors import ProviderUnavailableError
+from quantum_api.services.service_errors import ProviderUnavailableError
 
 
 def ensure_dependency(

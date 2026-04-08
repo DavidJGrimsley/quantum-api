@@ -11,7 +11,7 @@ from quantum_api.models.api import (
     OutputQasmVersion,
     QasmVersion,
 )
-from quantum_api.services.phase2_errors import Qasm3DependencyMissingError, QasmParseError
+from quantum_api.services.service_errors import Qasm3DependencyMissingError, QasmParseError
 from quantum_api.services.quantum_runtime import runtime
 
 

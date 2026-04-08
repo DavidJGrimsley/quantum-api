@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from quantum_api.services.phase2_errors import Phase2ServiceError
+from quantum_api.services.service_errors import QuantumApiServiceError
 from quantum_api.services.qiskit_common.dependencies import ensure_dependency
 from quantum_api.services.quantum_runtime import runtime
 
@@ -14,7 +14,7 @@ def build_aer_backend(*, seed: int | None, purpose: str) -> Any:
         import_error=runtime.qiskit_experiments_import_error,
     )
     if runtime.AerSimulator is None:
-        raise Phase2ServiceError(
+        raise QuantumApiServiceError(
             error="provider_unavailable",
             message=f"Aer simulator is unavailable for {purpose}.",
             status_code=503,

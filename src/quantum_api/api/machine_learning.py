@@ -15,7 +15,7 @@ from quantum_api.models.api import (
 from quantum_api.services.machine_learning.kernel_classifier import run_kernel_classifier
 from quantum_api.services.machine_learning.qsvr_regressor import run_qsvr_regressor
 from quantum_api.services.machine_learning.vqc_classifier import run_vqc_classifier
-from quantum_api.services.phase2_errors import Phase2ServiceError
+from quantum_api.services.service_errors import QuantumApiServiceError
 
 router = APIRouter()
 
@@ -27,7 +27,7 @@ def ml_kernel_classifier(
 ) -> KernelClassifierResponse | JSONResponse:
     try:
         payload = run_kernel_classifier(request_data)
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
         return service_error_response(request, exc)
     return KernelClassifierResponse.model_validate(payload)
 
@@ -39,7 +39,7 @@ def ml_vqc_classifier(
 ) -> VqcClassifierResponse | JSONResponse:
     try:
         payload = run_vqc_classifier(request_data)
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
         return service_error_response(request, exc)
     return VqcClassifierResponse.model_validate(payload)
 
@@ -51,6 +51,6 @@ def ml_qsvr_regressor(
 ) -> QsvrRegressorResponse | JSONResponse:
     try:
         payload = run_qsvr_regressor(request_data)
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
         return service_error_response(request, exc)
     return QsvrRegressorResponse.model_validate(payload)

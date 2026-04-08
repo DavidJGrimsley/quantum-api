@@ -2258,6 +2258,7 @@ phase5-finance = [
     { name = "qiskit-optimization" },
 ]
 phase5-ml = [
+    { name = "qiskit-algorithms" },
     { name = "qiskit-machine-learning" },
     { name = "scikit-learn" },
 ]
@@ -2292,6 +2293,7 @@ requires-dist = [
     { name = "qiskit", specifier = ">=2.1.0" },
     { name = "qiskit-aer", specifier = ">=0.17.0" },
     { name = "qiskit-algorithms", marker = "extra == 'phase5-finance'", specifier = ">=0.4.0" },
+    { name = "qiskit-algorithms", marker = "extra == 'phase5-ml'", specifier = ">=0.4.0" },
     { name = "qiskit-algorithms", marker = "extra == 'phase5-nature'", specifier = ">=0.4.0" },
     { name = "qiskit-algorithms", marker = "extra == 'phase5-optimization'", specifier = ">=0.4.0" },
     { name = "qiskit-experiments", marker = "extra == 'phase5-experiments'", specifier = ">=0.13.0" },

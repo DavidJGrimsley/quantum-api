@@ -11,12 +11,14 @@ Quantum API is a greenfield FastAPI service for quantum-inspired runtime feature
 - `/v1/transpile`
 - `/v1/qasm/import`
 - `/v1/qasm/export`
+- `/v1/qasm/run`
 - `/v1/text/transform`
 - `/v1/keys`
 - `/v1/ibm/profiles`
 - `/v1/ibm/profiles/{profile_id}`
 - `/v1/ibm/profiles/{profile_id}/verify`
 - `/v1/jobs/circuits`
+- `/v1/jobs/qasm`
 - `/v1/jobs/{job_id}`
 - `/v1/jobs/{job_id}/result`
 - `/v1/jobs/{job_id}/cancel`
@@ -322,6 +324,33 @@ Notes:
 - Jobs are scoped by the owning API key's `owner_user_id`, not by bearer JWT.
 - Submit persists a local job row immediately, then status/result endpoints poll IBM on read and cache terminal state.
 
+### `POST /v1/jobs/qasm`
+Submit an asynchronous IBM hardware execution job from OpenQASM source.
+
+Request:
+
+```json
+{
+  "provider": "ibm",
+  "backend_name": "ibm_kingston",
+  "qasm": "OPENQASM 2.0; include \"qelib1.inc\"; qreg q[2]; creg c[2]; h q[0]; cx q[0],q[1]; measure q[0] -> c[0]; measure q[1] -> c[1];",
+  "qasm_version": "auto",
+  "shots": 1024,
+  "ibm_profile": "my-open-plan"
+}
+```
+
+Response fields:
+
+- `job_id`
+- `provider`
+- `backend_name`
+- `ibm_profile`
+- `status`
+- `remote_job_id`
+- `created_at`
+- `updated_at`
+
 ### `GET /v1/jobs/{job_id}`
 Returns the normalized job contract with local status values:
 
@@ -390,6 +419,35 @@ Response fields:
 Default export version:
 
 - QASM export defaults to OpenQASM 3.
+
+### `POST /v1/qasm/run`
+Run OpenQASM synchronously on the local simulator.
+
+Request:
+
+```json
+{
+  "qasm": "OPENQASM 2.0; include \"qelib1.inc\"; qreg q[2]; creg c[2]; h q[0]; cx q[0],q[1]; measure q[0] -> c[0]; measure q[1] -> c[1];",
+  "qasm_version": "auto",
+  "shots": 1024,
+  "include_statevector": false,
+  "seed": 7
+}
+```
+
+Response fields:
+
+- `detected_qasm_version` (`2|3`)
+- `num_qubits`
+- `shots` (nullable)
+- `counts` (nullable)
+- `backend_mode`
+- `statevector`
+
+Analytic mode:
+
+- Set `shots` to `null` to run analytic mode.
+- Analytic mode returns `statevector` and `counts: null`.
 
 ### `POST /v1/text/transform`
 Request:

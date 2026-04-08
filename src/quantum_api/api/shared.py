@@ -21,7 +21,7 @@ from quantum_api.models.api import (
     PortfolioEndpointResponse,
 )
 from quantum_api.services.ibm_provider import resolve_request_ibm_credentials
-from quantum_api.services.phase2_errors import Phase2ServiceError
+from quantum_api.services.service_errors import QuantumApiServiceError
 from quantum_api.services.quantum_runtime import runtime
 
 
@@ -29,7 +29,7 @@ def request_id_from(request: Request) -> str:
     return getattr(request.state, "request_id", "unknown")
 
 
-def service_error_response(request: Request, exc: Phase2ServiceError) -> JSONResponse:
+def service_error_response(request: Request, exc: QuantumApiServiceError) -> JSONResponse:
     payload = exc.to_payload()
     payload["request_id"] = request_id_from(request)
     return JSONResponse(status_code=exc.status_code, content=payload)

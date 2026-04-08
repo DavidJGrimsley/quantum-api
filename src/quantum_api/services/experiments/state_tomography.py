@@ -3,7 +3,7 @@ from __future__ import annotations
 from quantum_api.models.experiments import StateTomographyRequest
 from quantum_api.services.circuit_conversion import build_circuit_from_definition
 from quantum_api.services.experiments.common import analysis_results_by_name, build_aer_backend
-from quantum_api.services.phase2_errors import Phase2ServiceError
+from quantum_api.services.service_errors import QuantumApiServiceError
 from quantum_api.services.qiskit_common.serialization import complex_payload
 
 
@@ -24,7 +24,7 @@ def run_state_tomography(request: StateTomographyRequest) -> dict[str, object]:
     analysis_results = analysis_results_by_name(experiment_data)
     state_result = analysis_results.get("state")
     if state_result is None:
-        raise Phase2ServiceError(
+        raise QuantumApiServiceError(
             error="tomography_failed",
             message="State tomography did not produce a reconstructed state.",
             status_code=500,

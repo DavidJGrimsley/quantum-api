@@ -4,15 +4,15 @@ from typing import Any
 
 from quantum_api.execution_jobs import ExecutionJobRecord, QuantumExecutionJobService
 from quantum_api.ibm_credentials import ResolvedIbmCredentials
-from quantum_api.models.api import CircuitJobSubmitRequest
+from quantum_api.models.api import CircuitJobSubmitRequest, QasmJobSubmitRequest
 from quantum_api.services.backend_catalog import resolve_backend
-from quantum_api.services.circuit_conversion import build_circuit_from_definition
+from quantum_api.services.circuit_conversion import build_circuit_from_definition, parse_qasm
 from quantum_api.services.ibm_provider import (
     build_ibm_service,
     normalize_runtime_job_status,
     runtime_job_error_payload,
 )
-from quantum_api.services.phase2_errors import ProviderUnavailableError, ResultNotReadyError
+from quantum_api.services.service_errors import ProviderUnavailableError, ResultNotReadyError
 from quantum_api.services.quantum_runtime import runtime
 
 
@@ -112,6 +112,69 @@ class HardwareJobService:
             request_payload=request_data.model_dump(mode="json"),
         )
 
+    async def submit_qasm_job(
+        self,
+        *,
+        owner_user_id: str,
+        api_key_id: str,
+        request_data: QasmJobSubmitRequest,
+        ibm_credentials: ResolvedIbmCredentials,
+    ) -> ExecutionJobRecord:
+        if request_data.provider != "ibm":
+            raise ProviderUnavailableError(
+                provider=request_data.provider,
+                details={"reason": "unsupported_provider"},
+            )
+        if runtime.transpile is None or runtime.SamplerV2 is None:
+            raise ProviderUnavailableError(
+                provider="ibm",
+                details={
+                    "reason": "missing_dependency",
+                    "message": "Install qiskit-ibm-runtime to submit IBM hardware jobs.",
+                    "import_error": runtime.ibm_runtime_import_error,
+                },
+            )
+
+        _, backend = resolve_backend(
+            request_data.backend_name,
+            "ibm",
+            ibm_credentials=ibm_credentials,
+        )
+        circuit, detected_qasm_version = parse_qasm(
+            source=request_data.qasm,
+            qasm_version=request_data.qasm_version,
+        )
+        measured_circuit = circuit.copy()
+        has_measurements = any(
+            str(instruction.operation.name) == "measure"
+            for instruction in measured_circuit.data
+        )
+        if not has_measurements:
+            measured_circuit.measure_all()
+        transpiled = runtime.transpile(measured_circuit, backend)
+
+        sampler = runtime.SamplerV2(mode=backend)
+        remote_job = sampler.run([transpiled], shots=request_data.shots)
+        status = normalize_runtime_job_status(remote_job.status())
+        request_payload = request_data.model_dump(mode="json")
+        request_payload["detected_qasm_version"] = detected_qasm_version
+        request_payload["num_qubits"] = int(circuit.num_qubits)
+
+        return await self._job_service.create_job(
+            owner_user_id=owner_user_id,
+            api_key_id=api_key_id,
+            provider=request_data.provider,
+            backend_name=request_data.backend_name,
+            ibm_profile_name=ibm_credentials.profile_name,
+            credential_instance=ibm_credentials.instance,
+            credential_channel=ibm_credentials.channel,
+            credential_masked_token=ibm_credentials.masked_token,
+            credential_token_ciphertext=ibm_credentials.token_ciphertext,
+            remote_job_id=_remote_job_id(remote_job),
+            status=status,
+            request_payload=request_payload,
+        )
+
     async def refresh_job(self, *, record: ExecutionJobRecord, decrypted_token: str) -> ExecutionJobRecord:
         if record.status in {"succeeded", "failed", "cancelled"}:
             return record
@@ -132,7 +195,10 @@ class HardwareJobService:
         status = normalize_runtime_job_status(remote_job.status())
 
         if status == "succeeded":
-            num_qubits = int(record.request_payload["circuit"]["num_qubits"])
+            num_qubits_value = record.request_payload.get("num_qubits")
+            if num_qubits_value is None:
+                num_qubits_value = record.request_payload["circuit"]["num_qubits"]
+            num_qubits = int(num_qubits_value)
             shots = int(record.request_payload["shots"])
             counts = _measurement_counts_from_result(remote_job.result(), num_qubits)
             return await self._job_service.update_job(

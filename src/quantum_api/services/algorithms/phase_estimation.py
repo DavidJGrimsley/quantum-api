@@ -6,7 +6,7 @@ from quantum_api.services.algorithms.common import (
     build_sampler,
     serialize_distribution,
 )
-from quantum_api.services.phase2_errors import Phase2ServiceError
+from quantum_api.services.service_errors import QuantumApiServiceError
 from quantum_api.services.qiskit_common.dependencies import ensure_dependency
 from quantum_api.services.qiskit_common.operators import sparse_pauli_op_from_terms
 from quantum_api.services.quantum_runtime import runtime
@@ -50,7 +50,7 @@ def run_phase_estimation(request: PhaseEstimationRequest) -> dict[str, object]:
         estimated_eigenvalue = None
     else:
         if not request.hamiltonian:
-            raise Phase2ServiceError(
+            raise QuantumApiServiceError(
                 error="invalid_hamiltonian",
                 message="hamiltonian must contain at least one Pauli term for variant 'hamiltonian'.",
                 status_code=400,

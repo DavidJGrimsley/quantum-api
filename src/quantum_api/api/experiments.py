@@ -21,7 +21,7 @@ from quantum_api.services.experiments.randomized_benchmarking import run_randomi
 from quantum_api.services.experiments.state_tomography import run_state_tomography
 from quantum_api.services.experiments.t1 import run_t1_experiment
 from quantum_api.services.experiments.t2ramsey import run_t2ramsey_experiment
-from quantum_api.services.phase2_errors import Phase2ServiceError
+from quantum_api.services.service_errors import QuantumApiServiceError
 
 router = APIRouter()
 
@@ -33,7 +33,7 @@ def experiments_state_tomography(
 ) -> StateTomographyResponse | JSONResponse:
     try:
         payload = run_state_tomography(request_data)
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
         return service_error_response(request, exc)
     return StateTomographyResponse.model_validate(payload)
 
@@ -45,7 +45,7 @@ def experiments_randomized_benchmarking(
 ) -> RandomizedBenchmarkingResponse | JSONResponse:
     try:
         payload = run_randomized_benchmarking(request_data)
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
         return service_error_response(request, exc)
     return RandomizedBenchmarkingResponse.model_validate(payload)
 
@@ -57,7 +57,7 @@ def experiments_quantum_volume(
 ) -> QuantumVolumeResponse | JSONResponse:
     try:
         payload = run_quantum_volume(request_data)
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
         return service_error_response(request, exc)
     return QuantumVolumeResponse.model_validate(payload)
 
@@ -69,7 +69,7 @@ def experiments_t1(
 ) -> T1ExperimentResponse | JSONResponse:
     try:
         payload = run_t1_experiment(request_data)
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
         return service_error_response(request, exc)
     return T1ExperimentResponse.model_validate(payload)
 
@@ -81,6 +81,6 @@ def experiments_t2ramsey(
 ) -> T2RamseyExperimentResponse | JSONResponse:
     try:
         payload = run_t2ramsey_experiment(request_data)
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
         return service_error_response(request, exc)
     return T2RamseyExperimentResponse.model_validate(payload)

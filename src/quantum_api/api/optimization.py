@@ -21,7 +21,7 @@ from quantum_api.services.optimization.maxcut import solve_maxcut
 from quantum_api.services.optimization.qaoa import solve_qaoa
 from quantum_api.services.optimization.tsp import solve_tsp
 from quantum_api.services.optimization.vqe import solve_vqe
-from quantum_api.services.phase2_errors import Phase2ServiceError
+from quantum_api.services.service_errors import QuantumApiServiceError
 
 router = APIRouter()
 
@@ -30,7 +30,7 @@ router = APIRouter()
 def optimization_qaoa(request_data: OptimizationQaoaRequest, request: Request) -> OptimizationQaoaResponse | JSONResponse:
     try:
         payload = solve_qaoa(request_data)
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
         return service_error_response(request, exc)
     return OptimizationQaoaResponse.model_validate(payload)
 
@@ -39,7 +39,7 @@ def optimization_qaoa(request_data: OptimizationQaoaRequest, request: Request) -
 def optimization_vqe(request_data: OptimizationVqeRequest, request: Request) -> OptimizationVqeResponse | JSONResponse:
     try:
         payload = solve_vqe(request_data)
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
         return service_error_response(request, exc)
     return OptimizationVqeResponse.model_validate(payload)
 
@@ -51,7 +51,7 @@ def optimization_maxcut(
 ) -> OptimizationMaxcutResponse | JSONResponse:
     try:
         payload = solve_maxcut(request_data)
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
         return service_error_response(request, exc)
     return OptimizationMaxcutResponse.model_validate(payload)
 
@@ -63,7 +63,7 @@ def optimization_knapsack(
 ) -> OptimizationKnapsackResponse | JSONResponse:
     try:
         payload = solve_knapsack(request_data)
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
         return service_error_response(request, exc)
     return OptimizationKnapsackResponse.model_validate(payload)
 
@@ -75,6 +75,6 @@ def optimization_tsp(
 ) -> OptimizationTspResponse | JSONResponse:
     try:
         payload = solve_tsp(request_data)
-    except Phase2ServiceError as exc:
+    except QuantumApiServiceError as exc:
         return service_error_response(request, exc)
     return OptimizationTspResponse.model_validate(payload)

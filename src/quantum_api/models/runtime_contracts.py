@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from quantum_api.config import get_settings
 from quantum_api.models.common import ErrorResponse
-from quantum_api.models.core import CircuitDefinition
+from quantum_api.models.core import Amplitude, CircuitDefinition
 
 BackendProvider = Literal["aer", "ibm"]
 HardwareJobProvider = Literal["ibm"]
@@ -179,6 +179,52 @@ class QasmExportResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class QasmRunRequest(BaseModel):
+    qasm: str = Field(min_length=1)
+    qasm_version: QasmVersion = "auto"
+    shots: int | None = Field(default=1024, ge=1)
+    include_statevector: bool = False
+    seed: int | None = None
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "qasm": (
+                    'OPENQASM 2.0; include "qelib1.inc"; '
+                    "qreg q[2]; creg c[2]; h q[0]; cx q[0],q[1]; "
+                    "measure q[0] -> c[0]; measure q[1] -> c[1];"
+                ),
+                "qasm_version": "auto",
+                "shots": 1024,
+                "include_statevector": False,
+                "seed": 7,
+            }
+        },
+    )
+
+    @field_validator("shots")
+    @classmethod
+    def validate_shots_limit(cls, value: int | None) -> int | None:
+        if value is None:
+            return value
+        max_shots = get_settings().max_circuit_shots
+        if value > max_shots:
+            raise ValueError(f"shots exceeds MAX_CIRCUIT_SHOTS ({max_shots})")
+        return value
+
+
+class QasmRunResponse(BaseModel):
+    detected_qasm_version: OutputQasmVersion
+    num_qubits: int = Field(ge=0)
+    shots: int | None = None
+    counts: dict[str, int] | None = None
+    backend_mode: str = "qiskit"
+    statevector: list[Amplitude] | None = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class CircuitJobSubmitRequest(BaseModel):
     provider: HardwareJobProvider = "ibm"
     backend_name: str = Field(min_length=1)
@@ -201,6 +247,41 @@ class CircuitJobSubmitRequest(BaseModel):
                         {"gate": "cx", "target": 1, "control": 0},
                     ],
                 },
+            }
+        },
+    )
+
+    @field_validator("shots")
+    @classmethod
+    def validate_shots_limit(cls, value: int) -> int:
+        max_shots = get_settings().max_circuit_shots
+        if value > max_shots:
+            raise ValueError(f"shots exceeds MAX_CIRCUIT_SHOTS ({max_shots})")
+        return value
+
+
+class QasmJobSubmitRequest(BaseModel):
+    provider: HardwareJobProvider = "ibm"
+    backend_name: str = Field(min_length=1)
+    qasm: str = Field(min_length=1)
+    qasm_version: QasmVersion = "auto"
+    shots: int = Field(default=1024, ge=1)
+    ibm_profile: str | None = Field(default=None, min_length=1)
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "provider": "ibm",
+                "backend_name": "ibm_kyiv",
+                "qasm": (
+                    'OPENQASM 2.0; include "qelib1.inc"; '
+                    "qreg q[2]; creg c[2]; h q[0]; cx q[0],q[1]; "
+                    "measure q[0] -> c[0]; measure q[1] -> c[1];"
+                ),
+                "qasm_version": "auto",
+                "shots": 1024,
+                "ibm_profile": "IBM Open",
             }
         },
     )

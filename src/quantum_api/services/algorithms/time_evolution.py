@@ -11,7 +11,7 @@ from quantum_api.services.algorithms.common import (
     serialize_aux_operator_values,
     serialize_evolved_state,
 )
-from quantum_api.services.phase2_errors import Phase2ServiceError
+from quantum_api.services.service_errors import QuantumApiServiceError
 from quantum_api.services.qiskit_common.dependencies import ensure_dependency
 from quantum_api.services.qiskit_common.operators import sparse_pauli_op_from_terms
 from quantum_api.services.qiskit_common.optimizers import build_optimizer
@@ -75,7 +75,7 @@ def run_time_evolution(request: TimeEvolutionRequest) -> dict[str, object]:
         )
         initial_parameters = np.asarray(request.initial_parameters, dtype=float)
         if len(initial_parameters) != ansatz.num_parameters:
-            raise Phase2ServiceError(
+            raise QuantumApiServiceError(
                 error="invalid_initial_parameters",
                 message="initial_parameters length must match the generated ansatz parameter count.",
                 status_code=400,

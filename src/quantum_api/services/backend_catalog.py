@@ -5,9 +5,9 @@ from typing import Any
 from quantum_api.ibm_credentials import ResolvedIbmCredentials
 from quantum_api.models.api import BackendProvider
 from quantum_api.services.ibm_provider import build_ibm_service, clear_ibm_provider_cache
-from quantum_api.services.phase2_errors import (
+from quantum_api.services.service_errors import (
     BackendNotFoundError,
-    Phase2ServiceError,
+    QuantumApiServiceError,
     ProviderUnavailableError,
 )
 from quantum_api.services.quantum_runtime import runtime
@@ -50,7 +50,7 @@ def list_backends(
 
         try:
             raw_entries.extend(("ibm", backend) for backend in _list_ibm_backends(ibm_credentials))
-        except Phase2ServiceError as exc:
+        except QuantumApiServiceError as exc:
             if provider == "ibm":
                 raise
             warnings.append(exc.message)

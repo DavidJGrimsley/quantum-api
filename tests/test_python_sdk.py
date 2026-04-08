@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -117,3 +118,92 @@ def test_python_sdk_raises_structured_api_error() -> None:
             assert exc.headers["retry-after"] == "15"
         else:
             raise AssertionError("QuantumApiError was not raised")
+
+
+def test_python_sdk_run_qasm_route_and_payload() -> None:
+    from quantum_api_sdk import QuantumApiClient
+
+    captured: dict[str, str | dict[str, object] | None] = {
+        "path": None,
+        "api_key": None,
+        "payload": None,
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["path"] = request.url.path
+        captured["api_key"] = request.headers.get("X-API-Key")
+        captured["payload"] = json.loads(request.content.decode("utf-8"))
+        return httpx.Response(
+            status_code=200,
+            json={
+                "detected_qasm_version": "2",
+                "num_qubits": 1,
+                "shots": 32,
+                "counts": {"0": 32},
+                "backend_mode": "qiskit",
+                "statevector": None,
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    with QuantumApiClient(
+        base_url="http://example.test",
+        api_key="sdk-secret",
+        http_client=httpx.Client(transport=transport, timeout=10.0),
+    ) as client:
+        response = client.run_qasm(
+            {
+                "qasm": 'OPENQASM 2.0; include "qelib1.inc"; qreg q[1]; x q[0];',
+                "shots": 32,
+            }
+        )
+
+    assert captured["path"] == "/v1/qasm/run"
+    assert captured["api_key"] == "sdk-secret"
+    assert isinstance(captured["payload"], dict)
+    assert captured["payload"] == {
+        "qasm": 'OPENQASM 2.0; include "qelib1.inc"; qreg q[1]; x q[0];',
+        "shots": 32,
+    }
+    assert response["counts"] == {"0": 32}
+
+
+def test_python_sdk_submit_qasm_job_route() -> None:
+    from quantum_api_sdk import QuantumApiClient
+
+    captured: dict[str, str | None] = {"path": None, "api_key": None}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["path"] = request.url.path
+        captured["api_key"] = request.headers.get("X-API-Key")
+        return httpx.Response(
+            status_code=200,
+            json={
+                "job_id": "job_123",
+                "provider": "ibm",
+                "backend_name": "ibm_fake_backend",
+                "ibm_profile": None,
+                "remote_job_id": "remote-job-123",
+                "status": "queued",
+                "created_at": "2026-04-08T00:00:00Z",
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    with QuantumApiClient(
+        base_url="http://example.test",
+        api_key="sdk-secret",
+        http_client=httpx.Client(transport=transport, timeout=10.0),
+    ) as client:
+        response = client.submit_qasm_job(
+            {
+                "provider": "ibm",
+                "backend_name": "ibm_fake_backend",
+                "qasm": 'OPENQASM 2.0; include "qelib1.inc"; qreg q[1]; x q[0];',
+                "shots": 256,
+            }
+        )
+
+    assert captured["path"] == "/v1/jobs/qasm"
+    assert captured["api_key"] == "sdk-secret"
+    assert response["status"] == "queued"

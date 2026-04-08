@@ -266,22 +266,32 @@ Goal: cover major Qiskit domain capabilities through focused APIs.
 - [x] Keep mixed optional-dependency behavior with normalized `503 provider_unavailable` responses
 - [ ] Close the final Nature excited-state gap once upstream Qiskit Nature compatibility lands or we contribute a maintained fix
 
-## Phase 6 - Client and Engine Integrations & Migrations (from old quantum-api)
+## Phase 6 - Client and Engine Integrations & Migrations (from old quantum-api) - SDK
 
 Goal: make adoption easy across game and app stacks.
 
-### SDK Productization
+### JS SDK
 
 - [x] Promote `sdk/js` scaffold to package-ready ESM package
 - [x] Expand `sdk/js` coverage to the full current `/v1` surface
 - [x] Add SDK auth support for both `X-API-Key` and bearer-token flows with per-request override
 - [x] Add structured SDK error handling (`error`, `message`, `details`, `request_id`, status, headers)
 - [x] Normalize SDK base URL handling for both local `/v1` and mounted `/public-facing/api/quantum/v1`
+
+### Python SDK
+
 - [x] Promote `sdk/python` scaffold to package-ready wheel
 - [x] Expand `sdk/python` coverage to the full current `/v1` surface
 - [x] Add Python SDK context-manager ergonomics and stronger typing metadata
 - [x] Add semantic versioning and changelog policies
 - [x] Add SDK bootstrap/setup docs so `uv`, `tsc`, and related tooling are explicit instead of assumed
+- [x] Add Python SDK methods for `POST /v1/qasm/run` and `POST /v1/jobs/qasm`
+- [x] Add typed request/response entries for QASM run and QASM job submission
+- [x] Install local test tooling (`uv`, `pytest`) in the dev environment
+- [x] Run focused Python SDK and QASM contract tests after PennyLane groundwork changes
+- [x] Build `sdk/python` artifacts (`sdist` + `wheel`) and validate install from a clean venv
+- [ ] Publish `sdk/python` package to PyPI
+- [ ] Add/verify Python package publish workflow + credentials (`PYPI_API_TOKEN`) in CI
 
 ### Godot
 
@@ -303,13 +313,28 @@ Goal: make adoption easy across game and app stacks.
 - [x] Build runtime C# client wrapper (`UnityWebRequest`)
 - [x] Add coroutine/async usage examples and fallback modes
 
+### Pennylane
+
+- [x] Add additive API groundwork endpoint `POST /v1/qasm/run` (finite-shot + analytic statevector mode)
+- [x] Add additive IBM async endpoint `POST /v1/jobs/qasm`
+- [x] Add Python SDK support for QASM run and QASM job submission
+- [x] Add backend/API/SDK test coverage for the new QASM run + QASM job flow
+- [ ] Create `sdk/pennylane/` package scaffold with `pyproject.toml` and plugin entry points
+- [ ] Implement PennyLane device plugin (`QuantumApiDevice`) using QASM serialization and API execution
+- [ ] Implement finite-shot measurement reconstruction + analytic statevector handling in the plugin
+- [ ] Add plugin tests (unit + mocked transport + optional integration smoke)
+- [ ] Build and validate `sdk/pennylane` artifacts from a clean venv
+- [ ] Publish PennyLane package(s) to PyPI
+- [ ] Add/verify CI publish workflow + credentials for PennyLane package release
+
+
 ### Completion Criteria
 
 - [ ] All five client paths (JS, Python, Godot, Unreal, Unity) have maintained reference integrations
 - [ ] Godot migration acts as the first validated reference integration for the reusable addon/client path
 - [x] JS/Python SDKs are package-ready even if public publishing remains deferred
 - [ ] JS SDK tested
-- [ ] Python SDK tested
+- [x] Python SDK tested
 - [ ] Unreal Engine local plugin tested
 - [ ] Godot local plugin tested
 - [ ] Unity local plugin tested
@@ -343,6 +368,7 @@ Goal: keep the platform stable as capabilities grow.
 
 - [ ] Publish JS SDK package after Phase 6 validation gates are green
 - [ ] Publish Python SDK package after Phase 6 validation gates are green
+- [ ] Publish PennyLane package(s) after Phase 6 PennyLane validation gates are green
 - [ ] Package and publish Unreal runtime plugin after Godot reference migration is stable
 
 ### Quality and Reliability

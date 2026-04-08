@@ -8,7 +8,7 @@ from quantum_api.services.machine_learning.common import (
     python_list,
     set_algorithm_seed,
 )
-from quantum_api.services.phase2_errors import Phase2ServiceError
+from quantum_api.services.service_errors import QuantumApiServiceError
 from quantum_api.services.qiskit_common.dependencies import ensure_dependency
 from quantum_api.services.quantum_runtime import runtime
 
@@ -34,7 +34,7 @@ def run_kernel_classifier(request: KernelClassifierRequest) -> dict[str, object]
     try:
         classifier.fit(training_features, training_labels)
     except ValueError as exc:
-        raise Phase2ServiceError(
+        raise QuantumApiServiceError(
             error="ml_training_failed",
             message=str(exc),
             status_code=400,
