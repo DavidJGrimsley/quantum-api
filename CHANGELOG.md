@@ -13,4 +13,5 @@ The format is based on Keep a Changelog and uses semantic versioning expectation
 ### Changed
 
 - Release governance now distinguishes `package-ready` from public package publishing.
+- Added `.gitattributes` export filtering so Godot Asset Library downloads include only `addons/` content.
 

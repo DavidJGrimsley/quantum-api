@@ -14,6 +14,46 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate Godot AssetLib export rules
+        run: |
+          test -f .gitattributes
+
+          addons_attr="$(git check-attr export-ignore -- addons/quantum_api_client/plugin.cfg)"
+          case "$addons_attr" in
+            "addons/quantum_api_client/plugin.cfg: export-ignore: unspecified") ;;
+            *)
+              echo "Expected addons/quantum_api_client/plugin.cfg to be included in git archive"
+              echo "$addons_attr"
+              exit 1
+              ;;
+          esac
+
+          root_attr="$(git check-attr export-ignore -- README.md)"
+          case "$root_attr" in
+            "README.md: export-ignore: set") ;;
+            *)
+              echo "Expected README.md to be excluded from git archive"
+              echo "$root_attr"
+              exit 1
+              ;;
+          esac
+
+          archive_listing="$(mktemp)"
+          archive_invalid="$(mktemp)"
+          trap 'rm -f "$archive_listing" "$archive_invalid"' EXIT
+          git archive --format=tar HEAD | tar -tf - > "$archive_listing"
+
+          if grep -vE '^addons(/|$)' "$archive_listing" > "$archive_invalid"; then
+            echo "Archive contains paths outside addons/:"
+            cat "$archive_invalid"
+            exit 1
+          fi
+
+          grep -q '^addons/quantum_api_client/' "$archive_listing" || {
+            echo "Archive is missing addons/quantum_api_client content"
+            exit 1
+          }
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:

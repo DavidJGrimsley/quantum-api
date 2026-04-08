@@ -59,7 +59,7 @@ def _qv_body() -> dict[str, object]:
 def _t1_body() -> dict[str, object]:
     return {
         "qubits": [0],
-        "delays": [0.000001, 0.000002, 0.000003, 0.000004],
+        "delays": [0.00001, 0.00002, 0.00005, 0.0001],
         "shots": 64,
         "seed": 7,
     }

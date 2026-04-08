@@ -63,6 +63,7 @@ This document defines how Quantum API client releases work during and after Phas
 - Version bump is intentional and reviewed.
 - Distribution credentials/tokens are available.
 - External install instructions are verified from a clean environment.
+- Godot AssetLib archive output is verified via `git archive --format=tar HEAD | tar -tf -` and contains only `addons/` paths.
 
 ## Tooling bootstrap note
 
