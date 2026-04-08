@@ -6,8 +6,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from quantum_api.config import get_settings
 from quantum_api.models.core import Amplitude, CircuitDefinition
-from quantum_api.models.runtime_contracts import NormalizedOperation
 from quantum_api.models.qiskit_common import AnsatzConfig, OptimizerConfig, PauliTerm
+from quantum_api.models.runtime_contracts import NormalizedOperation
 
 AlgorithmProvider = Literal["qiskit-algorithms"]
 AmplitudeEstimationVariant = Literal["ae", "iae", "fae", "mlae"]

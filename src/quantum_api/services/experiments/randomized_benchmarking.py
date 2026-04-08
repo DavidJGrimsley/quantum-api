@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from quantum_api.models.experiments import RandomizedBenchmarkingRequest
 from quantum_api.services.experiments.common import build_aer_backend
-from quantum_api.services.service_errors import QuantumApiServiceError
 from quantum_api.services.qiskit_common.serialization import to_nominal_float
+from quantum_api.services.service_errors import QuantumApiServiceError
 
 
 def run_randomized_benchmarking(request: RandomizedBenchmarkingRequest) -> dict[str, object]:

@@ -9,13 +9,13 @@ from quantum_api.services.machine_learning.common import (
     python_list,
     set_algorithm_seed,
 )
-from quantum_api.services.service_errors import QuantumApiServiceError
 from quantum_api.services.qiskit_common.dependencies import ensure_dependency
 from quantum_api.services.qiskit_common.optimizers import (
     build_optimizer,
     optimizer_metadata_from_result,
 )
 from quantum_api.services.quantum_runtime import runtime
+from quantum_api.services.service_errors import QuantumApiServiceError
 
 
 def run_vqc_classifier(request: VqcClassifierRequest) -> dict[str, object]:

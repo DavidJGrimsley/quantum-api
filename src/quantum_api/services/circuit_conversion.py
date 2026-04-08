@@ -11,8 +11,8 @@ from quantum_api.models.api import (
     OutputQasmVersion,
     QasmVersion,
 )
-from quantum_api.services.service_errors import Qasm3DependencyMissingError, QasmParseError
 from quantum_api.services.quantum_runtime import runtime
+from quantum_api.services.service_errors import Qasm3DependencyMissingError, QasmParseError
 
 
 def build_circuit_from_definition(definition: CircuitDefinition) -> Any:

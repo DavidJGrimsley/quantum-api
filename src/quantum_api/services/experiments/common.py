@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from quantum_api.services.service_errors import QuantumApiServiceError
 from quantum_api.services.qiskit_common.dependencies import ensure_dependency
 from quantum_api.services.quantum_runtime import runtime
+from quantum_api.services.service_errors import QuantumApiServiceError
 
 
 def build_aer_backend(*, seed: int | None, purpose: str) -> Any:

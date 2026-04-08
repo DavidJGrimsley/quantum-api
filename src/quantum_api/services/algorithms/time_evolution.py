@@ -11,12 +11,12 @@ from quantum_api.services.algorithms.common import (
     serialize_aux_operator_values,
     serialize_evolved_state,
 )
-from quantum_api.services.service_errors import QuantumApiServiceError
 from quantum_api.services.qiskit_common.dependencies import ensure_dependency
 from quantum_api.services.qiskit_common.operators import sparse_pauli_op_from_terms
 from quantum_api.services.qiskit_common.optimizers import build_optimizer
 from quantum_api.services.qiskit_common.serialization import json_safe_value
 from quantum_api.services.quantum_runtime import runtime
+from quantum_api.services.service_errors import QuantumApiServiceError
 
 
 def _final_parameters_payload(value: object) -> list[float] | None:

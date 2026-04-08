@@ -6,10 +6,10 @@ from quantum_api.services.algorithms.common import (
     build_sampler,
     serialize_distribution,
 )
-from quantum_api.services.service_errors import QuantumApiServiceError
 from quantum_api.services.qiskit_common.dependencies import ensure_dependency
 from quantum_api.services.qiskit_common.operators import sparse_pauli_op_from_terms
 from quantum_api.services.quantum_runtime import runtime
+from quantum_api.services.service_errors import QuantumApiServiceError
 
 
 def run_phase_estimation(request: PhaseEstimationRequest) -> dict[str, object]:
