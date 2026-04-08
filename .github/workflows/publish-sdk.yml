@@ -5,9 +5,11 @@ on:
   push:
     tags:
       - "sdk-v*"
+      - "godot-v*"
 
 jobs:
   publish-js-sdk:
+    if: startsWith(github.ref_name, 'sdk-v')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -68,6 +70,7 @@ jobs:
           NODE_AUTH_TOKEN="${NPM_TOKEN}" npm publish --provenance --access public
 
   publish-python-sdk:
+    if: startsWith(github.ref_name, 'sdk-v')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -105,6 +108,7 @@ jobs:
           packages-dir: sdk/python/dist/
 
   publish-pennylane-sdk:
+    if: startsWith(github.ref_name, 'sdk-v')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -144,3 +148,30 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: sdk/pennylane/dist/
+
+  publish-godot-addon:
+    if: startsWith(github.ref_name, 'godot-v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Godot AssetLib zip
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          zip_name="quantum-api-godot-${GITHUB_REF_NAME}.zip"
+          git archive --format=zip --output "dist/${zip_name}" HEAD
+          ls -lh dist/
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: dist/*.zip
+
+      - name: Print commit for Asset Library form
+        run: echo "Commit: $(git rev-parse HEAD)"
