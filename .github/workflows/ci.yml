@@ -18,26 +18,34 @@ jobs:
         run: |
           test -f .gitattributes
 
-          required_rules=(
-            "* text=auto eol=lf"
-            "/** export-ignore"
-            "/addons !export-ignore"
-            "/addons/** !export-ignore"
-          )
-
-          for rule in "${required_rules[@]}"; do
-            grep -Fx "$rule" .gitattributes >/dev/null || {
-              echo "Missing .gitattributes rule: $rule"
+          addons_attr="$(git check-attr export-ignore -- addons/quantum_api_client/plugin.cfg)"
+          case "$addons_attr" in
+            "addons/quantum_api_client/plugin.cfg: export-ignore: unspecified") ;;
+            *)
+              echo "Expected addons/quantum_api_client/plugin.cfg to be included in git archive"
+              echo "$addons_attr"
               exit 1
-            }
-          done
+              ;;
+          esac
+
+          root_attr="$(git check-attr export-ignore -- README.md)"
+          case "$root_attr" in
+            "README.md: export-ignore: set") ;;
+            *)
+              echo "Expected README.md to be excluded from git archive"
+              echo "$root_attr"
+              exit 1
+              ;;
+          esac
 
           archive_listing="$(mktemp)"
+          archive_invalid="$(mktemp)"
+          trap 'rm -f "$archive_listing" "$archive_invalid"' EXIT
           git archive --format=tar HEAD | tar -tf - > "$archive_listing"
 
-          if grep -vE '^addons(/|$)' "$archive_listing" > /tmp/archive-invalid.txt; then
+          if grep -vE '^addons(/|$)' "$archive_listing" > "$archive_invalid"; then
             echo "Archive contains paths outside addons/:"
-            cat /tmp/archive-invalid.txt
+            cat "$archive_invalid"
             exit 1
           fi
 
