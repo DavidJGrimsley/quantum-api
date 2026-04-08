@@ -291,7 +291,7 @@ Goal: make adoption easy across game and app stacks.
 - [x] Run focused Python SDK and QASM contract tests after PennyLane groundwork changes
 - [x] Build `sdk/python` artifacts (`sdist` + `wheel`) and validate install from a clean venv
 - [ ] Publish `sdk/python` package to PyPI
-- [ ] Add/verify Python package publish workflow + credentials (`PYPI_API_TOKEN`) in CI
+- [x] Add/verify Python package publish workflow using PyPI Trusted Publisher (OIDC) in CI
 
 ### Godot
 
@@ -319,13 +319,13 @@ Goal: make adoption easy across game and app stacks.
 - [x] Add additive IBM async endpoint `POST /v1/jobs/qasm`
 - [x] Add Python SDK support for QASM run and QASM job submission
 - [x] Add backend/API/SDK test coverage for the new QASM run + QASM job flow
-- [ ] Create `sdk/pennylane/` package scaffold with `pyproject.toml` and plugin entry points
-- [ ] Implement PennyLane device plugin (`QuantumApiDevice`) using QASM serialization and API execution
-- [ ] Implement finite-shot measurement reconstruction + analytic statevector handling in the plugin
-- [ ] Add plugin tests (unit + mocked transport + optional integration smoke)
-- [ ] Build and validate `sdk/pennylane` artifacts from a clean venv
+- [x] Create `sdk/pennylane/` package scaffold with `pyproject.toml` and plugin entry points
+- [x] Implement PennyLane device plugin (`QuantumApiDevice`) using QASM serialization and API execution
+- [x] Implement finite-shot measurement reconstruction + analytic statevector handling in the plugin
+- [x] Add plugin tests (unit + mocked transport + optional integration smoke)
+- [x] Build and validate `sdk/pennylane` artifacts from a clean venv
 - [ ] Publish PennyLane package(s) to PyPI
-- [ ] Add/verify CI publish workflow + credentials for PennyLane package release
+- [x] Add/verify CI publish workflow using PyPI Trusted Publisher (OIDC) for PennyLane package release
 
 
 ### Completion Criteria

@@ -4,7 +4,7 @@ This document defines how Quantum API client releases work during and after Phas
 
 ## Current Phase 6 default
 
-- `sdk/js`, `sdk/python`, the Godot addon/client path, the Unreal plugin, and the Unity runtime helper (`sdk/unity/`) should be treated as `package-ready`. The Unity helper awaits in-editor validation and package publishing, but the scaffold and package metadata are in place.
+- `sdk/js`, `sdk/python`, `sdk/pennylane`, the Godot addon/client path, the Unreal plugin, and the Unity runtime helper (`sdk/unity/`) should be treated as `package-ready`. The Unity helper awaits in-editor validation and package publishing, but the scaffold and package metadata are in place.
 - Public publication is a separate release decision and is not implied by a passing implementation branch.
 - Engine clients should default their production guidance to backend-proxy usage.
 - Direct `X-API-Key` mode remains supported for local, prototype, and demo workflows only.

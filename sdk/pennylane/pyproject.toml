@@ -1,0 +1,42 @@
+[project]
+name = "quantum-api-pennylane"
+version = "0.1.0"
+description = "PennyLane device plugin for Quantum API"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+authors = [
+  { name = "Quantum API Contributors" }
+]
+keywords = ["quantum", "pennylane", "plugin", "qasm", "api"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Typing :: Typed"
+]
+dependencies = [
+  "pennylane>=0.44.1",
+  "quantum-api-sdk>=0.1.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/davidjgrimsley/quantum-api"
+Repository = "https://github.com/davidjgrimsley/quantum-api"
+Issues = "https://github.com/davidjgrimsley/quantum-api/issues"
+
+[project.entry-points."pennylane.plugins"]
+"quantum.api" = "quantum_api_pennylane:QuantumApiDevice"
+
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["quantum_api_pennylane"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"quantum_api_pennylane/py.typed" = "quantum_api_pennylane/py.typed"

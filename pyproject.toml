@@ -60,6 +60,9 @@ phase5-nature = [
 phase5-docs = [
   "nbformat>=5.10.4",
 ]
+phase6-pennylane = [
+  "pennylane>=0.44.1",
+]
 
 [project.scripts]
 quantum-api = "quantum_api.main:run"
