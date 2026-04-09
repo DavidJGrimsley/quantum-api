@@ -91,7 +91,6 @@ def test_concurrent_qsvr_runs_are_seed_stable():
     assert all(payload["training_score"] == first["training_score"] for payload in payloads)
 
 
-
 def test_concurrent_ibm_service_cache_returns_consistent_instance(monkeypatch):
     init_calls = 0
     init_lock = Lock()

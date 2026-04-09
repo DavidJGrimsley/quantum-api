@@ -17,6 +17,7 @@ def test_quantum_circuit_manager_respects_configured_max_qubits(monkeypatch):
 
     assert manager.num_qubits == 12
 
+
 def test_quantum_circuit_manager_rejects_qubits_above_configured_max(monkeypatch):
     monkeypatch.setattr(
         "quantum_api.services.quantum_core.get_settings",

@@ -77,7 +77,7 @@ class BackendQubitCapacityExceededError(QuantumApiServiceError):
             error="backend_qubit_capacity_exceeded",
             message=(
                 f"Backend '{backend_name}' supports at most {available_qubits} qubits, "
-                f"but request requires {requested_qubits}."
+                f"but request requires {requested_qubits} qubits."
             ),
             status_code=400,
             details={
