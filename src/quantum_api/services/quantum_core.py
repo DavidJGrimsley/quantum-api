@@ -5,6 +5,7 @@ import random
 from dataclasses import dataclass
 from typing import Any
 
+from quantum_api.config import get_settings
 from quantum_api.enums import GateType
 from quantum_api.services.quantum_runtime import runtime
 
@@ -121,8 +122,9 @@ class QuantumCircuitManager:
     """Multi-qubit manager used by advanced text transformations."""
 
     def __init__(self, num_qubits: int) -> None:
-        if num_qubits < 1 or num_qubits > 8:
-            raise ValueError("num_qubits must be between 1 and 8")
+        max_qubits = get_settings().max_circuit_qubits
+        if num_qubits < 1 or num_qubits > max_qubits:
+            raise ValueError(f"num_qubits must be between 1 and {max_qubits}")
         self.num_qubits = num_qubits
         self._gates: list[tuple[GateType, int, float]] = []
         circuit_class = runtime.QuantumCircuit

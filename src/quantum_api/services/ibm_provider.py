@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from functools import lru_cache
+import hashlib
+from collections import OrderedDict
+from threading import RLock
 from typing import Any
 
 from quantum_api.config import Settings, get_settings
@@ -20,9 +22,14 @@ from quantum_api.services.service_errors import (
     ProviderUnavailableError,
 )
 
+_IBM_SERVICE_CACHE_MAX_SIZE = 256
+_IBM_SERVICE_CACHE: OrderedDict[tuple[str, str, str], Any] = OrderedDict()
+_IBM_SERVICE_CACHE_LOCK = RLock()
+
 
 def clear_ibm_provider_cache() -> None:
-    _build_ibm_service.cache_clear()
+    with _IBM_SERVICE_CACHE_LOCK:
+        _IBM_SERVICE_CACHE.clear()
 
 
 async def resolve_request_ibm_credentials(
@@ -155,15 +162,39 @@ def build_ibm_runtime_service_from_settings(settings: Settings) -> Any:
     return build_ibm_service(credentials)
 
 
-@lru_cache
 def _build_ibm_service(*, token: str, instance: str, channel: str) -> Any:
     if runtime.QiskitRuntimeService is None:
         raise ProviderUnavailableError(
             provider="ibm",
             details={"reason": "missing_dependency", "import_error": runtime.ibm_runtime_import_error},
         )
-    return runtime.QiskitRuntimeService(
+
+    cache_key = _cache_key(token=token, instance=instance, channel=channel)
+    with _IBM_SERVICE_CACHE_LOCK:
+        cached = _IBM_SERVICE_CACHE.get(cache_key)
+        if cached is not None:
+            _IBM_SERVICE_CACHE.move_to_end(cache_key)
+            return cached
+
+    service = runtime.QiskitRuntimeService(
         token=token,
         instance=instance,
         channel=channel,
     )
+
+    with _IBM_SERVICE_CACHE_LOCK:
+        cached = _IBM_SERVICE_CACHE.get(cache_key)
+        if cached is not None:
+            _IBM_SERVICE_CACHE.move_to_end(cache_key)
+            return cached
+
+        _IBM_SERVICE_CACHE[cache_key] = service
+        while len(_IBM_SERVICE_CACHE) > _IBM_SERVICE_CACHE_MAX_SIZE:
+            _IBM_SERVICE_CACHE.popitem(last=False)
+
+    return service
+
+
+def _cache_key(*, token: str, instance: str, channel: str) -> tuple[str, str, str]:
+    token_digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    return (token_digest, instance, channel)

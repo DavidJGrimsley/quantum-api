@@ -7,8 +7,8 @@ from quantum_api.services.machine_learning.common import (
     build_ansatz,
     build_feature_map,
     python_list,
-    set_algorithm_seed,
 )
+from quantum_api.services.qiskit_common.algorithm_seed import scoped_algorithm_seed
 from quantum_api.services.qiskit_common.dependencies import ensure_dependency
 from quantum_api.services.qiskit_common.optimizers import (
     build_optimizer,
@@ -37,30 +37,32 @@ def run_vqc_classifier(request: VqcClassifierRequest) -> dict[str, object]:
     prediction_features = np.asarray(request.prediction_features, dtype=float)
     training_labels = np.asarray(request.training_labels)
 
-    set_algorithm_seed(request.seed)
-    feature_map = build_feature_map(training_features.shape[1], request.feature_map)
-    ansatz = build_ansatz(training_features.shape[1], request.ansatz)
-    classifier = VQC(
-        feature_map=feature_map,
-        ansatz=ansatz,
-        optimizer=build_optimizer(request.optimizer),
-        sampler=StatevectorSampler(seed=request.seed),
-    )
-    try:
-        classifier.fit(training_features, training_labels)
-    except ValueError as exc:
-        raise QuantumApiServiceError(
-            error="ml_training_failed",
-            message=str(exc),
-            status_code=400,
-        ) from exc
+    with scoped_algorithm_seed(request.seed):
+        feature_map = build_feature_map(training_features.shape[1], request.feature_map)
+        ansatz = build_ansatz(training_features.shape[1], request.ansatz)
+        classifier = VQC(
+            feature_map=feature_map,
+            ansatz=ansatz,
+            optimizer=build_optimizer(request.optimizer),
+            sampler=StatevectorSampler(seed=request.seed),
+        )
+        try:
+            classifier.fit(training_features, training_labels)
+        except ValueError as exc:
+            raise QuantumApiServiceError(
+                error="ml_training_failed",
+                message=str(exc),
+                status_code=400,
+            ) from exc
 
-    predictions = classifier.predict(prediction_features)
+        predictions = classifier.predict(prediction_features)
+        training_score = float(classifier.score(training_features, training_labels))
+
     labels = list(dict.fromkeys(python_list(training_labels)))
     fit_result = classifier.fit_result
     return {
         "predictions": python_list(predictions),
-        "training_score": float(classifier.score(training_features, training_labels)),
+        "training_score": training_score,
         "class_metadata": {
             "labels": labels,
             "num_classes": int(classifier.num_classes),

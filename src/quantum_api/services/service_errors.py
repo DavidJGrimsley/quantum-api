@@ -64,6 +64,31 @@ class BackendNotFoundError(QuantumApiServiceError):
         )
 
 
+class BackendQubitCapacityExceededError(QuantumApiServiceError):
+    def __init__(
+        self,
+        *,
+        backend_name: str,
+        provider: str,
+        requested_qubits: int,
+        available_qubits: int,
+    ) -> None:
+        super().__init__(
+            error="backend_qubit_capacity_exceeded",
+            message=(
+                f"Backend '{backend_name}' supports at most {available_qubits} qubits, "
+                f"but request requires {requested_qubits}."
+            ),
+            status_code=400,
+            details={
+                "backend_name": backend_name,
+                "provider": provider,
+                "requested_qubits": requested_qubits,
+                "available_qubits": available_qubits,
+            },
+        )
+
+
 class ProviderUnavailableError(QuantumApiServiceError):
     def __init__(self, *, provider: str, details: dict[str, Any] | None = None) -> None:
         super().__init__(

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from quantum_api.config import get_settings
@@ -112,6 +114,46 @@ def test_transpile_backend_not_found_error(client):
     payload = response.json()
     assert payload["error"] == "backend_not_found"
     assert payload["details"]["backend_name"] == "does_not_exist"
+
+
+@requires_qiskit
+def test_transpile_rejects_backend_qubit_capacity_mismatch(client, monkeypatch):
+    class _TinyBackend:
+        def configuration(self):
+            return SimpleNamespace(
+                backend_name="tiny_backend",
+                simulator=True,
+                n_qubits=1,
+                basis_gates=["x"],
+                coupling_map=[],
+            )
+
+    def fake_resolve_backend(backend_name, provider, *, ibm_credentials=None):
+        assert backend_name == "tiny_backend"
+        assert provider == "aer"
+        assert ibm_credentials is None
+        return "aer", _TinyBackend()
+
+    monkeypatch.setattr("quantum_api.services.transpilation.resolve_backend", fake_resolve_backend)
+
+    response = client.post(
+        "/v1/transpile",
+        json={
+            "circuit": {
+                "num_qubits": 2,
+                "operations": [{"gate": "x", "target": 1}],
+            },
+            "backend_name": "tiny_backend",
+            "provider": "aer",
+        },
+    )
+    assert response.status_code == 400
+    payload = response.json()
+    assert payload["error"] == "backend_qubit_capacity_exceeded"
+    assert payload["details"]["backend_name"] == "tiny_backend"
+    assert payload["details"]["provider"] == "aer"
+    assert payload["details"]["requested_qubits"] == 2
+    assert payload["details"]["available_qubits"] == 1
 
 
 @requires_qiskit

@@ -7,6 +7,7 @@ from quantum_api.models.optimization import (
     OptimizationQaoaRequest,
     OptimizationSolutionSample,
 )
+from quantum_api.services.qiskit_common.algorithm_seed import scoped_algorithm_seed
 from quantum_api.services.qiskit_common.dependencies import ensure_dependency
 from quantum_api.services.qiskit_common.optimizers import (
     build_optimizer,
@@ -51,19 +52,19 @@ def solve_qaoa(request: OptimizationQaoaRequest) -> dict[str, object]:
 
     from qiskit.primitives import StatevectorSampler
     from qiskit_algorithms.minimum_eigensolvers import QAOA
-    from qiskit_algorithms.utils import algorithm_globals
     from qiskit_optimization.algorithms import MinimumEigenOptimizer
 
     program = quadratic_program_from_problem(request.problem)
     optimizer = build_optimizer(request.optimizer)
-    if request.seed is not None:
-        algorithm_globals.random_seed = request.seed
-    min_eigen_solver = QAOA(
-        sampler=StatevectorSampler(default_shots=request.shots, seed=request.seed),
-        optimizer=optimizer,
-        reps=request.reps,
-    )
-    result = MinimumEigenOptimizer(min_eigen_solver).solve(program)
+
+    with scoped_algorithm_seed(request.seed):
+        min_eigen_solver = QAOA(
+            sampler=StatevectorSampler(default_shots=request.shots, seed=request.seed),
+            optimizer=optimizer,
+            reps=request.reps,
+        )
+        result = MinimumEigenOptimizer(min_eigen_solver).solve(program)
+
     raw_solver_result = result.min_eigen_solver_result
 
     samples = [
