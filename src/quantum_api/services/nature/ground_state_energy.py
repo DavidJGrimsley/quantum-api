@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from quantum_api.models.nature import NatureGroundStateEnergyRequest
 from quantum_api.services.nature.common import build_problem_and_operator
+from quantum_api.services.qiskit_common.algorithm_seed import scoped_algorithm_seed
 from quantum_api.services.qiskit_common.dependencies import ensure_dependency
 from quantum_api.services.qiskit_common.optimizers import (
     build_optimizer,
@@ -14,7 +15,6 @@ def compute_ground_state_energy(request: NatureGroundStateEnergyRequest) -> dict
     from qiskit.circuit.library import real_amplitudes
     from qiskit.primitives import StatevectorEstimator
     from qiskit_algorithms.minimum_eigensolvers import VQE
-    from qiskit_algorithms.utils import algorithm_globals
 
     ensure_dependency(
         available=runtime.qiskit_algorithms_available,
@@ -24,18 +24,19 @@ def compute_ground_state_energy(request: NatureGroundStateEnergyRequest) -> dict
 
     problem, operator = build_problem_and_operator(request)
     optimizer = build_optimizer(request.optimizer)
-    if request.seed is not None:
-        algorithm_globals.random_seed = request.seed
-    ansatz = real_amplitudes(
-        operator.num_qubits,
-        reps=request.ansatz.reps,
-        entanglement=request.ansatz.entanglement,
-    )
-    result = VQE(
-        estimator=StatevectorEstimator(seed=request.seed),
-        ansatz=ansatz,
-        optimizer=optimizer,
-    ).compute_minimum_eigenvalue(operator)
+
+    with scoped_algorithm_seed(request.seed):
+        ansatz = real_amplitudes(
+            operator.num_qubits,
+            reps=request.ansatz.reps,
+            entanglement=request.ansatz.entanglement,
+        )
+        result = VQE(
+            estimator=StatevectorEstimator(seed=request.seed),
+            ansatz=ansatz,
+            optimizer=optimizer,
+        ).compute_minimum_eigenvalue(operator)
+
     interpreted = problem.interpret(result)
     total_energy = None
     if getattr(interpreted, "total_energies", None) is not None:

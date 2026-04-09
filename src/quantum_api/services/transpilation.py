@@ -9,7 +9,7 @@ from quantum_api.models.api import (
     QasmRunRequest,
     TranspileRequest,
 )
-from quantum_api.services.backend_catalog import resolve_backend
+from quantum_api.services.backend_catalog import ensure_backend_supports_qubits, resolve_backend
 from quantum_api.services.circuit_conversion import (
     build_circuit_from_definition,
     export_qasm,
@@ -43,6 +43,12 @@ def transpile_circuit(
         backend_name=request.backend_name,
         provider=request.provider,
         ibm_credentials=ibm_credentials,
+    )
+    ensure_backend_supports_qubits(
+        backend_name=request.backend_name,
+        provider=provider,
+        backend=backend,
+        required_qubits=int(source_circuit.num_qubits),
     )
     transpiled = _run_transpile(
         source_circuit,

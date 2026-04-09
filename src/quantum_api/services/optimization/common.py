@@ -4,6 +4,7 @@ from typing import Any
 
 from quantum_api.models.optimization import OptimizationApplicationSolver
 from quantum_api.models.qiskit_common import OptimizerConfig
+from quantum_api.services.qiskit_common.algorithm_seed import scoped_algorithm_seed
 from quantum_api.services.qiskit_common.dependencies import ensure_dependency
 from quantum_api.services.qiskit_common.optimizers import (
     build_optimizer,
@@ -35,24 +36,22 @@ def solve_quadratic_program(
 
     from qiskit.primitives import StatevectorSampler
     from qiskit_algorithms.minimum_eigensolvers import QAOA, NumPyMinimumEigensolver
-    from qiskit_algorithms.utils import algorithm_globals
     from qiskit_optimization.algorithms import MinimumEigenOptimizer
 
-    if seed is not None:
-        algorithm_globals.random_seed = seed
+    with scoped_algorithm_seed(seed):
+        if solver == "exact":
+            min_eigen_solver = NumPyMinimumEigensolver()
+            backend_mode = "numpy_minimum_eigensolver"
+        else:
+            min_eigen_solver = QAOA(
+                sampler=StatevectorSampler(default_shots=shots, seed=seed),
+                optimizer=build_optimizer(optimizer_config),
+                reps=reps,
+            )
+            backend_mode = "statevector_sampler"
 
-    if solver == "exact":
-        min_eigen_solver = NumPyMinimumEigensolver()
-        backend_mode = "numpy_minimum_eigensolver"
-    else:
-        min_eigen_solver = QAOA(
-            sampler=StatevectorSampler(default_shots=shots, seed=seed),
-            optimizer=build_optimizer(optimizer_config),
-            reps=reps,
-        )
-        backend_mode = "statevector_sampler"
+        result = MinimumEigenOptimizer(min_eigen_solver).solve(program)
 
-    result = MinimumEigenOptimizer(min_eigen_solver).solve(program)
     solver_metadata: dict[str, object] = {
         "solver": solver,
         "best_bitstring": bitstring_from_vector(result.x),

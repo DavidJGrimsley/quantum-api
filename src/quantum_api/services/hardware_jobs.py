@@ -5,7 +5,7 @@ from typing import Any
 from quantum_api.execution_jobs import ExecutionJobRecord, QuantumExecutionJobService
 from quantum_api.ibm_credentials import ResolvedIbmCredentials
 from quantum_api.models.api import CircuitJobSubmitRequest, QasmJobSubmitRequest
-from quantum_api.services.backend_catalog import resolve_backend
+from quantum_api.services.backend_catalog import ensure_backend_supports_qubits, resolve_backend
 from quantum_api.services.circuit_conversion import build_circuit_from_definition, parse_qasm
 from quantum_api.services.ibm_provider import (
     build_ibm_service,
@@ -83,12 +83,18 @@ class HardwareJobService:
                 },
             )
 
-        _, backend = resolve_backend(
+        provider, backend = resolve_backend(
             request_data.backend_name,
             "ibm",
             ibm_credentials=ibm_credentials,
         )
         circuit = build_circuit_from_definition(request_data.circuit)
+        ensure_backend_supports_qubits(
+            backend_name=request_data.backend_name,
+            provider=provider,
+            backend=backend,
+            required_qubits=int(circuit.num_qubits),
+        )
         measured_circuit = circuit.copy()
         measured_circuit.measure_all()
         transpiled = runtime.transpile(measured_circuit, backend)
@@ -135,7 +141,7 @@ class HardwareJobService:
                 },
             )
 
-        _, backend = resolve_backend(
+        provider, backend = resolve_backend(
             request_data.backend_name,
             "ibm",
             ibm_credentials=ibm_credentials,
@@ -143,6 +149,12 @@ class HardwareJobService:
         circuit, detected_qasm_version = parse_qasm(
             source=request_data.qasm,
             qasm_version=request_data.qasm_version,
+        )
+        ensure_backend_supports_qubits(
+            backend_name=request_data.backend_name,
+            provider=provider,
+            backend=backend,
+            required_qubits=int(circuit.num_qubits),
         )
         measured_circuit = circuit.copy()
         has_measurements = any(

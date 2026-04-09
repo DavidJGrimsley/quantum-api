@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from types import SimpleNamespace
 
 import pytest
 
@@ -269,3 +270,75 @@ def test_hardware_jobs_are_user_scoped(unauth_client, monkeypatch):
 
     rejected = unauth_client.get(f"/v1/jobs/{job_id}", headers={"X-API-Key": intruder_key})
     assert rejected.status_code == 404
+
+
+@requires_qiskit
+def test_hardware_circuit_job_rejects_backend_qubit_capacity_mismatch(unauth_client, monkeypatch):
+    headers = _mock_user(monkeypatch, user_id="hardware-capacity-user")
+    _create_profile(unauth_client, headers=headers)
+    raw_key = _create_runtime_key(unauth_client, headers=headers)
+
+    class _TinyBackend:
+        def configuration(self):
+            return SimpleNamespace(backend_name="ibm_tiny_backend", n_qubits=1, simulator=False)
+
+    monkeypatch.setattr(
+        "quantum_api.services.hardware_jobs.resolve_backend",
+        lambda *args, **kwargs: ("ibm", _TinyBackend()),
+    )
+
+    submitted = unauth_client.post(
+        "/v1/jobs/circuits",
+        json={
+            "provider": "ibm",
+            "backend_name": "ibm_tiny_backend",
+            "circuit": {
+                "num_qubits": 2,
+                "operations": [{"gate": "x", "target": 1}],
+            },
+            "shots": 256,
+        },
+        headers={"X-API-Key": raw_key},
+    )
+    assert submitted.status_code == 400
+    payload = submitted.json()
+    assert payload["error"] == "backend_qubit_capacity_exceeded"
+    assert payload["details"]["backend_name"] == "ibm_tiny_backend"
+    assert payload["details"]["provider"] == "ibm"
+    assert payload["details"]["requested_qubits"] == 2
+    assert payload["details"]["available_qubits"] == 1
+
+
+@requires_qiskit
+def test_hardware_qasm_job_rejects_backend_qubit_capacity_mismatch(unauth_client, monkeypatch):
+    headers = _mock_user(monkeypatch, user_id="hardware-capacity-qasm-user")
+    _create_profile(unauth_client, headers=headers)
+    raw_key = _create_runtime_key(unauth_client, headers=headers)
+
+    class _TinyBackend:
+        def configuration(self):
+            return SimpleNamespace(backend_name="ibm_tiny_backend", n_qubits=1, simulator=False)
+
+    monkeypatch.setattr(
+        "quantum_api.services.hardware_jobs.resolve_backend",
+        lambda *args, **kwargs: ("ibm", _TinyBackend()),
+    )
+
+    submitted = unauth_client.post(
+        "/v1/jobs/qasm",
+        json={
+            "provider": "ibm",
+            "backend_name": "ibm_tiny_backend",
+            "qasm": QASM2_BELL,
+            "qasm_version": "auto",
+            "shots": 256,
+        },
+        headers={"X-API-Key": raw_key},
+    )
+    assert submitted.status_code == 400
+    payload = submitted.json()
+    assert payload["error"] == "backend_qubit_capacity_exceeded"
+    assert payload["details"]["backend_name"] == "ibm_tiny_backend"
+    assert payload["details"]["provider"] == "ibm"
+    assert payload["details"]["requested_qubits"] == 2
+    assert payload["details"]["available_qubits"] == 1

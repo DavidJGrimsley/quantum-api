@@ -8,6 +8,7 @@ from quantum_api.services.ibm_provider import build_ibm_service, clear_ibm_provi
 from quantum_api.services.quantum_runtime import runtime
 from quantum_api.services.service_errors import (
     BackendNotFoundError,
+    BackendQubitCapacityExceededError,
     ProviderUnavailableError,
     QuantumApiServiceError,
 )
@@ -105,6 +106,23 @@ def resolve_backend(
 
 def clear_backend_catalog_cache() -> None:
     clear_ibm_provider_cache()
+
+
+def ensure_backend_supports_qubits(
+    *,
+    backend_name: str,
+    provider: BackendProvider,
+    backend: Any,
+    required_qubits: int,
+) -> None:
+    available_qubits = _backend_qubit_count(backend, _safe_backend_configuration(backend))
+    if available_qubits and required_qubits > available_qubits:
+        raise BackendQubitCapacityExceededError(
+            backend_name=backend_name,
+            provider=provider,
+            requested_qubits=required_qubits,
+            available_qubits=available_qubits,
+        )
 
 
 def _list_aer_backends() -> list[Any]:
