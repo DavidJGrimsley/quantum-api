@@ -7,8 +7,8 @@ from quantum_api.models.api import BackendProvider
 from quantum_api.services.ibm_provider import build_ibm_service, clear_ibm_provider_cache
 from quantum_api.services.quantum_runtime import runtime
 from quantum_api.services.service_errors import (
-    BackendQubitCapacityExceededError,
     BackendNotFoundError,
+    BackendQubitCapacityExceededError,
     ProviderUnavailableError,
     QuantumApiServiceError,
 )
