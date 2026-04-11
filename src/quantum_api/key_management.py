@@ -139,8 +139,10 @@ class DatabaseManager:
                 database_host = parsed.host or "unknown"
                 if database_host.endswith(".pooler.supabase.com") or parsed.port == 6543:
                     connect_args["prepared_statement_cache_size"] = 0
+                    connect_args["statement_cache_size"] = 0
             except Exception:
                 connect_args["prepared_statement_cache_size"] = 0
+                connect_args["statement_cache_size"] = 0
 
         self._settings = settings
         self._engine: AsyncEngine = create_async_engine(
@@ -149,10 +151,11 @@ class DatabaseManager:
             connect_args=connect_args,
         )
         logger.info(
-            "Database engine initialized (driver=%s host=%s prepared_statement_cache_size=%s)",
+            "Database engine initialized (driver=%s host=%s prepared_statement_cache_size=%s statement_cache_size=%s)",
             database_driver,
             database_host,
             connect_args.get("prepared_statement_cache_size", "default"),
+            connect_args.get("statement_cache_size", "default"),
         )
         self._session_factory = async_sessionmaker(
             self._engine,
