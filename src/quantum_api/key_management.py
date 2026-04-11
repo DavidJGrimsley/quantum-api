@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.pool import NullPool
 
 from quantum_api.config import Settings
 
@@ -125,6 +126,7 @@ class DatabaseManager:
         connect_args: dict[str, Any] = {}
         database_driver = "unknown"
         database_host = "unknown"
+        use_null_pool = False
 
         if settings.database_url.startswith("sqlite"):
             connect_args["check_same_thread"] = False
@@ -140,15 +142,29 @@ class DatabaseManager:
                 if database_host.endswith(".pooler.supabase.com") or parsed.port == 6543:
                     connect_args["prepared_statement_cache_size"] = 0
                     connect_args["statement_cache_size"] = 0
+                    connect_args["prepared_statement_name_func"] = (
+                        lambda: f"__asyncpg_{uuid.uuid4()}__"
+                    )
+                    use_null_pool = True
             except Exception:
                 connect_args["prepared_statement_cache_size"] = 0
                 connect_args["statement_cache_size"] = 0
+                connect_args["prepared_statement_name_func"] = (
+                    lambda: f"__asyncpg_{uuid.uuid4()}__"
+                )
+                use_null_pool = True
 
         self._settings = settings
+        engine_kwargs: dict[str, Any] = {
+            "pool_pre_ping": True,
+            "connect_args": connect_args,
+        }
+        if use_null_pool:
+            engine_kwargs["poolclass"] = NullPool
+
         self._engine: AsyncEngine = create_async_engine(
             settings.database_url,
-            pool_pre_ping=True,
-            connect_args=connect_args,
+            **engine_kwargs,
         )
         logger.info(
             "Database engine initialized (driver=%s host=%s prepared_statement_cache_size=%s statement_cache_size=%s)",
