@@ -171,6 +171,12 @@ class ApiKeyAuthService:
 
         return ApiKeyAuthenticationAttempt(key=None, failure_reason="hash_mismatch", key_prefix=prefix)
 
+    async def authenticate_runtime_key_by_id(self, *, owner_user_id: str, key_id: str) -> RuntimeApiKey | None:
+        return await self._lifecycle_service.find_active_runtime_key_by_id(
+            key_id=key_id,
+            owner_user_id=owner_user_id,
+        )
+
     async def invalidate_key_prefix(self, prefix: str) -> None:
         if not await self._ensure_cache_connection():
             return

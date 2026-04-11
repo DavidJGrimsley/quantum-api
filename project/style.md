@@ -44,3 +44,9 @@
 
 - Semantic versioning for API and SDKs
 - Breaking contract changes require major version bump
+
+## Contribution Workflow
+
+- Follow `CONTRIBUTING.md` for branch strategy, commit style, and PR quality gates
+- Route high-risk Qiskit and PennyLane changes through CODEOWNERS review
+- Keep `CHANGELOG.md`, `README.md`, and docs aligned with user-visible behavior changes

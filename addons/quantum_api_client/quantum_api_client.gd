@@ -1,42 +1,65 @@
 class_name QuantumApiClient
 extends Node
 
-const DEFAULT_BASE_URL := "https://davidjgrimsley.com/public-facing/api/quantum/v1"
+const DEFAULT_BASE_URL := "https://davidjgrimsley.com/public-facing/api/quantum-gateway/v1"
 const DIRECT_API_KEY := ""
+const PUBLISHABLE_GATEWAY_CLIENT_KEY := ""
 const DEFAULT_IBM_PROFILE := ""
 const SETTINGS_BASE_URL := "quantum_api/base_url"
 const SETTINGS_BACKEND_PROXY_MODE := "quantum_api/backend_proxy_mode"
 const SETTINGS_DIRECT_API_KEY := "quantum_api/direct_api_key"
+const SETTINGS_PUBLISHABLE_GATEWAY_CLIENT_KEY := "quantum_api/publishable_gateway_client_key"
 const SETTINGS_DEFAULT_IBM_PROFILE := "quantum_api/default_ibm_profile"
-const DEFAULT_BACKEND_PROXY_MODE := true
+const DEFAULT_BACKEND_PROXY_MODE := false
+const RUNTIME_TOKEN_REFRESH_BUFFER_SECONDS := 15.0
 
 var base_url: String = DEFAULT_BASE_URL
 var api_key: String = DIRECT_API_KEY
+var publishable_gateway_client_key: String = PUBLISHABLE_GATEWAY_CLIENT_KEY
 var default_ibm_profile: String = DEFAULT_IBM_PROFILE
-var backend_proxy_mode: bool = DIRECT_API_KEY.is_empty()
+var backend_proxy_mode: bool = DEFAULT_BACKEND_PROXY_MODE
+var runtime_token: String = ""
+var runtime_token_expires_at_unix: float = 0.0
+var runtime_project_id: String = ""
 
 func _init(
 	custom_base_url: String = DEFAULT_BASE_URL,
 	custom_api_key: String = DIRECT_API_KEY,
-	use_backend_proxy: bool = DIRECT_API_KEY.is_empty(),
+	use_backend_proxy: bool = DEFAULT_BACKEND_PROXY_MODE,
 	custom_default_ibm_profile: String = DEFAULT_IBM_PROFILE,
+	custom_publishable_gateway_client_key: String = PUBLISHABLE_GATEWAY_CLIENT_KEY,
 ) -> void:
 	base_url = _normalize_base_url(custom_base_url)
 	api_key = custom_api_key.strip_edges()
 	default_ibm_profile = custom_default_ibm_profile.strip_edges()
 	backend_proxy_mode = use_backend_proxy
+	publishable_gateway_client_key = custom_publishable_gateway_client_key.strip_edges()
 
 func set_base_url(url: String) -> void:
 	base_url = _normalize_base_url(url)
+	clear_runtime_token()
 
 func set_api_key(key: String) -> void:
 	api_key = key.strip_edges()
+	if !api_key.is_empty():
+		clear_runtime_token()
+
+func set_publishable_gateway_client_key(key: String) -> void:
+	publishable_gateway_client_key = key.strip_edges()
+	clear_runtime_token()
 
 func set_default_ibm_profile(profile_name: String) -> void:
 	default_ibm_profile = profile_name.strip_edges()
 
 func set_backend_proxy_mode(enabled: bool) -> void:
 	backend_proxy_mode = enabled
+	if backend_proxy_mode:
+		clear_runtime_token()
+
+func clear_runtime_token() -> void:
+	runtime_token = ""
+	runtime_token_expires_at_unix = 0.0
+	runtime_project_id = ""
 
 func apply_project_settings() -> void:
 	var configured_base_url := str(ProjectSettings.get_setting(SETTINGS_BASE_URL, DEFAULT_BASE_URL)).strip_edges()
@@ -51,6 +74,14 @@ func apply_project_settings() -> void:
 		)
 	)
 	set_api_key(str(ProjectSettings.get_setting(SETTINGS_DIRECT_API_KEY, DIRECT_API_KEY)).strip_edges())
+	set_publishable_gateway_client_key(
+		str(
+			ProjectSettings.get_setting(
+				SETTINGS_PUBLISHABLE_GATEWAY_CLIENT_KEY,
+				PUBLISHABLE_GATEWAY_CLIENT_KEY
+			)
+		).strip_edges()
+	)
 	set_default_ibm_profile(str(ProjectSettings.get_setting(SETTINGS_DEFAULT_IBM_PROFILE, DEFAULT_IBM_PROFILE)).strip_edges())
 
 func get_default_base_url() -> String:
@@ -61,11 +92,17 @@ func get_config_snapshot() -> Dictionary:
 		"base_url": base_url,
 		"backend_proxy_mode": backend_proxy_mode,
 		"api_key_present": !api_key.is_empty(),
+		"publishable_gateway_client_key_present": !publishable_gateway_client_key.is_empty(),
 		"default_ibm_profile": default_ibm_profile,
+		"runtime_token_present": !runtime_token.is_empty(),
+		"runtime_project_id": runtime_project_id,
 	}
 
 func health_check(callback: Callable) -> void:
 	_request_json("/health", HTTPClient.METHOD_GET, null, callback, false)
+
+func mint_runtime_token(callback: Callable, client_session_id: String = "") -> void:
+	_ensure_runtime_token(callback, true, client_session_id)
 
 func transform_text(text: String, callback: Callable, fallback_text: String = "") -> void:
 	var wrapped_callback := func(success: bool, payload: Dictionary) -> void:
@@ -164,15 +201,19 @@ func _request_json(
 	requires_api_key: bool,
 	query_params: Variant = null,
 ) -> void:
-	var request_url: String = _build_request_url(endpoint_path, query_params)
+	var resolved_base_url := _resolve_runtime_base_url(requires_api_key)
+	var request_url: String = _build_request_url(endpoint_path, query_params, resolved_base_url)
 	var method_name: String = _http_method_to_string(method)
+	var body_string := ""
+	if payload != null:
+		body_string = JSON.stringify(payload)
 
-	if requires_api_key and !backend_proxy_mode and api_key.is_empty():
+	if requires_api_key and !backend_proxy_mode and api_key.is_empty() and publishable_gateway_client_key.is_empty():
 		callback.call(
 			false,
 			_local_error_payload(
-				"missing_api_key",
-				"Direct API-key mode is enabled, but no Quantum API key is configured.",
+				"missing_runtime_auth",
+				"Set quantum_api/publishable_gateway_client_key for Gateway runtime mode, or set quantum_api/direct_api_key for direct Quantum API mode.",
 				request_url,
 				endpoint_path,
 				method_name,
@@ -181,15 +222,57 @@ func _request_json(
 		)
 		return
 
+	if requires_api_key and !backend_proxy_mode and api_key.is_empty() and !publishable_gateway_client_key.is_empty():
+		_ensure_runtime_token(
+			func(success: bool, runtime_payload: Dictionary) -> void:
+				if !success:
+					callback.call(false, runtime_payload)
+					return
+
+				_dispatch_request(
+					request_url,
+					_build_headers(requires_api_key, payload != null),
+					method,
+					body_string,
+					callback,
+					endpoint_path,
+					method_name,
+					requires_api_key
+				)
+			)
+		return
+
+	_dispatch_request(
+		request_url,
+		_build_headers(requires_api_key, payload != null),
+		method,
+		body_string,
+		callback,
+		endpoint_path,
+		method_name,
+		requires_api_key
+	)
+
+func _dispatch_request(
+	request_url: String,
+	headers: PackedStringArray,
+	method: int,
+	body_string: String,
+	callback: Callable,
+	endpoint_path: String,
+	method_name: String,
+	requires_api_key: bool,
+	cache_runtime_token_on_success: bool = false,
+) -> void:
 	var http_request := HTTPRequest.new()
 	add_child(http_request)
 
 	http_request.request_completed.connect(
-		func(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
+		func(result: int, response_code: int, response_headers: PackedStringArray, body: PackedByteArray) -> void:
 			var parsed := _parse_response(
 				result,
 				response_code,
-				headers,
+				response_headers,
 				body,
 				request_url,
 				endpoint_path,
@@ -197,13 +280,28 @@ func _request_json(
 				requires_api_key
 			)
 			http_request.queue_free()
+
+			if parsed["success"] and cache_runtime_token_on_success:
+				var parsed_payload := parsed["payload"]
+				if parsed_payload is Dictionary and _cache_runtime_token_from_payload(parsed_payload):
+					callback.call(true, parsed_payload)
+					return
+
+				callback.call(
+					false,
+					_local_error_payload(
+						"invalid_runtime_token_payload",
+						"Gateway runtime token response was missing required fields.",
+						request_url,
+						endpoint_path,
+						method_name,
+						requires_api_key
+					)
+				)
+				return
+
 			callback.call(parsed["success"], parsed["payload"])
 	)
-
-	var body_string := ""
-	var headers := _build_headers(requires_api_key, payload != null)
-	if payload != null:
-		body_string = JSON.stringify(payload)
 
 	var error := http_request.request(request_url, headers, method, body_string)
 	if error != OK:
@@ -227,6 +325,10 @@ func _build_headers(requires_api_key: bool, include_json_content_type: bool) -> 
 		headers.append("Content-Type: application/json")
 	if requires_api_key and !backend_proxy_mode and !api_key.is_empty():
 		headers.append("X-API-Key: " + api_key)
+	elif requires_api_key and !backend_proxy_mode and !runtime_token.is_empty():
+		headers.append("Authorization: Bearer " + runtime_token)
+		if !runtime_project_id.is_empty():
+			headers.append("X-Project-Id: " + runtime_project_id)
 	return headers
 
 func _parse_response(
@@ -276,7 +378,7 @@ func _parse_response(
 	if payload.is_empty():
 		var default_message := response_text if !response_text.is_empty() else "Quantum API request failed"
 		if response_code == 401 and requires_api_key:
-			default_message = "Unauthorized (401). Configure quantum_api/direct_api_key or use a backend proxy endpoint that injects authentication."
+			default_message = "Unauthorized (401). Configure a publishable Gateway client key, a direct Quantum API key, or your own backend proxy mode."
 
 		payload = {
 			"error": "http_error",
@@ -288,7 +390,12 @@ func _parse_response(
 	if response_code == 401:
 		payload["error"] = "unauthorized"
 		if requires_api_key:
-			payload["auth_hint"] = "Set [quantum_api] direct_api_key and ensure the endpoint accepts your auth mode."
+			if !api_key.is_empty():
+				payload["auth_hint"] = "Set [quantum_api] direct_api_key and ensure the endpoint accepts direct Quantum API key mode."
+			elif !publishable_gateway_client_key.is_empty():
+				payload["auth_hint"] = "Set [quantum_api] publishable_gateway_client_key and make sure the Gateway project is active."
+			else:
+				payload["auth_hint"] = "Configure a publishable Gateway client key, a direct Quantum API key, or your own backend proxy mode."
 
 	_attach_diagnostics(
 		payload,
@@ -322,8 +429,11 @@ func _attach_diagnostics(
 	payload["method"] = method_name
 	payload["backend_proxy_mode"] = backend_proxy_mode
 	payload["api_key_present"] = !api_key.is_empty()
+	payload["publishable_gateway_client_key_present"] = !publishable_gateway_client_key.is_empty()
 	payload["default_ibm_profile_present"] = !default_ibm_profile.is_empty()
 	payload["requires_api_key"] = requires_api_key
+	payload["runtime_token_present"] = !runtime_token.is_empty()
+	payload["runtime_project_id"] = runtime_project_id
 	if !request_id.is_empty() and !payload.has("request_id"):
 		payload["request_id"] = request_id
 	if !response_text.is_empty():
@@ -358,16 +468,20 @@ func _local_error_payload(
 		"method": method_name,
 		"backend_proxy_mode": backend_proxy_mode,
 		"api_key_present": !api_key.is_empty(),
+		"publishable_gateway_client_key_present": !publishable_gateway_client_key.is_empty(),
 		"default_ibm_profile_present": !default_ibm_profile.is_empty(),
 		"requires_api_key": requires_api_key,
+		"runtime_token_present": !runtime_token.is_empty(),
+		"runtime_project_id": runtime_project_id,
 		"result": result,
 	}
 	if result != 0:
 		payload["result_text"] = error_string(result)
 	return payload
 
-func _build_request_url(endpoint_path: String, query_params: Variant = null) -> String:
-	var request_url := base_url + endpoint_path
+func _build_request_url(endpoint_path: String, query_params: Variant = null, custom_base_url: String = "") -> String:
+	var resolved_base_url := custom_base_url if !custom_base_url.is_empty() else base_url
+	var request_url := resolved_base_url + endpoint_path
 	if query_params == null:
 		return request_url
 	if !(query_params is Dictionary):
@@ -423,6 +537,127 @@ func _resolve_optional_ibm_profile(override_profile: String = "") -> String:
 	if !explicit_profile.is_empty():
 		return explicit_profile
 	return default_ibm_profile.strip_edges()
+
+func _ensure_runtime_token(
+	callback: Callable,
+	force_refresh: bool = false,
+	client_session_id: String = "",
+) -> void:
+	var endpoint_path := "/runtime-sessions"
+	var request_url := _build_request_url(endpoint_path)
+	var method_name := "POST"
+
+	if backend_proxy_mode:
+		callback.call(
+			false,
+			_local_error_payload(
+				"backend_proxy_mode_enabled",
+				"Runtime tokens are not used when backend_proxy_mode=true.",
+				request_url,
+				endpoint_path,
+				method_name,
+				false
+			)
+		)
+		return
+
+	if !api_key.is_empty() and publishable_gateway_client_key.is_empty():
+		callback.call(
+			false,
+			_local_error_payload(
+				"direct_mode_enabled",
+				"Direct Quantum API key mode does not mint Gateway runtime tokens.",
+				request_url,
+				endpoint_path,
+				method_name,
+				false
+			)
+		)
+		return
+
+	if publishable_gateway_client_key.is_empty():
+		callback.call(
+			false,
+			_local_error_payload(
+				"missing_publishable_gateway_client_key",
+				"Set quantum_api/publishable_gateway_client_key to mint Gateway runtime tokens.",
+				request_url,
+				endpoint_path,
+				method_name,
+				false
+			)
+		)
+		return
+
+	if !force_refresh and _runtime_token_is_valid():
+		callback.call(
+			true,
+			{
+				"token": runtime_token,
+				"project_id": runtime_project_id,
+				"expires_at_unix": runtime_token_expires_at_unix,
+			}
+		)
+		return
+
+	var headers: PackedStringArray = []
+	headers.append("X-Gateway-Publishable-Key: " + publishable_gateway_client_key)
+	var body_string := ""
+	var normalized_client_session_id := client_session_id.strip_edges()
+	if !normalized_client_session_id.is_empty():
+		headers.append("Content-Type: application/json")
+		body_string = JSON.stringify({"client_session_id": normalized_client_session_id})
+	if !runtime_project_id.is_empty():
+		headers.append("X-Project-Id: " + runtime_project_id)
+
+	_dispatch_request(
+		request_url,
+		headers,
+		HTTPClient.METHOD_POST,
+		body_string,
+		callback,
+		endpoint_path,
+		method_name,
+		false,
+		true
+	)
+
+func _runtime_token_is_valid() -> bool:
+	if runtime_token.is_empty():
+		return false
+	if runtime_token_expires_at_unix <= 0.0:
+		return false
+	return runtime_token_expires_at_unix > (_current_unix_time() + RUNTIME_TOKEN_REFRESH_BUFFER_SECONDS)
+
+func _cache_runtime_token_from_payload(payload: Dictionary) -> bool:
+	var token := str(payload.get("token", "")).strip_edges()
+	if token.is_empty():
+		return false
+
+	runtime_token = token
+	runtime_project_id = str(payload.get("project_id", "")).strip_edges()
+	runtime_token_expires_at_unix = _parse_datetime_to_unix(
+		str(payload.get("expires_at", "")).strip_edges()
+	)
+	if runtime_token_expires_at_unix <= 0.0:
+		runtime_token_expires_at_unix = _current_unix_time() + 300.0
+	return true
+
+func _parse_datetime_to_unix(value: String) -> float:
+	var normalized := value.strip_edges()
+	if normalized.is_empty():
+		return 0.0
+	return float(Time.get_unix_time_from_datetime_string(normalized))
+
+func _current_unix_time() -> float:
+	return float(Time.get_unix_time_from_system())
+
+func _resolve_runtime_base_url(requires_api_key: bool) -> String:
+	if !requires_api_key or backend_proxy_mode or api_key.is_empty():
+		return base_url
+	if base_url.find("/public-facing/api/quantum-gateway") != -1:
+		return base_url.replace("/public-facing/api/quantum-gateway", "/public-facing/api/quantum")
+	return base_url
 
 func _normalize_base_url(url: String) -> String:
 	var normalized := url.strip_edges().trim_suffix("/")

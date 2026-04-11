@@ -143,12 +143,17 @@ async def resolve_ibm_credentials(
     request: Request,
     *,
     profile_name: str | None,
+    profile_id: str | None = None,
     required: bool,
 ) -> ResolvedIbmCredentials | None:
     owner_user_id = api_key_owner_user_id_from(request)
+    gateway_profile_id = profile_id
+    if gateway_profile_id is None:
+        gateway_profile_id = getattr(request.state, "gateway_ibm_profile_id", None)
     return await resolve_request_ibm_credentials(
         owner_user_id=owner_user_id,
         profile_name=profile_name,
+        profile_id=gateway_profile_id,
         profile_service=request.app.state.ibm_profile_service,
         required=required,
         allow_env_fallback=True,

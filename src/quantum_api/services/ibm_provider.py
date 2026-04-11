@@ -36,12 +36,23 @@ async def resolve_request_ibm_credentials(
     *,
     owner_user_id: str | None,
     profile_name: str | None,
+    profile_id: str | None = None,
     profile_service: IbmCredentialProfileService | None,
     required: bool,
     allow_env_fallback: bool = True,
 ) -> ResolvedIbmCredentials | None:
     if owner_user_id is not None and profile_service is not None:
         try:
+            if profile_name is not None:
+                return await profile_service.resolve_runtime_credentials(
+                    owner_user_id=owner_user_id,
+                    profile_name=profile_name,
+                )
+            if profile_id is not None:
+                return await profile_service.get_profile_credentials_by_id(
+                    owner_user_id=owner_user_id,
+                    profile_id=profile_id,
+                )
             return await profile_service.resolve_runtime_credentials(
                 owner_user_id=owner_user_id,
                 profile_name=profile_name,

@@ -1,5 +1,7 @@
 # Project Info - Quantum API
 
+A public-facing free to use API to make qiskit easily usable not only in Python but in other languages and frameworks as well.
+
 ## Product Goal
 
 Run a production-ready Quantum API that supports:

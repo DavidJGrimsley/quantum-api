@@ -29,3 +29,17 @@ router.include_router(experiments_router)
 router.include_router(finance_router)
 router.include_router(machine_learning_router)
 router.include_router(nature_router)
+
+internal_router = APIRouter(
+    prefix=initial_settings.gateway_internal_api_prefix,
+    include_in_schema=False,
+)
+internal_router.include_router(core_router)
+internal_router.include_router(runtime_router)
+internal_router.include_router(jobs_router)
+internal_router.include_router(algorithms_router)
+internal_router.include_router(optimization_router)
+internal_router.include_router(experiments_router)
+internal_router.include_router(finance_router)
+internal_router.include_router(machine_learning_router)
+internal_router.include_router(nature_router)

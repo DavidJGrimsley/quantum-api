@@ -65,6 +65,18 @@ This document defines how Quantum API client releases work during and after Phas
 - External install instructions are verified from a clean environment.
 - Godot AssetLib archive output is verified via `git archive --format=tar HEAD | tar -tf -` and contains only `addons/` paths.
 
+## Deprecation and sunset policy
+
+- Record deprecations in `CHANGELOG.md` under `Deprecated`.
+- Keep a minimum two-release deprecation window before removal.
+- Treat removals and incompatible public contract changes as major-version changes.
+- Include migration guidance in docs when a deprecated behavior has a replacement path.
+
+## Contribution governance links
+
+- Contribution workflow and PR quality gates: `CONTRIBUTING.md`
+- Path ownership and expert review routing: `.github/CODEOWNERS`
+
 ## Tooling bootstrap note
 
 The repo should not assume local tooling is preinstalled. Any release or verification instructions must state the expected tools explicitly, including:

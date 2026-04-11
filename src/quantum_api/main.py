@@ -11,7 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse, Response
 
-from quantum_api.api.router import router
+from quantum_api.api.router import internal_router, router
 from quantum_api.api.shared import endpoint_display_sort_key
 from quantum_api.config import get_settings
 from quantum_api.execution_jobs import QuantumExecutionJobService
@@ -216,6 +216,7 @@ def metrics() -> Response:
 
 
 app.include_router(router)
+app.include_router(internal_router)
 
 
 def custom_openapi() -> dict[str, object]:

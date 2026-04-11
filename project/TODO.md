@@ -360,9 +360,13 @@ Goal: keep the platform stable as capabilities grow.
 ### Release Discipline
 
 - [x] Enforce semantic versioning rules across API and SDKs
-- [ ] Add deprecation policy and sunset timelines
+- [x] Add deprecation policy and sunset timelines
 - [x] Add compatibility matrix (API versions vs SDK versions)
 - [x] Split "package-ready" from "public publishing" in release checklists so external publication remains an explicit follow-up decision
+- [x] Add root contribution policy (`CONTRIBUTING.md`) covering branch workflow, PR quality gates, and release-impact rules
+- [x] Add repository templates for pull requests and issues (`.github/pull_request_template.md`, `.github/ISSUE_TEMPLATE/*`)
+- [x] Add CODEOWNERS ownership map for Qiskit and PennyLane critical paths with maintainer fallback
+- [ ] Enable/enforce main branch protection with required CODEOWNERS review and maintainer final approval for protected paths
 
 ### Future Distribution Follow-On
 

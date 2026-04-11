@@ -55,6 +55,12 @@ class RouteAwareCORSMiddleware(BaseHTTPMiddleware):
             settings.api_key_header,
             settings.metrics_token_header,
             settings.request_id_header,
+            settings.gateway_service_token_header,
+            settings.gateway_project_slug_header,
+            settings.gateway_owner_user_id_header,
+            settings.gateway_api_key_id_header,
+            settings.gateway_ibm_profile_id_header,
+            settings.gateway_client_key_id_header,
         )
         self._runtime_expose_headers = (
             settings.request_id_header,
@@ -85,10 +91,18 @@ class RouteAwareCORSMiddleware(BaseHTTPMiddleware):
         if path == self._settings.metrics_path:
             return None
 
+        if self._settings.requires_gateway_internal_auth(path):
+            return CorsPolicy(
+                allow_all=False,
+                allowed_origins=(),
+                expose_headers=(),
+            )
+
         if (
             self._settings.public_api_cors_allow_all
             and path.startswith(self._settings.api_prefix.rstrip("/"))
             and not self._settings.requires_user_jwt(path)
+            and not self._settings.requires_gateway_internal_auth(path)
         ):
             return CorsPolicy(
                 allow_all=True,
@@ -209,7 +223,63 @@ class SecurityObservabilityMiddleware(BaseHTTPMiddleware):
                         client_ip=client_ip,
                     )
 
-            if self._settings.auth_enabled and self._settings.requires_user_jwt(request.scope["path"]):
+            if self._settings.requires_gateway_internal_auth(request.scope["path"]):
+                if self._should_apply_rate_limits():
+                    ip_result = await self._rate_limiter.check_ip(client_ip=client_ip)
+                    if not ip_result.allowed:
+                        RATE_LIMIT_REJECTIONS_TOTAL.labels(reason=ip_result.reason).inc()
+                        response = self._rate_limited_response(ip_result, request_id=request_id)
+                        return self._finalize_response(
+                            request=request,
+                            response=response,
+                            started_at=started_at,
+                            path_label=path_label,
+                            client_ip=client_ip,
+                        )
+
+                gateway_auth = await self._authenticate_gateway_internal_request(request)
+                if gateway_auth is None:
+                    AUTH_FAILURES_TOTAL.labels(reason="gateway_service_token").inc()
+                    response = self._error_response(
+                        status_code=401,
+                        error="auth_required",
+                        message=self._friendly_auth_message(auth_target="gateway_service_token"),
+                        request_id=request_id,
+                    )
+                    return self._finalize_response(
+                        request=request,
+                        response=response,
+                        started_at=started_at,
+                        path_label=path_label,
+                        client_ip=client_ip,
+                    )
+
+                request.state.gateway_project_slug = gateway_auth["project_slug"]
+                request.state.gateway_client_key_id = gateway_auth["client_key_id"]
+                request.state.gateway_ibm_profile_id = gateway_auth["ibm_profile_id"]
+                request.state.api_key_id = gateway_auth["api_key_id"]
+                request.state.api_key_owner_user_id = gateway_auth["owner_user_id"]
+                request.state.auth_user_id = gateway_auth["owner_user_id"]
+                api_key_id_context.set(gateway_auth["api_key_id"])
+
+                if self._should_apply_rate_limits():
+                    key_result = await self._rate_limiter.check_key(
+                        key_id=gateway_auth["api_key_id"],
+                        policy=gateway_auth["policy"],
+                    )
+                    rate_headers.update(key_result.headers)
+                    if not key_result.allowed:
+                        RATE_LIMIT_REJECTIONS_TOTAL.labels(reason=key_result.reason).inc()
+                        response = self._rate_limited_response(key_result, request_id=request_id)
+                        return self._finalize_response(
+                            request=request,
+                            response=response,
+                            started_at=started_at,
+                            path_label=path_label,
+                            client_ip=client_ip,
+                        )
+
+            elif self._settings.auth_enabled and self._settings.requires_user_jwt(request.scope["path"]):
                 if self._should_apply_rate_limits():
                     ip_result = await self._rate_limiter.check_ip(client_ip=client_ip)
                     if not ip_result.allowed:
@@ -425,6 +495,7 @@ class SecurityObservabilityMiddleware(BaseHTTPMiddleware):
                 "client_ip": client_ip,
                 "api_key_id": getattr(request.state, "api_key_id", None),
                 "auth_user_id": getattr(request.state, "auth_user_id", None),
+                "gateway_project_slug": getattr(request.state, "gateway_project_slug", None),
             },
         )
         return response
@@ -466,6 +537,11 @@ class SecurityObservabilityMiddleware(BaseHTTPMiddleware):
             )
         if auth_target == "jwt":
             return "Authentication required: send a valid Supabase JWT in 'Authorization: Bearer <token>'."
+        if auth_target == "gateway_service_token":
+            return (
+                "Authentication required: send a valid Gateway service token in "
+                f"'{self._settings.gateway_service_token_header}' for this endpoint."
+            )
         return (
             "Authentication required: send a valid API key in "
             f"'{self._settings.api_key_header}' for this endpoint."
@@ -497,6 +573,58 @@ class SecurityObservabilityMiddleware(BaseHTTPMiddleware):
                 "key_prefix": key_prefix,
             },
         )
+
+    async def _authenticate_gateway_internal_request(self, request: Request) -> dict[str, object] | None:
+        service_token = request.headers.get(self._settings.gateway_service_token_header)
+        if not service_token or service_token.strip() != self._settings.gateway_service_token.strip():
+            return None
+
+        project_slug = request.headers.get(self._settings.gateway_project_slug_header)
+        owner_user_id = request.headers.get(self._settings.gateway_owner_user_id_header)
+        api_key_id = request.headers.get(self._settings.gateway_api_key_id_header)
+        ibm_profile_id = request.headers.get(self._settings.gateway_ibm_profile_id_header)
+        client_key_id = request.headers.get(self._settings.gateway_client_key_id_header)
+
+        if not project_slug or not owner_user_id or not api_key_id:
+            logger.warning(
+                "gateway_internal_context_missing",
+                extra={
+                    "event": "gateway_internal_context_missing",
+                    "path": request.scope["path"],
+                    "method": request.method,
+                    "project_slug": project_slug,
+                    "owner_user_id": owner_user_id,
+                    "api_key_id": api_key_id,
+                },
+            )
+            return None
+
+        runtime_key = await self._auth_service.authenticate_runtime_key_by_id(
+            owner_user_id=owner_user_id.strip(),
+            key_id=api_key_id.strip(),
+        )
+        if runtime_key is None:
+            logger.warning(
+                "gateway_internal_api_key_rejected",
+                extra={
+                    "event": "gateway_internal_api_key_rejected",
+                    "path": request.scope["path"],
+                    "method": request.method,
+                    "project_slug": project_slug,
+                    "owner_user_id": owner_user_id,
+                    "api_key_id": api_key_id,
+                },
+            )
+            return None
+
+        return {
+            "project_slug": project_slug.strip(),
+            "owner_user_id": owner_user_id.strip(),
+            "api_key_id": runtime_key.key_id,
+            "client_key_id": client_key_id.strip() if isinstance(client_key_id, str) and client_key_id.strip() else None,
+            "ibm_profile_id": ibm_profile_id.strip() if isinstance(ibm_profile_id, str) and ibm_profile_id.strip() else None,
+            "policy": runtime_key.policy,
+        }
 
     @staticmethod
     def _friendly_rate_limit_message(result: RateLimitResult) -> str:

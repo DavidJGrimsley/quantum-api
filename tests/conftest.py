@@ -17,6 +17,7 @@ os.environ.setdefault("DEV_BOOTSTRAP_API_KEY_ENABLED", "true")
 os.environ.setdefault("PUBLIC_API_CORS_ALLOW_ALL", "false")
 os.environ.setdefault("SUPABASE_URL", "https://example.supabase.co")
 os.environ.setdefault("SUPABASE_JWT_AUDIENCE", "authenticated")
+os.environ.setdefault("GATEWAY_SERVICE_TOKEN", "gateway-service-test-token")
 os.environ["IBM_TOKEN"] = ""
 os.environ["IBM_INSTANCE"] = ""
 os.environ["IBM_CHANNEL"] = "ibm_quantum_platform"

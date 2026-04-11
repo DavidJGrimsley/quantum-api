@@ -59,6 +59,8 @@ uv run uvicorn quantum_api.main:app --reload
 
 Open docs at `http://127.0.0.1:8000/docs`.
 
+See `CONTRIBUTING.md` for branch workflow, review policy, and PR quality gates.
+
 For local development, use API key `qapi_devlocal_0123456789abcdef0123456789abcdef` with the default `.env.example` values.
 
 Optional Phase 5 extras:

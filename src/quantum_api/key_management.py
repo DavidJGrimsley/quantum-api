@@ -250,6 +250,18 @@ class ApiKeyLifecycleService:
                 return None
             return self._to_runtime(model)
 
+    async def find_active_runtime_key_by_id(
+        self,
+        *,
+        key_id: str,
+        owner_user_id: str,
+    ) -> RuntimeApiKey | None:
+        async with self._database.session() as session:
+            model = await session.get(ApiKeyRecordModel, key_id)
+            if model is None or model.owner_user_id != owner_user_id or model.status != "active":
+                return None
+            return self._to_runtime(model)
+
     async def list_user_keys(self, *, owner_user_id: str) -> list[KeyMetadata]:
         async with self._database.session() as session:
             statement = (

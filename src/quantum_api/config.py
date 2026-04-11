@@ -6,6 +6,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _DEFAULT_HASH_SECRET = "dev-only-change-me"
+_DEFAULT_GATEWAY_SERVICE_CREDENTIAL = "gateway-dev-only-change-me"
 
 
 class Settings(BaseSettings):
@@ -43,6 +44,38 @@ class Settings(BaseSettings):
     api_key_prefix_length: int = Field(default=12, alias="API_KEY_PREFIX_LENGTH", ge=6, le=24)
     api_key_secret_length: int = Field(default=40, alias="API_KEY_SECRET_LENGTH", ge=16, le=128)
     api_key_cache_ttl_seconds: int = Field(default=90, alias="API_KEY_CACHE_TTL_SECONDS", ge=5, le=86400)
+    gateway_service_token: str = Field(
+        default=_DEFAULT_GATEWAY_SERVICE_CREDENTIAL,
+        alias="GATEWAY_SERVICE_TOKEN",
+    )
+    gateway_service_token_header: str = Field(
+        default="X-Gateway-Service-Token",
+        alias="GATEWAY_SERVICE_TOKEN_HEADER",
+    )
+    gateway_internal_api_prefix: str = Field(
+        default="/internal/gateway/v1",
+        alias="GATEWAY_INTERNAL_API_PREFIX",
+    )
+    gateway_project_slug_header: str = Field(
+        default="X-Gateway-Project-Slug",
+        alias="GATEWAY_PROJECT_SLUG_HEADER",
+    )
+    gateway_owner_user_id_header: str = Field(
+        default="X-Gateway-Owner-User-Id",
+        alias="GATEWAY_OWNER_USER_ID_HEADER",
+    )
+    gateway_api_key_id_header: str = Field(
+        default="X-Gateway-Api-Key-Id",
+        alias="GATEWAY_API_KEY_ID_HEADER",
+    )
+    gateway_ibm_profile_id_header: str = Field(
+        default="X-Gateway-Ibm-Profile-Id",
+        alias="GATEWAY_IBM_PROFILE_ID_HEADER",
+    )
+    gateway_client_key_id_header: str = Field(
+        default="X-Gateway-Client-Key-Id",
+        alias="GATEWAY_CLIENT_KEY_ID_HEADER",
+    )
 
     default_key_rate_limit_per_second: int = Field(
         default=10,
@@ -168,6 +201,10 @@ class Settings(BaseSettings):
         prefix = self.api_prefix.rstrip("/")
         return path.startswith(f"{prefix}/keys") or path.startswith(f"{prefix}/ibm/profiles")
 
+    def requires_gateway_internal_auth(self, path: str) -> bool:
+        prefix = self.gateway_internal_api_prefix.rstrip("/")
+        return path.startswith(prefix)
+
     @property
     def supabase_jwt_issuer_effective(self) -> str:
         explicit = self.supabase_jwt_issuer.strip()
@@ -197,6 +234,8 @@ class Settings(BaseSettings):
                 raise ValueError("DATABASE_AUTO_CREATE must be false in staging/production")
             if self.api_key_hash_secret.strip() == _DEFAULT_HASH_SECRET:
                 raise ValueError("API_KEY_HASH_SECRET must be changed in staging/production")
+            if self.gateway_service_token.strip() == _DEFAULT_GATEWAY_SERVICE_CREDENTIAL:
+                raise ValueError("GATEWAY_SERVICE_TOKEN must be changed in staging/production")
 
         if self.auth_enabled:
             if not self.database_url.strip():
