@@ -622,6 +622,17 @@ Tooling note:
 - JS SDK verification also needs Node.js, npm, and the TypeScript toolchain.
 - Engine deliverables require their native toolchains for real packaging validation.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the branch workflow, review expectations, and pull request checklist.
+
+Short version:
+
+- branch from `main`
+- run `uv run ruff check .`
+- run relevant `uv run pytest ...` coverage for your change
+- update docs and `CHANGELOG.md` when public behavior changes
+
 Optional performance benchmarks (non-blocking, not run in CI by default):
 
 ```bash

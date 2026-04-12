@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Contributing guide
+    about: Read the contributor workflow, review expectations, and quality checks first.
+    url: https://github.com/DavidJGrimsley/quantum-api/blob/main/CONTRIBUTING.md
+  - name: Private security report
+    about: Report sensitive security issues privately instead of opening a public issue.
+    url: https://github.com/DavidJGrimsley/quantum-api/security/advisories/new
