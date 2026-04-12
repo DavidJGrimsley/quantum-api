@@ -423,18 +423,18 @@ For now, `@DavidJGrimsley` remains the actual GitHub approver on pull requests. 
 
 ### Qiskit expert sign-offs
 
-- [ ] `src/quantum_api/services/quantum_runtime.py` - expert: <GitHub profile link> - status: pending
-- [ ] `src/quantum_api/services/qiskit_common/` - expert: <GitHub profile link> - status: pending
-- [ ] `src/quantum_api/services/algorithms/` - expert: <GitHub profile link> - status: pending
-- [ ] `src/quantum_api/services/optimization/` - expert: <GitHub profile link> - status: pending
-- [ ] `src/quantum_api/services/finance/` - expert: <GitHub profile link> - status: pending
-- [ ] `src/quantum_api/services/machine_learning/` - expert: <GitHub profile link> - status: pending
-- [ ] `src/quantum_api/services/nature/` - expert: <GitHub profile link> - status: pending
-- [ ] `src/quantum_api/services/experiments/` - expert: <GitHub profile link> - status: pending
+- [ ] `src/quantum_api/services/quantum_runtime.py` - expert: [GitHub profile link](https://github.com/USERNAME) - status: pending
+- [ ] `src/quantum_api/services/qiskit_common/` - expert: [GitHub profile link](https://github.com/USERNAME) - status: pending
+- [ ] `src/quantum_api/services/algorithms/` - expert: [GitHub profile link](https://github.com/USERNAME) - status: pending
+- [ ] `src/quantum_api/services/optimization/` - expert: [GitHub profile link](https://github.com/USERNAME) - status: pending
+- [ ] `src/quantum_api/services/finance/` - expert: [GitHub profile link](https://github.com/USERNAME) - status: pending
+- [ ] `src/quantum_api/services/machine_learning/` - expert: [GitHub profile link](https://github.com/USERNAME) - status: pending
+- [ ] `src/quantum_api/services/nature/` - expert: [GitHub profile link](https://github.com/USERNAME) - status: pending
+- [ ] `src/quantum_api/services/experiments/` - expert: [GitHub profile link](https://github.com/USERNAME) - status: pending
 
 Reviewers should also use `project/questions.md` as the running list of senior Qiskit review questions when evaluating architecture and correctness.
 
 ### PennyLane expert sign-offs
 
-- [ ] `sdk/pennylane/` - expert: <GitHub profile link> - status: pending
-- [ ] `tests/test_pennylane_plugin.py` - expert: <GitHub profile link> - status: pending
+- [ ] `sdk/pennylane/` - expert: [GitHub profile link](https://github.com/USERNAME) - status: pending
+- [ ] `tests/test_pennylane_plugin.py` - expert: [GitHub profile link](https://github.com/USERNAME) - status: pending

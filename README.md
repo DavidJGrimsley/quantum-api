@@ -630,7 +630,7 @@ Short version:
 
 - branch from `main`
 - run `uv run ruff check .`
-- run relevant `uv run pytest ...` coverage for your change
+- run relevant `uv run pytest ...` tests for your change
 - update docs and `CHANGELOG.md` when public behavior changes
 
 Optional performance benchmarks (non-blocking, not run in CI by default):
