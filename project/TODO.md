@@ -413,3 +413,28 @@ Goal: keep the platform stable as capabilities grow.
 - This roadmap targets broad Qiskit coverage over multiple phases.
 - "Complete" means practical platform completeness, not a one-to-one mirror of every internal Qiskit API symbol.
 - Endpoint names in future phases should be finalized once schemas are locked, but the capability goals in this file are the source of truth.
+
+
+## Expert Sign-offs
+
+These Qiskit- and PennyLane-related areas were heavily AI-assisted and need human domain review before we treat them as fully trusted quantum computing code. A sign-off means the reviewer read the relevant package, ran or inspected the relevant tests, requested changes if needed, and only then marked the item complete with their GitHub profile link inline.
+
+For now, `@DavidJGrimsley` remains the actual GitHub approver on pull requests. This section is the review ledger until dedicated outside Qiskit and PennyLane experts are formally added to the repository workflow.
+
+### Qiskit expert sign-offs
+
+- [ ] `src/quantum_api/services/quantum_runtime.py` - expert: [GitHub profile link](https://github.com/USERNAME) - status: pending
+- [ ] `src/quantum_api/services/qiskit_common/` - expert: [GitHub profile link](https://github.com/USERNAME) - status: pending
+- [ ] `src/quantum_api/services/algorithms/` - expert: [GitHub profile link](https://github.com/USERNAME) - status: pending
+- [ ] `src/quantum_api/services/optimization/` - expert: [GitHub profile link](https://github.com/USERNAME) - status: pending
+- [ ] `src/quantum_api/services/finance/` - expert: [GitHub profile link](https://github.com/USERNAME) - status: pending
+- [ ] `src/quantum_api/services/machine_learning/` - expert: [GitHub profile link](https://github.com/USERNAME) - status: pending
+- [ ] `src/quantum_api/services/nature/` - expert: [GitHub profile link](https://github.com/USERNAME) - status: pending
+- [ ] `src/quantum_api/services/experiments/` - expert: [GitHub profile link](https://github.com/USERNAME) - status: pending
+
+Reviewers should also use `project/questions.md` as the running list of senior Qiskit review questions when evaluating architecture and correctness.
+
+### PennyLane expert sign-offs
+
+- [ ] `sdk/pennylane/` - expert: [GitHub profile link](https://github.com/USERNAME) - status: pending
+- [ ] `tests/test_pennylane_plugin.py` - expert: [GitHub profile link](https://github.com/USERNAME) - status: pending

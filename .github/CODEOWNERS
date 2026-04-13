@@ -1,0 +1,23 @@
+# Default owner for the repository.
+* @DavidJGrimsley
+
+# Runtime and public contract surfaces.
+/src/quantum_api/api/ @DavidJGrimsley
+/src/quantum_api/models/ @DavidJGrimsley
+/src/quantum_api/services/quantum_runtime.py @DavidJGrimsley
+/src/quantum_api/services/qiskit_common/ @DavidJGrimsley
+/src/quantum_api/services/algorithms/ @DavidJGrimsley
+/src/quantum_api/services/optimization/ @DavidJGrimsley
+/src/quantum_api/services/finance/ @DavidJGrimsley
+/src/quantum_api/services/machine_learning/ @DavidJGrimsley
+/src/quantum_api/services/nature/ @DavidJGrimsley
+/src/quantum_api/services/experiments/ @DavidJGrimsley
+
+# Packaging, release, and governance files.
+/sdk/pennylane/ @DavidJGrimsley
+/pyproject.toml @DavidJGrimsley
+/.github/workflows/ @DavidJGrimsley
+/CONTRIBUTING.md @DavidJGrimsley
+/docs/sdk/release-governance.md @DavidJGrimsley
+/project/style.md @DavidJGrimsley
+/project/TODO.md @DavidJGrimsley
