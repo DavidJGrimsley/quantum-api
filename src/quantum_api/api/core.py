@@ -12,15 +12,12 @@ from quantum_api.models.api import (
     GateRunRequest,
     GateRunResponse,
     HealthResponse,
-    RandomIntRequest,
-    RandomIntResponse,
     TextTransformRequest,
     TextTransformResponse,
 )
 from quantum_api.services.circuit_runner import run_circuit
 from quantum_api.services.gate_runner import run_gate
 from quantum_api.services.quantum_runtime import runtime
-from quantum_api.services.randomness import generate_random
 from quantum_api.services.text_transform import transform_text
 
 router = APIRouter()
@@ -73,18 +70,6 @@ def circuits_run(request: CircuitRunRequest) -> CircuitRunResponse:
         )
     payload = run_circuit(request)
     return CircuitRunResponse.model_validate(payload)
-
-
-@router.post(
-    "/random",
-    response_model=RandomIntResponse,
-    summary="Generate a bounded random integer locally",
-    description="Inclusive signed 32-bit bounds. Uses Qiskit simulation or an explicitly labeled classical fallback.",
-)
-def random_integer(request: RandomIntRequest) -> RandomIntResponse:
-    if get_settings().require_qiskit and not runtime.qiskit_available:
-        raise HTTPException(status_code=503, detail="qiskit is unavailable and REQUIRE_QISKIT=true")
-    return generate_random(request.min, request.max)
 
 
 @router.post("/text/transform", response_model=TextTransformResponse)

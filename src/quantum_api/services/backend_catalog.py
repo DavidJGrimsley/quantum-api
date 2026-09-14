@@ -108,20 +108,6 @@ def clear_backend_catalog_cache() -> None:
     clear_ibm_provider_cache()
 
 
-def ensure_backend_is_hardware(*, backend_name: str, provider: BackendProvider, backend: Any) -> None:
-    configuration = _safe_backend_configuration(backend)
-    simulator = getattr(configuration, "simulator", None)
-    if simulator is None:
-        simulator = getattr(backend, "simulator", None)
-    if provider != "ibm" or simulator is not False:
-        raise QuantumApiServiceError(
-            error="hardware_backend_required",
-            message="Random hardware jobs require a verified non-simulator IBM backend.",
-            status_code=400,
-            details={"backend_name": backend_name, "provider": provider},
-        )
-
-
 def ensure_backend_supports_qubits(
     *,
     backend_name: str,

@@ -182,7 +182,6 @@ def endpoint_display_sort_key(path: str) -> tuple[int, int, str]:
     priority_prefixes = (
         "/v1/gates",
         "/v1/circuits",
-        "/v1/random",
         "/v1/list_backends",
         "/v1/transpile",
         "/v1/qasm",

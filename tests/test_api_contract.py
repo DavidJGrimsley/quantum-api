@@ -78,7 +78,7 @@ def _materialize_portfolio_request(
             request_body["profile_name"] = "IBM Portfolio Smoke"
         if original_path == "/v1/keys" and str(endpoint["method"]).upper() == "POST":
             request_body["name"] = "Portfolio smoke key"
-        if original_path in {"/v1/jobs/circuits", "/v1/jobs/qasm", "/v1/jobs/random", "/v1/transpile"}:
+        if original_path in {"/v1/jobs/circuits", "/v1/jobs/qasm", "/v1/transpile"}:
             request_body.pop("ibm_profile", None)
 
     return path, query_params, request_body
@@ -129,8 +129,6 @@ def test_portfolio_metadata_contract(unauth_client):
     assert ("GET", "/v1/ibm/profiles") in by_signature
     assert ("POST", "/v1/jobs/circuits") in by_signature
     assert ("POST", "/v1/jobs/qasm") in by_signature
-    assert ("POST", "/v1/jobs/random") in by_signature
-    assert ("POST", "/v1/random") in by_signature
     assert ("GET", "/v1/jobs/{job_id}") in by_signature
     assert ("POST", "/v1/qasm/run") in by_signature
     assert ("POST", "/v1/optimization/qaoa") in by_signature
@@ -149,8 +147,6 @@ def test_portfolio_metadata_contract(unauth_client):
     assert by_signature[("GET", "/v1/ibm/profiles")]["auth"] == "bearer_jwt"
     assert by_signature[("POST", "/v1/jobs/circuits")]["auth"] == "api_key"
     assert by_signature[("POST", "/v1/jobs/qasm")]["auth"] == "api_key"
-    assert by_signature[("POST", "/v1/jobs/random")]["auth"] == "api_key"
-    assert by_signature[("POST", "/v1/random")]["auth"] == "api_key"
     assert by_signature[("GET", "/v1/jobs/{job_id}")]["auth"] == "api_key"
     assert by_signature[("POST", "/v1/qasm/run")]["auth"] == "api_key"
     assert by_signature[("POST", "/v1/optimization/qaoa")]["auth"] == "api_key"
@@ -203,14 +199,6 @@ def test_openapi_declares_security_schemes_for_docs(unauth_client):
     assert security_schemes["BearerAuth"]["scheme"] == "bearer"
 
     assert payload["paths"]["/v1/echo-types"]["get"]["security"] == [{"ApiKeyAuth": []}]
-    assert payload["paths"]["/v1/random"]["post"]["security"] == [{"ApiKeyAuth": []}]
-    assert payload["paths"]["/v1/jobs/random"]["post"]["security"] == [{"ApiKeyAuth": []}]
-    assert payload["paths"]["/v1/random"]["post"]["requestBody"]["content"]["application/json"]["schema"] == {
-        "$ref": "#/components/schemas/RandomIntRequest"
-    }
-    assert payload["paths"]["/v1/random"]["post"]["responses"]["200"]["content"]["application/json"]["schema"] == {
-        "$ref": "#/components/schemas/RandomIntResponse"
-    }
     assert payload["paths"]["/v1/optimization/qaoa"]["post"]["security"] == [{"ApiKeyAuth": []}]
     assert payload["paths"]["/v1/keys"]["get"]["security"] == [{"BearerAuth": []}]
     assert payload["paths"]["/v1/ibm/profiles"]["get"]["security"] == [{"BearerAuth": []}]
