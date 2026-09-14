@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from quantum_api.config import get_settings
 from quantum_api.models.common import ErrorResponse
-from quantum_api.models.core import Amplitude, CircuitDefinition
+from quantum_api.models.core import Amplitude, CircuitDefinition, RandomIntRequest
 
 BackendProvider = Literal["aer", "ibm"]
 HardwareJobProvider = Literal["ibm"]
@@ -295,6 +295,26 @@ class QasmJobSubmitRequest(BaseModel):
         return value
 
 
+class RandomJobSubmitRequest(RandomIntRequest):
+    provider: HardwareJobProvider = "ibm"
+    backend_name: str = Field(min_length=1)
+    ibm_profile: str | None = Field(default=None, min_length=1)
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {"min": 0, "max": 1, "provider": "ibm", "backend_name": "ibm_kyiv"}
+        },
+    )
+
+
+class RandomJobResultData(BaseModel):
+    value: int
+    source: Literal["ibm-hardware"] = "ibm-hardware"
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class CircuitJobSubmitResponse(BaseModel):
     job_id: str
     provider: HardwareJobProvider
@@ -333,6 +353,6 @@ class CircuitJobResultData(BaseModel):
 class CircuitJobResultResponse(BaseModel):
     job_id: str
     status: Literal["succeeded"] = "succeeded"
-    result: CircuitJobResultData
+    result: CircuitJobResultData | RandomJobResultData
 
     model_config = ConfigDict(extra="forbid")
