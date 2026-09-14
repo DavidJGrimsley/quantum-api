@@ -20,6 +20,7 @@ dist/
 
 # Environment
 .env
+tests/godot/quantum_api_client_harness/addons/
 
 # Editors and OS
 .vscode/

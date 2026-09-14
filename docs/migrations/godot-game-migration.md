@@ -70,7 +70,7 @@ Create a single source for base URL in the game codebase.
 Recommended implementation:
 
 - introduce a shared runtime client at `addons/quantum_api_client/quantum_api_client.gd`
-- keep the promoted reusable copy in this repo at `sdk/godot/addons/quantum_api_client/`
+- keep the canonical reusable copy in this repo at `addons/quantum_api_client/`
 - let that client normalize both:
   - `https://<your-domain>/public-facing/api/quantum`
   - `https://<your-domain>/public-facing/api/quantum/v1`
@@ -153,7 +153,7 @@ Recommended test order:
 1. Make sure the API itself is reachable:
    - local: `http://127.0.0.1:8000/v1/health`
    - mounted: `https://<your-domain>/public-facing/api/quantum/v1/health`
-2. Copy `sdk/godot/addons/quantum_api_client/` into the target Godot project as `addons/quantum_api_client/`.
+2. Copy `addons/quantum_api_client/` from this repository into the target Godot project as `addons/quantum_api_client/`.
 3. Configure the client in a test scene:
    - backend-proxy mode for shipped-like testing
    - direct mode plus `X-API-Key` only for local/dev/demo testing
