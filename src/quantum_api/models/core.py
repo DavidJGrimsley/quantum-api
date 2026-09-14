@@ -8,6 +8,26 @@ from quantum_api.config import get_settings
 from quantum_api.enums import GateType
 
 
+class RandomIntRequest(BaseModel):
+    min: int = Field(strict=True, ge=-2147483648, le=2147483647)
+    max: int = Field(strict=True, ge=-2147483648, le=2147483647)
+
+    model_config = ConfigDict(extra="forbid", json_schema_extra={"example": {"min": 0, "max": 1}})
+
+    @model_validator(mode="after")
+    def validate_range(self) -> RandomIntRequest:
+        if self.min > self.max:
+            raise ValueError("min must be less than or equal to max")
+        return self
+
+
+class RandomIntResponse(BaseModel):
+    value: int
+    source: Literal["qiskit-simulator", "classical-fallback"]
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class GateRunRequest(BaseModel):
     gate_type: GateType
     rotation_angle_rad: float | None = None

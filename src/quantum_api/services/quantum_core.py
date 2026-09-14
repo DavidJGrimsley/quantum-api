@@ -99,6 +99,10 @@ class Qubit:
         return p0 / total, p1 / total
 
     def measure(self, rng: random.Random | None = None) -> int:
+        if rng is None and self._state is not None and runtime.qiskit_available:
+            outcome, self._state = self._state.measure()
+            self._sync_from_statevector()
+            return int(outcome)
         random_source = rng or random.Random()
         p0, _ = self.probabilities()
         measured = 0 if random_source.random() < p0 else 1

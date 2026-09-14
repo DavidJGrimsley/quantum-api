@@ -4,8 +4,16 @@ from typing import Any
 
 from quantum_api.execution_jobs import ExecutionJobRecord, QuantumExecutionJobService
 from quantum_api.ibm_credentials import ResolvedIbmCredentials
-from quantum_api.models.api import CircuitJobSubmitRequest, QasmJobSubmitRequest
-from quantum_api.services.backend_catalog import ensure_backend_supports_qubits, resolve_backend
+from quantum_api.models.api import (
+    CircuitJobSubmitRequest,
+    QasmJobSubmitRequest,
+    RandomJobSubmitRequest,
+)
+from quantum_api.services.backend_catalog import (
+    ensure_backend_is_hardware,
+    ensure_backend_supports_qubits,
+    resolve_backend,
+)
 from quantum_api.services.circuit_conversion import build_circuit_from_definition, parse_qasm
 from quantum_api.services.ibm_provider import (
     build_ibm_service,
@@ -13,6 +21,11 @@ from quantum_api.services.ibm_provider import (
     runtime_job_error_payload,
 )
 from quantum_api.services.quantum_runtime import runtime
+from quantum_api.services.randomness import (
+    RandomResultError,
+    random_job_shots,
+    random_value_from_result,
+)
 from quantum_api.services.service_errors import ProviderUnavailableError, ResultNotReadyError
 
 
@@ -59,6 +72,57 @@ def _measurement_counts_from_result(raw_result: Any, num_qubits: int) -> dict[st
 class HardwareJobService:
     def __init__(self, job_service: QuantumExecutionJobService) -> None:
         self._job_service = job_service
+
+    async def submit_random_job(
+        self,
+        *,
+        owner_user_id: str,
+        api_key_id: str,
+        request_data: RandomJobSubmitRequest,
+        ibm_credentials: ResolvedIbmCredentials,
+    ) -> ExecutionJobRecord:
+        if not runtime.qiskit_available or any(
+            dependency is None
+            for dependency in (runtime.QuantumCircuit, runtime.transpile, runtime.SamplerV2)
+        ):
+            raise ProviderUnavailableError(provider="ibm", details={"reason": "missing_dependency"})
+        provider, backend = resolve_backend(
+            request_data.backend_name, "ibm", ibm_credentials=ibm_credentials
+        )
+        ensure_backend_is_hardware(
+            backend_name=request_data.backend_name, provider=provider, backend=backend
+        )
+        ensure_backend_supports_qubits(
+            backend_name=request_data.backend_name, provider=provider, backend=backend, required_qubits=1
+        )
+        circuit = runtime.QuantumCircuit(1)
+        circuit.h(0)
+        circuit.measure_all()
+        shots = random_job_shots(request_data.min, request_data.max)
+        try:
+            transpiled = runtime.transpile(circuit, backend)
+            remote_job = runtime.SamplerV2(mode=backend).run([transpiled], shots=shots)
+            status = normalize_runtime_job_status(remote_job.status())
+        except Exception as exc:
+            raise ProviderUnavailableError(
+                provider="ibm", details={"reason": "random_job_submission_failed"}
+            ) from exc
+        request_payload = request_data.model_dump(mode="json")
+        request_payload.update({"job_kind": "random", "shots": shots})
+        return await self._job_service.create_job(
+            owner_user_id=owner_user_id,
+            api_key_id=api_key_id,
+            provider=request_data.provider,
+            backend_name=request_data.backend_name,
+            ibm_profile_name=ibm_credentials.profile_name,
+            credential_instance=ibm_credentials.instance,
+            credential_channel=ibm_credentials.channel,
+            credential_masked_token=ibm_credentials.masked_token,
+            credential_token_ciphertext=ibm_credentials.token_ciphertext,
+            remote_job_id=_remote_job_id(remote_job),
+            status=status,
+            request_payload=request_payload,
+        )
 
     async def submit_circuit_job(
         self,
@@ -188,7 +252,9 @@ class HardwareJobService:
         )
 
     async def refresh_job(self, *, record: ExecutionJobRecord, decrypted_token: str) -> ExecutionJobRecord:
-        if record.status in {"succeeded", "failed", "cancelled"}:
+        if record.status in {"failed", "cancelled"} or (
+            record.status == "succeeded" and record.result_payload is not None
+        ):
             return record
 
         credentials = ResolvedIbmCredentials(
@@ -207,6 +273,8 @@ class HardwareJobService:
         status = normalize_runtime_job_status(remote_job.status())
 
         if status == "succeeded":
+            if record.request_payload.get("job_kind") == "random":
+                return await self._refresh_random_result(record=record, remote_job=remote_job)
             num_qubits_value = record.request_payload.get("num_qubits")
             if num_qubits_value is None:
                 num_qubits_value = record.request_payload["circuit"]["num_qubits"]
@@ -239,6 +307,31 @@ class HardwareJobService:
             status=status,
             result_payload=record.result_payload,
             error_payload=record.error_payload,
+        )
+
+    async def _refresh_random_result(self, *, record: ExecutionJobRecord, remote_job: Any) -> ExecutionJobRecord:
+        try:
+            value = random_value_from_result(
+                remote_job.result(), record.request_payload["min"], record.request_payload["max"]
+            )
+        except Exception as exc:
+            error_payload = {
+                "reason": exc.reason if isinstance(exc, RandomResultError) else "provider_result_unavailable",
+                "message": str(exc) if isinstance(exc, RandomResultError) else "IBM random job result could not be read.",
+            }
+            return await self._job_service.update_job(
+                owner_user_id=record.owner_user_id,
+                job_id=record.job_id,
+                status="failed",
+                result_payload=None,
+                error_payload=error_payload,
+            )
+        return await self._job_service.update_job(
+            owner_user_id=record.owner_user_id,
+            job_id=record.job_id,
+            status="succeeded",
+            result_payload={"value": value, "source": "ibm-hardware"},
+            error_payload=None,
         )
 
     async def cancel_job(self, *, record: ExecutionJobRecord, decrypted_token: str) -> ExecutionJobRecord:
