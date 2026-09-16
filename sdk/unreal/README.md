@@ -2,6 +2,40 @@
 
 `QuantumApi` is a UE 5.8 Runtime plugin for the mounted Quantum API `/v1` contract. It provides Blueprint async actions, never blocks the game thread, and ships as a project plugin.
 
+## Read this first if Unreal/quantum pins look confusing
+
+The Blueprint nodes are async HTTP calls wrapped in Unreal-friendly pins. You do
+not need to be a quantum computing expert to start.
+
+Think of each node like this:
+
+- The white execution pins say when the request starts.
+- The `Request` pins are a form you fill out before sending the request.
+- The `Options` pin is optional auth/proxy override data. Leave it empty for normal use.
+- `On Success` gives you the API response.
+- `On Error` gives you a safe error object instead of freezing gameplay.
+
+Unreal turns C++ names into awkward Blueprint labels. For example,
+`Quantum Api Circuit Definition` means "the small data form that describes a
+quantum circuit." It is not a separate asset, class, or advanced Unreal system.
+
+A `struct` means "a bundle of related fields." A `Circuit Operation` struct is
+one step in a circuit, such as "apply an H gate to qubit 0." An `array` means a
+list. So "array of circuit operation structures" just means "the ordered list of
+gate steps in the circuit."
+
+If you are brand new, start with these nodes in this order:
+
+1. `Health Check`
+2. `Run Gate`
+3. `Generate Random Int`
+4. `Run Circuit`
+5. `List Backends`
+6. `Submit Random Job`
+
+Do not start with `Run Circuit` unless you specifically want to build a multi-step
+quantum circuit. `Run Gate` and `Generate Random Int` are much easier first tests.
+
 ## Install
 
 1. Copy `sdk/unreal` to `<YourProject>/Plugins/QuantumApi`.
@@ -38,6 +72,72 @@ The source-controlled UE 5.8 build harness is [Examples/QuantumApiDemo](Examples
 For a release, distribute the `QuantumApi` plugin directory (descriptor, `Config`, `Source`, `Resources`, and UE-version-matched binaries when applicable), not the demo or any credentials. Validate the release in a newly created blank consumer project: enable the plugin, configure a non-secret proxy URL, build Development Editor and Shipping, package Win64, and confirm the packaged game reaches the proxy without exposing an upstream API key.
 
 ## Blueprint surface
+
+### The three easiest nodes
+
+`Health Check` confirms the service is reachable. It does not need a request
+body.
+
+`Run Gate` runs one simple gate. For the demo flow:
+
+- `GateType`: `rotation`
+- `bSendRotationAngle`: checked
+- `RotationAngleRad`: `1.57079632679`
+
+That angle is pi/2. The response includes `Measurement`, usually `0` or `1`.
+
+`Generate Random Int` asks the QRNG endpoint for a bounded integer:
+
+- `Min`: lowest allowed value
+- `Max`: highest allowed value
+
+For a coin-flip style test, use `Min = 0` and `Max = 1`.
+
+### What the Run Circuit pins mean
+
+`Run Circuit` is for a circuit with one or more operations. In plain English,
+you are saying: "create N qubits, run this ordered list of gates, then measure
+the result this many times."
+
+The pins from the split request struct mean:
+
+- `Request Circuit Num Qubits`: how many qubits/wires the circuit has. Start with `1`.
+- `Request Circuit Operations`: the list of gate steps to run, in order.
+- `Request Shots`: how many times to sample the circuit. Start with `1024`.
+- `Request Include Statevector`: advanced simulator output. Leave unchecked at first.
+- `Request Send Seed`: whether to send a deterministic simulator seed. Leave unchecked at first.
+- `Request Seed`: the seed value. It only matters if `Request Send Seed` is checked.
+- `Options`: optional per-call auth/proxy overrides. Leave it empty for normal project settings.
+
+To build `Request Circuit Operations` in Blueprint, make an array of
+`Quantum Api Circuit Operation` values. Each value is one gate instruction:
+
+- `Gate`: gate name such as `h`, `x`, `rx`, `ry`, `rz`, or `cx`.
+- `Target`: the qubit index the gate acts on. The first qubit is `0`.
+- `bSendTheta` and `Theta`: only needed for rotation gates like `rx`, `ry`, `rz`.
+- `bSendControl` and `Control`: only needed for controlled gates like `cx`.
+
+Tiny first circuit example:
+
+- `Num Qubits`: `1`
+- `Operations`: one operation with `Gate = h`, `Target = 0`
+- `Shots`: `1024`
+- `Include Statevector`: unchecked
+- `Send Seed`: unchecked
+
+That creates one qubit, puts it into a superposition with an H gate, and samples
+the result.
+
+### What Request Options means
+
+Most projects can leave `Options` alone. It exists for advanced cases:
+
+- `Override Api Key`: use a different API key for this one call.
+- `Override Bearer Token`: send a different user/proxy token for this one call.
+- `Extra Headers`: send custom headers to your own backend proxy.
+
+For game-jam/direct-key testing, configure Project Settings -> Quantum API and
+leave `Options` empty on the nodes.
 
 Typed success payloads are available for:
 
