@@ -6,9 +6,14 @@
   "Description": "Blueprint-friendly runtime HTTP client for the Quantum API mounted /v1 contract, including QRNG and jobs.",
   "Category": "Networking",
   "CreatedBy": "Quantum API",
+  "CreatedByURL": "https://davidjgrimsley.com/",
+  "DocsURL": "https://davidjgrimsley.com/public-facing/api/quantum/ue-plugin",
+  "MarketplaceURL": "",
+  "SupportURL": "https://davidjgrimsley.com/contact",
   "EnabledByDefault": false,
   "CanContainContent": false,
   "IsBetaVersion": true,
+  "IsExperimentalVersion": false,
   "Installed": false,
   "Modules": [
     {

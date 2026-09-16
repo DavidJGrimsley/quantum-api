@@ -110,7 +110,9 @@ The pins from the split request struct mean:
 - `Options`: optional per-call auth/proxy overrides. Leave it empty for normal project settings.
 
 To build `Request Circuit Operations` in Blueprint, make an array of
-`Quantum Api Circuit Operation` values. Each value is one gate instruction:
+`Quantum Api Circuit Operation` values. If you promote the pin to a variable,
+you can set the default values in the Details panel instead of building the list
+from scratch every time. Each value is one gate instruction:
 
 - `Gate`: gate name such as `h`, `x`, `rx`, `ry`, `rz`, or `cx`.
 - `Target`: the qubit index the gate acts on. The first qubit is `0`.
