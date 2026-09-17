@@ -11,8 +11,9 @@ class QUANTUMAPI_API UQuantumApiSettings : public UDeveloperSettings
     GENERATED_BODY()
 
 public:
-    UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Quantum API")
-    FString BaseUrl = TEXT("http://127.0.0.1:8000/v1");
+    /** Hidden from Project Settings; advanced/self-hosted users can still override it in DefaultGame.ini. */
+    UPROPERTY(Config)
+    FString BaseUrl = TEXT("https://davidjgrimsley.com/public-facing/api/quantum/v1");
 
     UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Quantum API")
     EQuantumApiAuthMode AuthMode = EQuantumApiAuthMode::BackendProxy;

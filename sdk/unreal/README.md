@@ -44,7 +44,6 @@ quantum circuit. `Run Gate` and `Generate Random Int` are much easier first test
 
 ```ini
 [/Script/QuantumApi.QuantumApiSettings]
-BaseUrl="https://davidjgrimsley.com/public-facing/api/quantum/v1"
 AuthMode=BackendProxy
 ApiKey=
 bUseEnvironmentApiKey=True
@@ -62,6 +61,7 @@ The source-controlled UE 5.8 build harness is [Examples/QuantumApiDemo](Examples
 
 - **Direct API Key** sends `X-API-Key` from Plugin Settings or per-call request options. For local development it first reads `QUANTUM_API_KEY` from the developer machine, then falls back to the Plugin Settings value. Restart Unreal after changing an environment variable. It is for local development, demos, and game jams only: a key packaged into a client can be extracted.
 - **Backend Proxy** never sends the configured API key. Supply your own bearer/custom headers when your proxy needs them, and keep the upstream key server-side.
+- The hosted API base URL is built into the plugin and hidden from Project Settings. Advanced/self-hosted projects can still override `BaseUrl` manually in `Config/DefaultGame.ini`.
 - The plugin intentionally does **not** create/revoke API keys or store/edit IBM credentials. For IBM routes, it accepts only an `ibm_profile` name; the service resolves that profile for the key owner. You can set a non-secret `DefaultIbmProfile` in Project Settings, then override it per Blueprint request when needed.
 - Credential values are never logged by the plugin.
 

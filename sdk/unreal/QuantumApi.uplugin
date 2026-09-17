@@ -4,7 +4,7 @@
   "VersionName": "0.2.0-beta",
   "FriendlyName": "Quantum API",
   "Description": "Blueprint-friendly runtime HTTP client for the Quantum API mounted /v1 contract, including QRNG and jobs.",
-  "Category": "Networking",
+  "Category": "Engine Tools",
   "CreatedBy": "Quantum API",
   "CreatedByURL": "https://davidjgrimsley.com/",
   "DocsURL": "https://davidjgrimsley.com/public-facing/api/quantum/ue-plugin",
