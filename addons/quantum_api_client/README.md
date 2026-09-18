@@ -80,7 +80,11 @@ Use these values for the current AssetLib submission form:
 - License: Apache-2.0
 - Repository URL: https://github.com/DavidJGrimsley/quantum-api
 - Install Path Inside ZIP: addons/quantum_api_client
-- Icon URL (direct): https://i.imgur.com/mbMnGVA.jpeg
+- Icon URL (direct, after tagging): `https://raw.githubusercontent.com/DavidJGrimsley/quantum-api/godot-v0.1.2/addons/quantum_api_client/icon.png`
+
+The icon is included in this addon folder so the Asset Library archive contains
+the same branding. In the Asset Library form, use the direct `raw.githubusercontent.com`
+URL above after the `godot-v0.1.2` tag exists.
 
 ## Base URL Behavior
 
