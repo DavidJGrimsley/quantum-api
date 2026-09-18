@@ -97,11 +97,11 @@ void SetOptionalString(const TSharedRef<FJsonObject>& JsonObject, const TCHAR* F
 }
 
 FQuantumApiClient::FQuantumApiClient(const UQuantumApiSettings* InSettings, TSharedPtr<IQuantumApiTransport> InTransport)
-    : BaseUrl(InSettings ? InSettings->GetNormalizedBaseUrl() : TEXT(""))
-    , DefaultApiKey(InSettings ? InSettings->GetResolvedApiKey() : TEXT(""))
-    , DefaultBearerToken(InSettings ? InSettings->BearerToken : TEXT(""))
+    : BaseUrl(InSettings ? InSettings->GetResolvedBaseUrl() : TEXT(""))
+    , DefaultApiKey(InSettings ? InSettings->ApiKey : TEXT(""))
     , DefaultIbmProfile(InSettings ? InSettings->GetDefaultIbmProfile() : TEXT(""))
-    , AuthMode(InSettings ? InSettings->AuthMode : EQuantumApiAuthMode::BackendProxy)
+    , DefaultIbmHardwareBackend(InSettings ? InSettings->GetDefaultIbmHardwareBackend() : TEXT(""))
+    , AuthMode(InSettings ? InSettings->AuthMode : EQuantumApiAuthMode::DirectApiKey)
     , RequestTimeoutSeconds(InSettings ? InSettings->RequestTimeoutSeconds : 10.0f)
     , MaxReadRetries(InSettings ? InSettings->MaxReadRetries : 2)
     , MaxRetryDelaySeconds(InSettings ? InSettings->MaxRetryDelaySeconds : 5.0f)
@@ -225,12 +225,23 @@ void FQuantumApiClient::ListBackends(const FQuantumApiBackendListRequest& Reques
 
 void FQuantumApiClient::Transpile(const FQuantumApiTranspileRequest& Request, const FQuantumApiRequestOptions& Options, FQuantumApiJsonDelegate OnSuccess, FQuantumApiErrorDelegate OnError) const
 {
+    FString BackendName = Request.BackendName;
+    BackendName.TrimStartAndEndInline();
+    if (BackendName.IsEmpty() && (Request.Provider.IsEmpty() || Request.Provider.Equals(TEXT("ibm"), ESearchCase::IgnoreCase)))
+    {
+        BackendName = ResolveIbmHardwareBackend(Request.BackendName);
+    }
+    if (BackendName.IsEmpty())
+    {
+        OnError.ExecuteIfBound(BuildClientError(TEXT("invalid_request"), TEXT("Transpile requires a Backend Name or a configured Default IBM Hardware Backend.")));
+        return;
+    }
     const TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
-    JsonObject->SetStringField(TEXT("backend_name"), Request.BackendName);
+    JsonObject->SetStringField(TEXT("backend_name"), BackendName);
     JsonObject->SetNumberField(TEXT("optimization_level"), Request.OptimizationLevel);
     JsonObject->SetStringField(TEXT("output_qasm_version"), Request.OutputQasmVersion);
     SetOptionalString(JsonObject, TEXT("provider"), Request.Provider);
-    const FString IbmProfile = ShouldUseDefaultIbmProfile(Request.Provider, Request.BackendName, false) ? ResolveIbmProfile(Request.IbmProfile) : Request.IbmProfile;
+    const FString IbmProfile = ShouldUseDefaultIbmProfile(Request.Provider, BackendName, false) ? ResolveIbmProfile(Request.IbmProfile) : Request.IbmProfile;
     SetOptionalString(JsonObject, TEXT("ibm_profile"), IbmProfile);
     if (Request.bSendSeedTranspiler) JsonObject->SetNumberField(TEXT("seed_transpiler"), Request.SeedTranspiler);
     if (Request.bUseQasmInput)
@@ -277,9 +288,15 @@ void FQuantumApiClient::RunQasm(const FQuantumApiQasmRunRequest& Request, const 
 
 void FQuantumApiClient::SubmitCircuitJob(const FQuantumApiCircuitJobRequest& Request, const FQuantumApiRequestOptions& Options, FQuantumApiJsonDelegate OnSuccess, FQuantumApiErrorDelegate OnError) const
 {
+    const FString BackendName = ResolveIbmHardwareBackend(Request.BackendName);
+    if (BackendName.IsEmpty())
+    {
+        OnError.ExecuteIfBound(BuildClientError(TEXT("invalid_request"), TEXT("Submit Circuit Job requires a Backend Name or a configured Default IBM Hardware Backend.")));
+        return;
+    }
     const TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
     JsonObject->SetStringField(TEXT("provider"), TEXT("ibm"));
-    JsonObject->SetStringField(TEXT("backend_name"), Request.BackendName);
+    JsonObject->SetStringField(TEXT("backend_name"), BackendName);
     JsonObject->SetNumberField(TEXT("shots"), Request.Shots);
     SetOptionalString(JsonObject, TEXT("ibm_profile"), ResolveIbmProfile(Request.IbmProfile));
     SetCircuitField(JsonObject, Request.Circuit);
@@ -288,9 +305,15 @@ void FQuantumApiClient::SubmitCircuitJob(const FQuantumApiCircuitJobRequest& Req
 
 void FQuantumApiClient::SubmitQasmJob(const FQuantumApiQasmJobRequest& Request, const FQuantumApiRequestOptions& Options, FQuantumApiJsonDelegate OnSuccess, FQuantumApiErrorDelegate OnError) const
 {
+    const FString BackendName = ResolveIbmHardwareBackend(Request.BackendName);
+    if (BackendName.IsEmpty())
+    {
+        OnError.ExecuteIfBound(BuildClientError(TEXT("invalid_request"), TEXT("Submit QASM Job requires a Backend Name or a configured Default IBM Hardware Backend.")));
+        return;
+    }
     const TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
     JsonObject->SetStringField(TEXT("provider"), TEXT("ibm"));
-    JsonObject->SetStringField(TEXT("backend_name"), Request.BackendName);
+    JsonObject->SetStringField(TEXT("backend_name"), BackendName);
     JsonObject->SetStringField(TEXT("qasm"), Request.Qasm);
     JsonObject->SetStringField(TEXT("qasm_version"), Request.QasmVersion);
     JsonObject->SetNumberField(TEXT("shots"), Request.Shots);
@@ -305,9 +328,15 @@ void FQuantumApiClient::SubmitRandomJob(const FQuantumApiRandomJobRequest& Reque
         OnError.ExecuteIfBound(BuildClientError(TEXT("invalid_request"), TEXT("Min must be less than or equal to Max.")));
         return;
     }
+    const FString BackendName = ResolveIbmHardwareBackend(Request.BackendName);
+    if (BackendName.IsEmpty())
+    {
+        OnError.ExecuteIfBound(BuildClientError(TEXT("invalid_request"), TEXT("Submit Random Job requires a Backend Name or a configured Default IBM Hardware Backend.")));
+        return;
+    }
     const TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
     JsonObject->SetStringField(TEXT("provider"), TEXT("ibm"));
-    JsonObject->SetStringField(TEXT("backend_name"), Request.BackendName);
+    JsonObject->SetStringField(TEXT("backend_name"), BackendName);
     JsonObject->SetNumberField(TEXT("min"), Request.Min);
     JsonObject->SetNumberField(TEXT("max"), Request.Max);
     SetOptionalString(JsonObject, TEXT("ibm_profile"), ResolveIbmProfile(Request.IbmProfile));
@@ -346,6 +375,17 @@ void FQuantumApiClient::RequestJson(const FString& Path, const FString& Verb, co
     if (IsProtectedPath(Path))
     {
         OnError.ExecuteIfBound(BuildClientError(TEXT("protected_endpoint"), TEXT("Credential lifecycle and metrics routes are intentionally not exposed by this runtime plugin.")));
+        return;
+    }
+    if (BaseUrl.IsEmpty())
+    {
+        OnError.ExecuteIfBound(BuildClientError(TEXT("configuration_error"), TEXT("Backend Proxy mode requires a Backend Proxy URL.")));
+        return;
+    }
+    const FString ApiKey = !Options.OverrideApiKey.IsEmpty() ? Options.OverrideApiKey : DefaultApiKey;
+    if (AuthMode == EQuantumApiAuthMode::DirectApiKey && ApiKey.IsEmpty())
+    {
+        OnError.ExecuteIfBound(BuildClientError(TEXT("configuration_error"), TEXT("Direct API Key mode requires an API Key.")));
         return;
     }
 
@@ -412,14 +452,9 @@ FQuantumApiTransportRequest FQuantumApiClient::BuildTransportRequest(const FStri
     Request.Headers.Add(TEXT("Content-Type"), TEXT("application/json"));
 
     const FString ApiKey = !Options.OverrideApiKey.IsEmpty() ? Options.OverrideApiKey : DefaultApiKey;
-    const FString BearerToken = !Options.OverrideBearerToken.IsEmpty() ? Options.OverrideBearerToken : DefaultBearerToken;
     if (!ApiKey.IsEmpty() && AuthMode == EQuantumApiAuthMode::DirectApiKey)
     {
         Request.Headers.Add(TEXT("X-API-Key"), ApiKey);
-    }
-    if (!BearerToken.IsEmpty())
-    {
-        Request.Headers.Add(TEXT("Authorization"), FString::Printf(TEXT("Bearer %s"), *BearerToken));
     }
     for (const TPair<FString, FString>& Header : Options.ExtraHeaders)
     {
@@ -556,6 +591,13 @@ FString FQuantumApiClient::ResolveIbmProfile(const FString& RequestProfile) cons
     FString Profile = RequestProfile;
     Profile.TrimStartAndEndInline();
     return Profile.IsEmpty() ? DefaultIbmProfile : Profile;
+}
+
+FString FQuantumApiClient::ResolveIbmHardwareBackend(const FString& RequestBackendName) const
+{
+    FString BackendName = RequestBackendName;
+    BackendName.TrimStartAndEndInline();
+    return BackendName.IsEmpty() ? DefaultIbmHardwareBackend : BackendName;
 }
 
 bool FQuantumApiClient::ShouldUseDefaultIbmProfile(const FString& Provider, const FString& BackendName, bool bAssumeIbmProviderIfMissing)

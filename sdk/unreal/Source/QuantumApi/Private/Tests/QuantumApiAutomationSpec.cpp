@@ -28,11 +28,11 @@ public:
 UQuantumApiSettings* MakeSettings(EQuantumApiAuthMode AuthMode)
 {
     UQuantumApiSettings* Settings = NewObject<UQuantumApiSettings>();
-    Settings->BaseUrl = TEXT("https://example.test/v1");
     Settings->AuthMode = AuthMode;
     Settings->ApiKey = TEXT("unit-test-key");
-    Settings->bUseEnvironmentApiKey = false;
+    Settings->BackendProxyUrl = TEXT("https://proxy.example.test/quantum");
     Settings->DefaultIbmProfile = TEXT("IBM Open");
+    Settings->DefaultIbmHardwareBackend = TEXT("ibm_default");
     Settings->MaxReadRetries = 2;
     return Settings;
 }
@@ -46,9 +46,11 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FQuantumApiTransportSpec::RunTest(const FString& Parameters)
 {
-    UQuantumApiSettings* UrlSettings = NewObject<UQuantumApiSettings>();
-    UrlSettings->BaseUrl = TEXT("https://example.test/v1/");
-    TestEqual(TEXT("Base URL preserves HTTPS scheme and removes one trailing slash"), UrlSettings->GetNormalizedBaseUrl(), FString(TEXT("https://example.test/v1")));
+    UQuantumApiSettings* DirectUrlSettings = MakeSettings(EQuantumApiAuthMode::DirectApiKey);
+    TestEqual(TEXT("Direct mode always uses the hosted Quantum API URL"), DirectUrlSettings->GetResolvedBaseUrl(), FString(TEXT("https://davidjgrimsley.com/public-facing/api/quantum/v1")));
+    UQuantumApiSettings* ProxyUrlSettings = MakeSettings(EQuantumApiAuthMode::BackendProxy);
+    ProxyUrlSettings->BackendProxyUrl = TEXT(" https://proxy.example.test/quantum/ ");
+    TestEqual(TEXT("Proxy URL is normalized to the mounted v1 contract"), ProxyUrlSettings->GetResolvedBaseUrl(), FString(TEXT("https://proxy.example.test/quantum/v1")));
 
     const TSharedRef<FQuantumApiMockTransport> Mock = MakeShared<FQuantumApiMockTransport>();
     FQuantumApiTransportResponse GateResponse;
@@ -79,9 +81,10 @@ bool FQuantumApiTransportSpec::RunTest(const FString& Parameters)
 
     TestTrue(TEXT("Gate response is parsed"), bGateSucceeded);
     TestEqual(TEXT("Gate request count"), Mock->Requests.Num(), 1);
-    TestEqual(TEXT("Gate URL"), Mock->Requests[0].Url, FString(TEXT("https://example.test/v1/gates/run")));
+    TestEqual(TEXT("Gate URL uses the hosted API"), Mock->Requests[0].Url, FString(TEXT("https://davidjgrimsley.com/public-facing/api/quantum/v1/gates/run")));
     TestEqual(TEXT("Gate verb"), Mock->Requests[0].Verb, FString(TEXT("POST")));
     TestEqual(TEXT("Direct API key header"), Mock->Requests[0].Headers.FindRef(TEXT("X-API-Key")), FString(TEXT("unit-test-key")));
+    TestFalse(TEXT("Plugin does not generate a bearer authorization header"), Mock->Requests[0].Headers.Contains(TEXT("Authorization")));
     TestTrue(TEXT("Rotation angle is serialized"), Mock->Requests[0].Body.Contains(TEXT("rotation_angle_rad")));
     TestEqual(TEXT("Success request ID is preserved"), GatePayload.Meta.RequestId, FString(TEXT("request-gate-1")));
 
@@ -94,6 +97,25 @@ bool FQuantumApiTransportSpec::RunTest(const FString& Parameters)
     FQuantumApiClient ProxyClient(MakeSettings(EQuantumApiAuthMode::BackendProxy), ProxyMock);
     ProxyClient.HealthCheck(FQuantumApiRequestOptions(), FQuantumApiHealthDelegate(), FQuantumApiErrorDelegate());
     TestFalse(TEXT("Proxy mode omits direct API key"), ProxyMock->Requests[0].Headers.Contains(TEXT("X-API-Key")));
+    TestEqual(TEXT("Proxy mode uses the configured proxy URL"), ProxyMock->Requests[0].Url, FString(TEXT("https://proxy.example.test/quantum/v1/health")));
+
+    const TSharedRef<FQuantumApiMockTransport> MissingDirectKeyMock = MakeShared<FQuantumApiMockTransport>();
+    UQuantumApiSettings* MissingDirectKeySettings = MakeSettings(EQuantumApiAuthMode::DirectApiKey);
+    MissingDirectKeySettings->ApiKey.Empty();
+    FQuantumApiClient MissingDirectKeyClient(MissingDirectKeySettings, MissingDirectKeyMock);
+    FQuantumApiError MissingDirectKeyError;
+    MissingDirectKeyClient.HealthCheck(FQuantumApiRequestOptions(), FQuantumApiHealthDelegate(), FQuantumApiErrorDelegate::CreateLambda([&MissingDirectKeyError](const FQuantumApiError& Error) { MissingDirectKeyError = Error; }));
+    TestEqual(TEXT("Missing direct key is a configuration error"), MissingDirectKeyError.Error, FString(TEXT("configuration_error")));
+    TestEqual(TEXT("Missing direct key makes no request"), MissingDirectKeyMock->Requests.Num(), 0);
+
+    const TSharedRef<FQuantumApiMockTransport> MissingProxyUrlMock = MakeShared<FQuantumApiMockTransport>();
+    UQuantumApiSettings* MissingProxyUrlSettings = MakeSettings(EQuantumApiAuthMode::BackendProxy);
+    MissingProxyUrlSettings->BackendProxyUrl.Empty();
+    FQuantumApiClient MissingProxyUrlClient(MissingProxyUrlSettings, MissingProxyUrlMock);
+    FQuantumApiError MissingProxyUrlError;
+    MissingProxyUrlClient.HealthCheck(FQuantumApiRequestOptions(), FQuantumApiHealthDelegate(), FQuantumApiErrorDelegate::CreateLambda([&MissingProxyUrlError](const FQuantumApiError& Error) { MissingProxyUrlError = Error; }));
+    TestEqual(TEXT("Missing proxy URL is a configuration error"), MissingProxyUrlError.Error, FString(TEXT("configuration_error")));
+    TestEqual(TEXT("Missing proxy URL makes no request"), MissingProxyUrlMock->Requests.Num(), 0);
 
     const TSharedRef<FQuantumApiMockTransport> ErrorMock = MakeShared<FQuantumApiMockTransport>();
     FQuantumApiTransportResponse ErrorResponse;
@@ -139,9 +161,31 @@ bool FQuantumApiTransportSpec::RunTest(const FString& Parameters)
     const TSharedRef<FQuantumApiMockTransport> HardwareMock = MakeShared<FQuantumApiMockTransport>();
     FQuantumApiClient HardwareClient(MakeSettings(EQuantumApiAuthMode::DirectApiKey), HardwareMock);
     FQuantumApiRandomJobRequest HardwareRequest;
-    HardwareRequest.BackendName = TEXT("ibm_kingston");
     HardwareClient.SubmitRandomJob(HardwareRequest, FQuantumApiRequestOptions(), FQuantumApiJsonDelegate(), FQuantumApiErrorDelegate());
-    TestTrue(TEXT("IBM random job uses configured profile fallback"), HardwareMock->Requests[0].Body.Contains(TEXT("\"ibm_profile\":\"IBM Open\"")));
+    TestTrue(TEXT("IBM random job uses configured profile fallback"), HardwareMock->Requests[0].Body.Contains(TEXT("\"ibm_profile\"")) && HardwareMock->Requests[0].Body.Contains(TEXT("IBM Open")));
+    TestTrue(TEXT("IBM random job uses configured backend fallback"), HardwareMock->Requests[0].Body.Contains(TEXT("\"backend_name\"")) && HardwareMock->Requests[0].Body.Contains(TEXT("ibm_default")));
+
+    const TSharedRef<FQuantumApiMockTransport> HardwareOverrideMock = MakeShared<FQuantumApiMockTransport>();
+    FQuantumApiClient HardwareOverrideClient(MakeSettings(EQuantumApiAuthMode::DirectApiKey), HardwareOverrideMock);
+    FQuantumApiRandomJobRequest HardwareOverrideRequest;
+    HardwareOverrideRequest.BackendName = TEXT("ibm_node_override");
+    HardwareOverrideClient.SubmitRandomJob(HardwareOverrideRequest, FQuantumApiRequestOptions(), FQuantumApiJsonDelegate(), FQuantumApiErrorDelegate());
+    TestTrue(TEXT("IBM node backend overrides configured default"), HardwareOverrideMock->Requests[0].Body.Contains(TEXT("\"backend_name\"")) && HardwareOverrideMock->Requests[0].Body.Contains(TEXT("ibm_node_override")));
+
+    const TSharedRef<FQuantumApiMockTransport> TranspileDefaultMock = MakeShared<FQuantumApiMockTransport>();
+    FQuantumApiClient TranspileDefaultClient(MakeSettings(EQuantumApiAuthMode::DirectApiKey), TranspileDefaultMock);
+    FQuantumApiTranspileRequest TranspileDefaultRequest;
+    TranspileDefaultClient.Transpile(TranspileDefaultRequest, FQuantumApiRequestOptions(), FQuantumApiJsonDelegate(), FQuantumApiErrorDelegate());
+    TestTrue(TEXT("Transpile uses configured IBM backend fallback"), TranspileDefaultMock->Requests[0].Body.Contains(TEXT("\"backend_name\"")) && TranspileDefaultMock->Requests[0].Body.Contains(TEXT("ibm_default")));
+
+    const TSharedRef<FQuantumApiMockTransport> MissingHardwareBackendMock = MakeShared<FQuantumApiMockTransport>();
+    UQuantumApiSettings* MissingHardwareBackendSettings = MakeSettings(EQuantumApiAuthMode::DirectApiKey);
+    MissingHardwareBackendSettings->DefaultIbmHardwareBackend.Empty();
+    FQuantumApiClient MissingHardwareBackendClient(MissingHardwareBackendSettings, MissingHardwareBackendMock);
+    FQuantumApiError MissingHardwareBackendError;
+    MissingHardwareBackendClient.SubmitRandomJob(FQuantumApiRandomJobRequest(), FQuantumApiRequestOptions(), FQuantumApiJsonDelegate(), FQuantumApiErrorDelegate::CreateLambda([&MissingHardwareBackendError](const FQuantumApiError& Error) { MissingHardwareBackendError = Error; }));
+    TestEqual(TEXT("Missing IBM backend is rejected locally"), MissingHardwareBackendError.Error, FString(TEXT("invalid_request")));
+    TestEqual(TEXT("Missing IBM backend makes no request"), MissingHardwareBackendMock->Requests.Num(), 0);
 
     return true;
 }

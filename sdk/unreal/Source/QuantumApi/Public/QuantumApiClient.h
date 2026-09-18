@@ -76,8 +76,8 @@ public:
 private:
     FString BaseUrl;
     FString DefaultApiKey;
-    FString DefaultBearerToken;
     FString DefaultIbmProfile;
+    FString DefaultIbmHardwareBackend;
     EQuantumApiAuthMode AuthMode;
     float RequestTimeoutSeconds;
     int32 MaxReadRetries;
@@ -94,6 +94,7 @@ private:
     static FString SerializeJsonObject(const TSharedRef<class FJsonObject>& JsonObject);
     static FString AppendQuery(const FString& Path, const TMap<FString, FString>& QueryParameters);
     FString ResolveIbmProfile(const FString& RequestProfile) const;
+    FString ResolveIbmHardwareBackend(const FString& RequestBackendName) const;
     static bool ShouldUseDefaultIbmProfile(const FString& Provider, const FString& BackendName, bool bAssumeIbmProviderIfMissing);
     static bool IsProtectedPath(const FString& Path);
 };

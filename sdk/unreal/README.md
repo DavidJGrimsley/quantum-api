@@ -1,30 +1,29 @@
 # Quantum API Unreal Plugin
 
-`QuantumApi` is a UE 5.8 Runtime plugin for the mounted Quantum API `/v1` contract. It provides Blueprint async actions, never blocks the game thread, and ships as a project plugin.
+`QuantumApi` is a UE 5.8 Runtime plugin for the Quantum API `/v1` contract.
+It gives Blueprint and C++ developers async nodes/calls for gates, circuits,
+QASM, QRNG, IBM jobs, and the allowlisted advanced API operations.
 
-## Read this first if Unreal/quantum pins look confusing
+## Start here: what the Blueprint pins mean
 
-The Blueprint nodes are async HTTP calls wrapped in Unreal-friendly pins. You do
-not need to be a quantum computing expert to start.
+You do not need to be a quantum-computing expert to begin.
 
-Think of each node like this:
+- A white execution pin controls when an async request starts.
+- A `Request` pin is the little form you fill out before sending the request.
+- `Options` is optional. Leave it empty for normal use.
+- `On Success` receives the API response.
+- `On Error` receives a safe error object without freezing gameplay.
 
-- The white execution pins say when the request starts.
-- The `Request` pins are a form you fill out before sending the request.
-- The `Options` pin is optional auth/proxy override data. Leave it empty for normal use.
-- `On Success` gives you the API response.
-- `On Error` gives you a safe error object instead of freezing gameplay.
+Unreal turns C++ names into slightly awkward labels. For example,
+`Quantum Api Circuit Definition` means “the data form that describes one
+quantum circuit.” It is not an asset or special Unreal system.
 
-Unreal turns C++ names into awkward Blueprint labels. For example,
-`Quantum Api Circuit Definition` means "the small data form that describes a
-quantum circuit." It is not a separate asset, class, or advanced Unreal system.
+A `struct` is a bundle of related fields. A `Circuit Operation` is one gate
+step, such as “apply an H gate to qubit 0.” An `array` is a list. Therefore an
+“array of circuit operation structures” means “the ordered list of gate steps
+in the circuit.”
 
-A `struct` means "a bundle of related fields." A `Circuit Operation` struct is
-one step in a circuit, such as "apply an H gate to qubit 0." An `array` means a
-list. So "array of circuit operation structures" just means "the ordered list of
-gate steps in the circuit."
-
-If you are brand new, start with these nodes in this order:
+For a first test, use these nodes in order:
 
 1. `Health Check`
 2. `Run Gate`
@@ -33,150 +32,192 @@ If you are brand new, start with these nodes in this order:
 5. `List Backends`
 6. `Submit Random Job`
 
-Do not start with `Run Circuit` unless you specifically want to build a multi-step
-quantum circuit. `Run Gate` and `Generate Random Int` are much easier first tests.
-
 ## Install
 
-1. Copy `sdk/unreal` to `<YourProject>/Plugins/QuantumApi`.
-2. Regenerate project files, build, then enable **Quantum API** in Unreal's Plugin Browser if needed.
-3. Put configuration in the host project's `Config/DefaultGame.ini` (rather than relying on a plugin-shipped secret):
+1. Copy the `QuantumApi` plugin folder into `<YourProject>/Plugins/QuantumApi`.
+2. Open the project, enable **Quantum API** in the Plugin Browser if Unreal asks,
+   and build only if Unreal says the plugin needs compiling.
+3. Open **Project Settings → Quantum API** and choose an authentication mode.
 
-```ini
-[/Script/QuantumApi.QuantumApiSettings]
-AuthMode=BackendProxy
-ApiKey=
-bUseEnvironmentApiKey=True
-ApiKeyEnvironmentVariable=QUANTUM_API_KEY
-BearerToken=
-DefaultIbmProfile=
-RequestTimeoutSeconds=10.000000
-MaxReadRetries=2
-MaxRetryDelaySeconds=5.000000
-```
+The source-controlled UE 5.8 build harness is
+[Examples/QuantumApiDemo](Examples/QuantumApiDemo/README.md). It is a demo,
+not something a game team must ship or install with the plugin.
 
-The source-controlled UE 5.8 build harness is [Examples/QuantumApiDemo](Examples/QuantumApiDemo/README.md).
+## Project Settings: choose one mode
 
-## Authentication and production posture
+### Direct API Key — development, demos, and game jams
 
-- **Direct API Key** sends `X-API-Key` from Plugin Settings or per-call request options. For local development it first reads `QUANTUM_API_KEY` from the developer machine, then falls back to the Plugin Settings value. Restart Unreal after changing an environment variable. It is for local development, demos, and game jams only: a key packaged into a client can be extracted.
-- **Backend Proxy** never sends the configured API key. Supply your own bearer/custom headers when your proxy needs them, and keep the upstream key server-side.
-- The hosted API base URL is built into the plugin and hidden from Project Settings. Advanced/self-hosted projects can still override `BaseUrl` manually in `Config/DefaultGame.ini`.
-- The plugin intentionally does **not** create/revoke API keys or store/edit IBM credentials. For IBM routes, it accepts only an `ibm_profile` name; the service resolves that profile for the key owner. You can set a non-secret `DefaultIbmProfile` in Project Settings, then override it per Blueprint request when needed.
-- Credential values are never logged by the plugin.
+Select **Direct API Key** and enter a Quantum API key. The field is visually
+masked, but Unreal project configuration is not a secure secret store. The
+plugin always calls this hosted API URL in Direct mode:
 
-## Demo and distribution
+`https://davidjgrimsley.com/public-facing/api/quantum/v1`
 
-`Examples/QuantumApiDemo` is a disposable verification harness, not a required dependency for a game using the plugin. Its demo actor runs `Health Check -> RY(pi/2) -> Generate Random Int(0, 1)` and shows either each result or one safe error. A developer using the plugin later installs `QuantumApi` in their own project's `Plugins/` directory, enables it, and uses the Blueprint async nodes directly.
+There is deliberately no editable Base URL. A localhost or stale `BaseUrl=`
+entry cannot redirect Direct-mode requests.
 
-For a release, distribute the `QuantumApi` plugin directory (descriptor, `Config`, `Source`, `Resources`, and UE-version-matched binaries when applicable), not the demo or any credentials. Validate the release in a newly created blank consumer project: enable the plugin, configure a non-secret proxy URL, build Development Editor and Shipping, package Win64, and confirm the packaged game reaches the proxy without exposing an upstream API key.
+Do not ship a direct API key in a packaged game: a player can extract it.
 
-## Blueprint surface
+### Backend Proxy — packaged production games
 
-### The three easiest nodes
+Select **Backend Proxy** and enter your own **Backend Proxy URL**. The plugin
+sends no Quantum API key in this mode. Your server should expose the compatible
+Quantum API `/v1` contract, keep its upstream Quantum API key in its server
+secret manager, and enforce whatever player/session authorization it needs.
 
-`Health Check` confirms the service is reachable. It does not need a request
-body.
+The URL can end with `/v1` or omit it; the plugin normalizes it to the mounted
+`/v1` contract. Leaving the Proxy URL blank returns a local configuration error
+before any request is sent.
 
-`Run Gate` runs one simple gate. For the demo flow:
+`Request Timeout Seconds` limits one HTTP attempt. The Reliability section
+retries safe GET reads only; POSTs and cancellations are never retried, which
+prevents duplicate jobs, charges, or changed random values.
 
-- `GateType`: `rotation`
-- `bSendRotationAngle`: checked
-- `RotationAngleRad`: `1.57079632679`
+## IBM hardware
 
-That angle is pi/2. The response includes `Measurement`, usually `0` or `1`.
+The plugin never stores IBM tokens or creates IBM profiles. Those credentials
+remain on the Quantum API service. Unreal stores only non-secret names:
 
-`Generate Random Int` asks the QRNG endpoint for a bounded integer:
+- **Default IBM Profile Name**: which service-side IBM profile to use when a
+  request leaves `IbmProfile` blank.
+- **Default IBM Hardware Backend**: which IBM machine to target when a job or
+  Transpile request leaves `Backend Name` blank.
 
-- `Min`: lowest allowed value
-- `Max`: highest allowed value
+Use `List Backends` with `Provider = ibm` to discover available names. A
+backend typed directly into a node always wins over the Project Settings
+default. Circuit/QASM/QRNG jobs and IBM-targeted Transpile calls fail locally
+with a useful error if neither supplies a backend.
 
-For a coin-flip style test, use `Min = 0` and `Max = 1`.
+IBM hardware access, queues, and usage limits still apply. The API label
+`ibm-hardware` does **not** mean cryptographic or certified randomness.
 
-### What the Run Circuit pins mean
+## Blueprint quickstart
 
-`Run Circuit` is for a circuit with one or more operations. In plain English,
-you are saying: "create N qubits, run this ordered list of gates, then measure
-the result this many times."
+`Health Check` confirms the service is reachable and has no request body.
 
-The pins from the split request struct mean:
+For `Run Gate`, use:
 
-- `Request Circuit Num Qubits`: how many qubits/wires the circuit has. Start with `1`.
-- `Request Circuit Operations`: the list of gate steps to run, in order.
-- `Request Shots`: how many times to sample the circuit. Start with `1024`.
-- `Request Include Statevector`: advanced simulator output. Leave unchecked at first.
-- `Request Send Seed`: whether to send a deterministic simulator seed. Leave unchecked at first.
-- `Request Seed`: the seed value. It only matters if `Request Send Seed` is checked.
-- `Options`: optional per-call auth/proxy overrides. Leave it empty for normal project settings.
+- `Gate Type`: `rotation`
+- `Send Rotation Angle`: checked
+- `Rotation Angle Rad`: `1.57079632679` (`PI / 2`)
 
-To build `Request Circuit Operations` in Blueprint, make an array of
-`Quantum Api Circuit Operation` values. If you promote the pin to a variable,
-you can set the default values in the Details panel instead of building the list
-from scratch every time. Each value is one gate instruction:
+The response has a `Measurement`, usually `0` or `1`.
 
-- `Gate`: gate name such as `h`, `x`, `rx`, `ry`, `rz`, or `cx`.
-- `Target`: the qubit index the gate acts on. The first qubit is `0`.
-- `bSendTheta` and `Theta`: only needed for rotation gates like `rx`, `ry`, `rz`.
-- `bSendControl` and `Control`: only needed for controlled gates like `cx`.
+`Generate Random Int` calls QRNG with inclusive integer bounds. For a
+coin-flip-style test, use `Min = 0` and `Max = 1`. The response identifies its
+source as `qiskit-simulator` or `classical-fallback`; neither is a claim of
+cryptographic randomness.
 
-Tiny first circuit example:
+### Run Circuit in plain English
+
+`Run Circuit` means: “make this many qubits, run these gate steps in order,
+then sample the answer this many times.” Its important fields are:
+
+- `Request Circuit Num Qubits`: number of qubit wires. Start with `1`.
+- `Request Circuit Operations`: the ordered list of gate steps.
+- `Request Shots`: how many samples to take. Start with `1024`.
+- `Request Include Statevector`: advanced simulator output; leave unchecked
+  while learning.
+- `Request Send Seed` and `Request Seed`: deterministic simulator controls;
+  leave unchecked while learning.
+
+To make `Request Circuit Operations`, create an array of `Quantum Api Circuit
+Operation` values. Promote the pin to a variable if you want to edit its
+default list in the Details panel.
+
+Tiny first circuit:
 
 - `Num Qubits`: `1`
 - `Operations`: one operation with `Gate = h`, `Target = 0`
 - `Shots`: `1024`
-- `Include Statevector`: unchecked
-- `Send Seed`: unchecked
 
-That creates one qubit, puts it into a superposition with an H gate, and samples
-the result.
+That puts one qubit into a superposition and samples it.
 
-### What Request Options means
+### Request Options
 
-Most projects can leave `Options` alone. It exists for advanced cases:
+Most projects leave `Options` empty. It is only for advanced per-call cases:
 
-- `Override Api Key`: use a different API key for this one call.
-- `Override Bearer Token`: send a different user/proxy token for this one call.
-- `Extra Headers`: send custom headers to your own backend proxy.
+- `Override Api Key`: a different direct-development key for this call.
+- `Extra Headers`: custom headers for your own backend proxy. The plugin never
+  logs their values and never invents a bearer-auth header.
 
-For game-jam/direct-key testing, configure Project Settings -> Quantum API and
-leave `Options` empty on the nodes.
+## C++ integration
 
-Typed success payloads are available for:
+Blueprint is not the only way to use the plugin. The demo’s
+[`QuantumApiDemoActor.cpp`](Examples/QuantumApiDemo/Source/QuantumApiDemo/QuantumApiDemoActor.cpp)
+is a C++ Actor that uses the same async-action classes exposed as Blueprint
+nodes.
 
-- `Health Check`, `Run Gate`, `Transform Text`, and `Generate Random Int`.
-- `Generate Random Int` calls `POST /v1/random` with inclusive signed 32-bit bounds. Its result identifies `qiskit-simulator` or `classical-fallback`—neither is a cryptographic-randomness guarantee.
+Add `QuantumApi` to your game module’s dependencies, then include
+`QuantumApiAsyncActions.h` and `QuantumApiTypes.h`:
 
-Named JSON-result async actions accept typed request structs for the remaining runtime core:
+```csharp
+PublicDependencyModuleNames.AddRange(new[] { "Core", "CoreUObject", "Engine", "QuantumApi" });
+```
 
-- `Get Echo Types`, `Run Circuit`, `List Backends`, `Transpile`.
-- `Import QASM`, `Export QASM`, `Run QASM`.
-- `Submit Circuit Job`, `Submit QASM Job`, `Submit Random Job`, `Get Job Status`, `Get Job Result`, `Cancel Job`.
+From an Actor or UObject, retain the action as a `UPROPERTY(Transient)` member,
+bind its success/error delegates, and activate it:
 
-`Call Advanced Json` exposes a fixed allowlist of 22 portfolio/algorithms/optimization/experiments/finance/ML/nature operations. It takes a JSON request body and returns raw JSON alongside status, request ID, and response headers. It cannot call `/v1/keys*`, `/v1/ibm/profiles*`, metrics, or arbitrary paths.
+```cpp
+void AMyActor::CheckQuantumApi()
+{
+    const FQuantumApiRequestOptions Options;
+    ActiveHealthAction = UQuantumApiHealthAsyncAction::HealthCheck(this, Options);
+    ActiveHealthAction->OnSuccess.AddDynamic(this, &AMyActor::HandleHealth);
+    ActiveHealthAction->OnError.AddDynamic(this, &AMyActor::HandleQuantumError);
+    ActiveHealthAction->Activate();
+}
+```
 
-The checked-in [endpoint coverage manifest](contract/endpoint-coverage.json) covers all 39 non-credential `/v1` operations: 17 named core actions plus 22 advanced JSON actions.
+```cpp
+UPROPERTY(Transient)
+TObjectPtr<UQuantumApiHealthAsyncAction> ActiveHealthAction;
 
-## 30-minute QRNG and gate quickstart
+UFUNCTION()
+void HandleHealth(FQuantumApiHealthResponse Response);
 
-1. Set a mounted `/v1` base URL and choose **Direct API Key** for a disposable game-jam key, or **Backend Proxy** for a production-safe path.
-2. From a Blueprint event, call **Run Gate** with `gate_type = rotation`, `bSendRotationAngle = true`, and `rotation_angle_rad = 1.57079632679` (`PI / 2`).
-3. On Success, read `measurement`; on Error, route `FQuantumApiError` to gameplay-safe UI/logging.
-4. Call **Generate Random Int** with `Min = 0`, `Max = 1`; read `value` and `source` on Success.
+UFUNCTION()
+void HandleQuantumError(FQuantumApiError Error);
+```
 
-All requests are async. GET health/backend/job reads retry at most twice for transport, 429, 502, 503, or 504 failures; POSTs and cancellation are never retried, preventing duplicate jobs, charges, and changed random results.
+For an advanced fully native integration, `FQuantumApiClient` is also public.
+Keep its instance alive until its callback runs; it is asynchronous and should
+be stored as a long-lived member, not created as a temporary stack object.
 
-## QRNG hardware jobs
+## Available operations
 
-`Submit Random Job` calls `POST /v1/jobs/random` and uses the same status/result/cancel actions as circuit/QASM jobs. To opt into IBM hardware from Blueprint, set **Default IBM Profile Name** in Project Settings or fill the request struct's `IbmProfile`, choose an IBM `BackendName` such as the backend returned by `List Backends` with `Provider = ibm`, then submit the job and poll `Get Job Status` / `Get Job Result`. The profile name is not a secret; the IBM token and instance live on the Quantum API service.
+Typed success payloads are available for `Health Check`, `Run Gate`,
+`Transform Text`, and `Generate Random Int`.
 
-IBM hardware availability, account access, queue time, and usage limits apply. Hardware output is labelled by the API as `ibm-hardware`; it is not a cryptographic or certified-randomness claim.
+Named JSON-result async actions cover `Get Echo Types`, `Run Circuit`, `List
+Backends`, `Transpile`, QASM import/export/run, and circuit/QASM/QRNG job
+submission, status, result, and cancellation.
 
-## Validation
+`Call Advanced Json` exposes a fixed allowlist of 22 API catalog, algorithm,
+optimization, experiment, finance, ML, and nature operations. In particular,
+the catalog option is the API metadata endpoint `/portfolio.json`, not finance
+portfolio optimization. Credential lifecycle routes, IBM profile management,
+metrics, and arbitrary paths are intentionally unavailable.
 
-Run backend/static contract validation from the repository root:
+The checked-in [endpoint coverage manifest](contract/endpoint-coverage.json)
+covers all 39 non-credential `/v1` operations.
+
+## Distribution and validation
+
+Distribute the `QuantumApi` plugin directory—descriptor, `Config`, `Source`,
+`Resources`, and UE-version-matched binaries where applicable. Do not include
+the demo project or credentials.
+
+Validate a release in a fresh blank Blueprint project: install the plugin,
+enable it, configure Direct mode for a disposable test key or Proxy mode for a
+real proxy, then build/package and confirm the async nodes work.
+
+Run repository contract validation from the repository root:
 
 ```powershell
 uv run pytest tests/test_unreal_plugin_contract.py -q
 ```
 
-On a UE 5.8 host, generate project files for the demo, build the Editor and Shipping targets, run `QuantumApi.Runtime.Transport` from Unreal Automation, test the `RY(π/2)` and QRNG flows in PIE, then package and smoke-test after staging the plugin under the demo project's `Plugins/` directory. The automation spec uses an injected mock transport to cover serialization, auth headers, response metadata/errors, request IDs, QRNG bounds, 429 retry policy, and no duplicate POST random request.
+On a UE 5.8 host, run `QuantumApi.Runtime.Transport` from Unreal Automation,
+test the `RY(PI/2)` and QRNG flows in PIE, then package and smoke-test the
+consumer project.

@@ -46,9 +46,6 @@ struct FQuantumApiRequestOptions
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quantum API")
     FString OverrideApiKey;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quantum API")
-    FString OverrideBearerToken;
-
     /** Headers for the developer's proxy or custom auth scheme. They are never logged by this plugin. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quantum API")
     TMap<FString, FString> ExtraHeaders;
