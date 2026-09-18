@@ -4,6 +4,7 @@ extends Node
 const DEFAULT_BASE_URL := "https://davidjgrimsley.com/public-facing/api/quantum/v1"
 const DIRECT_API_KEY := ""
 const DEFAULT_IBM_PROFILE := ""
+const PROJECT_SETTINGS_ACCOUNT_DEFAULT_PROFILE := "__quantum_api_use_account_default__"
 const SETTINGS_BASE_URL := "quantum_api/base_url"
 const SETTINGS_BACKEND_PROXY_MODE := "quantum_api/backend_proxy_mode"
 const SETTINGS_DIRECT_API_KEY := "quantum_api/direct_api_key"
@@ -37,7 +38,10 @@ func set_api_key(key: String) -> void:
 	api_key = key.strip_edges()
 
 func set_default_ibm_profile(profile_name: String) -> void:
-	default_ibm_profile = profile_name.strip_edges()
+	var normalized_profile := profile_name.strip_edges()
+	if normalized_profile == PROJECT_SETTINGS_ACCOUNT_DEFAULT_PROFILE:
+		normalized_profile = ""
+	default_ibm_profile = normalized_profile
 
 func set_backend_proxy_mode(enabled: bool) -> void:
 	backend_proxy_mode = enabled

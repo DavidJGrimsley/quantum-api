@@ -50,6 +50,20 @@ func _test_project_settings_registration() -> void:
 		"settings helper must not overwrite an existing IBM profile",
 	)
 	_expect(ProjectSettings.has_setting("quantum_api/request_timeout_seconds"), "timeout setting should be registered")
+	var profile_setting_is_basic := false
+	for property_info in ProjectSettings.get_property_list():
+		if str(property_info.get("name", "")) == "quantum_api/default_ibm_profile":
+			profile_setting_is_basic = (
+				int(property_info.get("usage", 0)) & PROPERTY_USAGE_EDITOR_BASIC_SETTING
+			) != 0
+			break
+	_expect(profile_setting_is_basic, "IBM profile setting should be visible in Basic Project Settings")
+	var client: Variant = ClientScript.new()
+	client.set_default_ibm_profile("__quantum_api_use_account_default__")
+	_expect(
+		str(client.get_config_snapshot().get("default_ibm_profile", "missing")).is_empty(),
+		"editor account-default marker must not be sent as an IBM profile name",
+	)
 	_next_case()
 
 func _process(_delta: float) -> void:
