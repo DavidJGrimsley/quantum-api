@@ -5,6 +5,7 @@ public class QuantumApi : ModuleRules
     public QuantumApi(ReadOnlyTargetRules Target) : base(Target)
     {
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+        PrecompileForTargets = PrecompileTargetsType.Any;
 
         PublicDependencyModuleNames.AddRange(
             new[]

@@ -1,0 +1,25 @@
+{
+  "FileVersion": 3,
+  "EngineAssociation": "5.8",
+  "Category": "Examples",
+  "Description": "UE 5.8 build and quickstart harness for the Quantum API plugin.",
+  "Modules": [
+    {
+      "Name": "QuantumApiDemo",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    }
+  ],
+  "Plugins": [
+    {
+      "Name": "QuantumApi",
+      "Enabled": true
+    }
+  ],
+  "AdditionalPluginDirectories": [
+    "../.."
+  ],
+  "TargetPlatforms": [
+    "Win64"
+  ]
+}
