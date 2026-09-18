@@ -10,6 +10,9 @@ The format is based on Keep a Changelog and uses semantic versioning expectation
 
 - Added `POST /v1/random` with strict inclusive signed 32-bit bounds, Hadamard measurements, rejection sampling, and honest local source labels.
 - Added `POST /v1/jobs/random` for asynchronous IBM hardware measurements, ordered-bit rejection sampling, encrypted job credential snapshots, and structured failed-result handling through existing job routes.
+- Godot's optional editor settings helper, which registers discoverable Project
+  Settings fields for base URL, auth mode, direct key, default IBM profile, and
+  request timeout.
 - Phase 6 SDK-first rollout work for package-ready JS/Python clients, Godot migration, and Unreal runtime plugin scaffolding.
 - Added `POST /v1/qasm/run` for synchronous OpenQASM execution (finite-shot and analytic statevector mode).
 - Added `POST /v1/jobs/qasm` for asynchronous IBM hardware execution from OpenQASM payloads.

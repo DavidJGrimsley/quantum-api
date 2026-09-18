@@ -1,62 +1,74 @@
-# Quantum API Godot Client
+# Quantum API Client for Godot
 
-Reusable Godot runtime client for the mounted Quantum API `/v1` contract.
+Use real quantum services from a Godot game without writing HTTP request code.
+The client covers quick gameplay effects, text transformation, simulator work,
+and the full IBM hardware job flow.
 
-## What This Is
+## Start Here
 
-This folder is the promoted home for the reusable Godot addon/client.
+1. Copy this entire folder into your Godot project at
+   `addons/quantum_api_client/`. Do not copy only `quantum_api_client.gd`.
+2. In Godot, open **Project > Project Settings > Plugins** and enable
+   **Quantum API Client Settings** once. It adds the Quantum API fields to
+   **General > Quantum Api**, including **Default Ibm Profile**.
+3. Set the base URL and choose one authentication mode below.
+4. Add the runtime client to your game with the small example in
+   [Sample Usage](#sample-usage).
 
-- Runtime-focused, not an editor plugin
-- Intended to be copied into a Godot project as `addons/quantum_api_client/`
-- Supports gameplay/runtime plus IBM hardware profile usage:
-  - `health_check`
-  - `transform_text`
-  - `run_gate`
-  - `list_backends`
-  - `transpile`
-  - `submit_circuit_job`
+The optional editor helper only makes settings easier to find. The actual
+client is a runtime node; it has no editor dependency and the helper does not
+run in an exported game.
 
-## Install
+## Choose Your Setup
 
-1. Install this folder as `addons/quantum_api_client/` in your Godot project.
-  If installing from this repository root, copy `addons/quantum_api_client/` into your game project.
-2. In your game script, preload `res://addons/quantum_api_client/quantum_api_client.gd`.
-3. Create the client as a child node at runtime.
-4. Call `apply_project_settings()` at startup (or set values manually via setters).
-5. Shipped games should use backend-proxy mode. Direct mode is only for a
-   developer-controlled local smoke test; read its short-lived key from a
-   process environment variable at runtime rather than putting it in project
-   settings or build inputs.
+| Setup | Best for | What to set |
+| --- | --- | --- |
+| Direct API key | Local development and a quick game-jam prototype | `backend_proxy_mode=false`, then provide `direct_api_key` |
+| Backend proxy | A public build where you do not want players to extract your key | `backend_proxy_mode=true`; the addon sends no key |
+
+For a small jam game, direct mode is the shortest path: the game sends its
+configured key to Quantum API. Be aware that players can extract any key put
+in a native or Web build. Rotate the key after the jam if that is acceptable
+for your project. Proxy mode is the safer choice for a long-lived public game.
 
 ## Project Settings
 
-Add this to your `project.godot`:
+The helper creates these values. You can also put them directly in
+`project.godot`:
 
 ```ini
 [quantum_api]
 base_url="https://davidjgrimsley.com/public-facing/api/quantum/v1"
-backend_proxy_mode=true
+backend_proxy_mode=false
 direct_api_key=""
 default_ibm_profile=""
 request_timeout_seconds=10.0
 ```
 
-Field usage:
+- `base_url`: Quantum API root. Whitespace and extra trailing slashes are safe;
+  the client produces exactly one `/v1`.
+- `backend_proxy_mode`: turn this **off** for a direct API-key setup; turn it
+  **on** only when your own proxy adds the upstream credentials.
+- `direct_api_key`: your Quantum API key for direct mode. It is intentionally
+  shown as a password field in Godot.
+- `default_ibm_profile`: optional name of the IBM profile to use for IBM calls.
+  Leave it blank to use the API account's default IBM profile.
+- `request_timeout_seconds`: how long a request may wait before returning a
+  structured failure. The default is 10 seconds.
 
-- `base_url`: mounted Quantum API root (`/v1` is auto-normalized by the addon)
-- `backend_proxy_mode`: when `true`, runtime endpoints can go through your backend proxy
-- `direct_api_key`: optional API key used only by a developer-controlled direct
-  mode runtime; leave it empty in committed settings and all distributed builds
-- `default_ibm_profile`: optional fallback profile name for IBM routes
-- `request_timeout_seconds`: positive REST timeout in seconds (defaults to `10.0`)
+## Simulator Gates, Hardware Jobs, and Text
 
-## Layout
+These are three different features:
 
-- `addons/quantum_api_client/quantum_api_client.gd` - shared runtime client
+| Feature | What happens | Does it use IBM hardware? |
+| --- | --- | --- |
+| `transform_text` | Quantum API transforms text and returns it immediately | No |
+| `run_gate` | Runs a small gate effect and returns immediately | No; simulator only |
+| `submit_circuit_job` | Queues a circuit on an IBM backend, then you poll for it | Yes |
 
-This is a runtime addon, not an editor plugin. It does not need to be enabled in
-the editor's Plugins tab; preload the script and add the client as a runtime
-child node instead.
+So seeing transformed text proves the API connection works, but it does not
+prove an IBM job ran. For IBM, submit a job, poll `get_circuit_job`, then fetch
+`get_circuit_job_result` when the status is complete.
 
 ## AssetLib Submission Metadata
 
@@ -77,33 +89,32 @@ The client normalizes either of these:
 - `https://your-backend.example.com/public-facing/api/quantum`
 - `https://your-backend.example.com/public-facing/api/quantum/v1`
 
-## Auth Modes
+## Failures You Can Handle
 
-- Backend proxy mode: recommended for shipped games. The addon sends no
-  `X-API-Key`; your narrowly scoped server-side gateway authenticates upstream.
-- Direct API-key mode: useful only for local/dev/demo setups for protected
-  runtime routes.
-
-If required auth is missing, the addon now fails early with clear diagnostics instead of sending doomed requests.
-
-Never embed a live API key in `project.godot`, source control, a native build,
-or a Web export. Anything shipped to a player can be extracted. Use a
-credential-free proxy endpoint for public builds, and inject a fresh key through
-the local process environment only for a developer-only direct-mode smoke test.
+Every callback receives `(success: bool, payload: Dictionary)` exactly once.
+When something fails, inspect `payload.error`, `payload.message`, and
+`payload.status_code`. The client distinguishes missing direct authentication,
+an unreachable server, timeout, malformed or empty JSON, request-start errors,
+and HTTP errors. `transform_text` also gives you the original text as its
+fallback value, so dialogue can keep moving.
 
 ## IBM Profiles (Per-User IBM Credentials)
 
-How a developer running a direct-mode IBM validation gets credentials and profiles:
+How to set up IBM hardware:
 
 1. Open `https://davidjgrimsley.com/public-facing/api/quantum` and sign in with an Identerest account.
 2. In the `Api Keys` panel, create a Quantum API key and copy the raw key immediately (it is shown once).
 3. In the `IBM Credentials` panel, create an IBM profile (`profile_name`, IBM API token, IBM instance/CRN, channel), then click verify.
 4. Optionally mark one profile as default on that same public page.
+5. Back in Godot, either leave **Default Ibm Profile** blank to use that API
+   account default, or enter the profile name exactly as you created it.
 
 Profile management (create/list/update/delete/verify) stays on your portfolio website.
 This addon only consumes existing profile names for IBM runtime calls.
 
-For IBM-specific runtime routes, pass `ibm_profile` explicitly or configure `default_ibm_profile` in project settings.
+The profile is stored by Quantum API, not copied into the Godot project. Godot
+only sends its profile name. For IBM-specific runtime routes, pass
+`ibm_profile` explicitly or configure `default_ibm_profile` in project settings.
 
 ## Sample Usage
 
@@ -118,18 +129,18 @@ func _ready() -> void:
     quantum_api_client.apply_project_settings()
 ```
 
-Developer-only direct API usage (never ship this path):
+Direct API usage:
 
 ```gdscript
 quantum_api_client.set_backend_proxy_mode(false)
 var developer_key := OS.get_environment("QUANTUM_API_KEY")
 if developer_key.is_empty():
-    push_error("QUANTUM_API_KEY is required for this local direct-mode test")
+    push_error("QUANTUM_API_KEY is required for direct mode")
     return
 quantum_api_client.set_api_key(developer_key)
 ```
 
-IBM hardware usage example:
+IBM hardware discovery example:
 
 ```gdscript
 quantum_api_client.set_backend_proxy_mode(false)
@@ -144,3 +155,9 @@ quantum_api_client.list_backends(func(success: bool, payload: Dictionary) -> voi
     print(success, payload)
 , "ibm")
 ```
+
+For a real hardware run, build your circuit payload, call
+`submit_circuit_job(payload, callback)`, keep the returned job ID, poll with
+`get_circuit_job(job_id, callback)`, and finally call
+`get_circuit_job_result(job_id, callback)`. Hardware queues are normal: do not
+block the game while waiting; show progress or let the player continue.

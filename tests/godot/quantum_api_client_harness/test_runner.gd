@@ -3,6 +3,7 @@ extends Node
 const FIXTURE_BASE_URL := "http://127.0.0.1:18101/v1"
 const UNREACHABLE_BASE_URL := "http://127.0.0.1:9/v1"
 const ClientScript = preload("res://addons/quantum_api_client/quantum_api_client.gd")
+const ProjectSettingsScript = preload("res://addons/quantum_api_client/project_settings.gd")
 
 var failures: Array[String] = []
 var case_index := 0
@@ -12,6 +13,7 @@ func _ready() -> void:
 	set_process(true)
 	print("Godot package harness starting")
 	cases = [
+		Callable(self, "_test_project_settings_registration"),
 		Callable(self, "_test_url_normalization_and_snapshot"),
 		Callable(self, "_test_proxy_auth"),
 		Callable(self, "_test_direct_auth"),
@@ -37,6 +39,17 @@ func _ready() -> void:
 		Callable(self, "_test_job_status"),
 		Callable(self, "_test_job_result"),
 	]
+	_next_case()
+
+func _test_project_settings_registration() -> void:
+	ProjectSettings.set_setting("quantum_api/default_ibm_profile", "existing-profile")
+	ProjectSettingsScript.register()
+	_expect(ProjectSettings.has_setting("quantum_api/default_ibm_profile"), "IBM profile setting should be registered")
+	_expect(
+		str(ProjectSettings.get_setting("quantum_api/default_ibm_profile")) == "existing-profile",
+		"settings helper must not overwrite an existing IBM profile",
+	)
+	_expect(ProjectSettings.has_setting("quantum_api/request_timeout_seconds"), "timeout setting should be registered")
 	_next_case()
 
 func _process(_delta: float) -> void:

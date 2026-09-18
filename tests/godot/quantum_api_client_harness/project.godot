@@ -6,6 +6,9 @@ config_version=5
 config/name="Quantum API Client Package Harness"
 run/main_scene="res://test_runner.tscn"
 
+[editor_plugins]
+enabled=PackedStringArray("res://addons/quantum_api_client/plugin.cfg")
+
 [rendering]
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
