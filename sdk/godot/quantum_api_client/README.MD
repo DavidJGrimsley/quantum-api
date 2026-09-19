@@ -23,7 +23,10 @@ This folder is the promoted home for the reusable Godot addon/client.
 2. In your game script, preload `res://addons/quantum_api_client/quantum_api_client.gd`.
 3. Create the client as a child node at runtime.
 4. Call `apply_project_settings()` at startup (or set values manually via setters).
-5. If you plan to use direct mode, go to https://davidjgrimsley.com/public-facing/api/quantum/ to sign up and create an API key for `direct_api_key`.
+5. Shipped games should use backend-proxy mode. Direct mode is only for a
+   developer-controlled local smoke test; read its short-lived key from a
+   process environment variable at runtime rather than putting it in project
+   settings or build inputs.
 
 ## Project Settings
 
@@ -35,18 +38,25 @@ base_url="https://davidjgrimsley.com/public-facing/api/quantum/v1"
 backend_proxy_mode=true
 direct_api_key=""
 default_ibm_profile=""
+request_timeout_seconds=10.0
 ```
 
 Field usage:
 
 - `base_url`: mounted Quantum API root (`/v1` is auto-normalized by the addon)
 - `backend_proxy_mode`: when `true`, runtime endpoints can go through your backend proxy
-- `direct_api_key`: API key used for protected runtime endpoints in direct mode
+- `direct_api_key`: optional API key used only by a developer-controlled direct
+  mode runtime; leave it empty in committed settings and all distributed builds
 - `default_ibm_profile`: optional fallback profile name for IBM routes
+- `request_timeout_seconds`: positive REST timeout in seconds (defaults to `10.0`)
 
 ## Layout
 
 - `addons/quantum_api_client/quantum_api_client.gd` - shared runtime client
+
+This is a runtime addon, not an editor plugin. It does not need to be enabled in
+the editor's Plugins tab; preload the script and add the client as a runtime
+child node instead.
 
 ## AssetLib Submission Metadata
 
@@ -69,14 +79,21 @@ The client normalizes either of these:
 
 ## Auth Modes
 
-- Backend proxy mode: recommended for shipped games
-- Direct API-key mode: useful for local/dev/demo setups for protected runtime routes
+- Backend proxy mode: recommended for shipped games. The addon sends no
+  `X-API-Key`; your narrowly scoped server-side gateway authenticates upstream.
+- Direct API-key mode: useful only for local/dev/demo setups for protected
+  runtime routes.
 
 If required auth is missing, the addon now fails early with clear diagnostics instead of sending doomed requests.
 
+Never embed a live API key in `project.godot`, source control, a native build,
+or a Web export. Anything shipped to a player can be extracted. Use a
+credential-free proxy endpoint for public builds, and inject a fresh key through
+the local process environment only for a developer-only direct-mode smoke test.
+
 ## IBM Profiles (Per-User IBM Credentials)
 
-How a normal hosted user gets credentials and profiles:
+How a developer running a direct-mode IBM validation gets credentials and profiles:
 
 1. Open `https://davidjgrimsley.com/public-facing/api/quantum` and sign in with an Identerest account.
 2. In the `Api Keys` panel, create a Quantum API key and copy the raw key immediately (it is shown once).
@@ -101,18 +118,26 @@ func _ready() -> void:
     quantum_api_client.apply_project_settings()
 ```
 
-Direct API usage:
+Developer-only direct API usage (never ship this path):
 
 ```gdscript
 quantum_api_client.set_backend_proxy_mode(false)
-quantum_api_client.set_api_key("your-runtime-api-key")
+var developer_key := OS.get_environment("QUANTUM_API_KEY")
+if developer_key.is_empty():
+    push_error("QUANTUM_API_KEY is required for this local direct-mode test")
+    return
+quantum_api_client.set_api_key(developer_key)
 ```
 
 IBM hardware usage example:
 
 ```gdscript
 quantum_api_client.set_backend_proxy_mode(false)
-quantum_api_client.set_api_key("your-runtime-api-key")
+var developer_key := OS.get_environment("QUANTUM_API_KEY")
+if developer_key.is_empty():
+    push_error("QUANTUM_API_KEY is required for this local direct-mode test")
+    return
+quantum_api_client.set_api_key(developer_key)
 quantum_api_client.set_default_ibm_profile("Echo Text Adventure Godot Game")
 
 quantum_api_client.list_backends(func(success: bool, payload: Dictionary) -> void:
