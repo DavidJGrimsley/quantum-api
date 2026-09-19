@@ -23,9 +23,11 @@ dist/
 tests/godot/quantum_api_client_harness/addons/
 
 # Editors and OS
+.godot/
 .vscode/
 .idea/
 .DS_Store
+tests/godot/quantum_api_client_harness/*.gd.uid
 
 # Node (SDK)
 node_modules/

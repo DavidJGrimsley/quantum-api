@@ -76,11 +76,17 @@ Use these values for the current AssetLib submission form:
 
 - Asset Name: Quantum API Client
 - Category: Addons > Scripts
-- Godot Version: 4.x
+- Asset Type: Addon
+- Godot Version: 4.x (set the minimum version in the form to the oldest
+  version you have validated for the release)
 - License: Apache-2.0
 - Repository URL: https://github.com/DavidJGrimsley/quantum-api
 - Install Path Inside ZIP: addons/quantum_api_client
 - Icon URL (direct, after tagging): `https://raw.githubusercontent.com/DavidJGrimsley/quantum-api/godot-v0.1.2/addons/quantum_api_client/icon.png`
+- Suggested tags: `quantum`, `api`, `http`, `ibm`, `gameplay`
+- AI-use disclosure: select **Yes** and disclose that AI assistance was used
+  during development, with human review and automated validation of the
+  shipped addon.
 
 The icon is included in this addon folder so the Asset Library archive contains
 the same branding. In the Asset Library form, use the direct `raw.githubusercontent.com`
