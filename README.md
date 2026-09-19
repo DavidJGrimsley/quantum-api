@@ -746,6 +746,15 @@ RUN_PERF_BENCHMARKS=true uv run pytest tests/perf -s
 - `sdk/pennylane/` is the package that would become the published PennyLane plugin on PyPI later in the roadmap.
 - `sdk/godot/`, `sdk/unreal/`, and `sdk/unity/` are engine-specific delivery artifacts, not npm packages.
 
+### Godot Quick Start
+
+The Godot client is a copy-in addon, not a package-manager dependency. Install
+the archive contents at `addons/quantum_api_client/`, enable the optional
+**Quantum API Client Settings** helper once in **Project Settings > Plugins**,
+then configure your API connection in **General > Quantum Api**. The complete
+beginner guide, including direct versus proxy authentication and the IBM job
+workflow, is in [addons/quantum_api_client/README.md](addons/quantum_api_client/README.md).
+
 ## License
 
 Apache-2.0.

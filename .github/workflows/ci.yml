@@ -18,11 +18,11 @@ jobs:
         run: |
           test -f .gitattributes
 
-          addons_attr="$(git check-attr export-ignore -- addons/quantum_api_client/plugin.cfg)"
+          addons_attr="$(git check-attr export-ignore -- addons/quantum_api_client/quantum_api_client.gd)"
           case "$addons_attr" in
-            "addons/quantum_api_client/plugin.cfg: export-ignore: unspecified") ;;
+            "addons/quantum_api_client/quantum_api_client.gd: export-ignore: unspecified") ;;
             *)
-              echo "Expected addons/quantum_api_client/plugin.cfg to be included in git archive"
+              echo "Expected addons/quantum_api_client/quantum_api_client.gd to be included in git archive"
               echo "$addons_attr"
               exit 1
               ;;
@@ -90,3 +90,42 @@ jobs:
 
       - name: Docker build
         run: docker build -t quantum-api:ci .
+
+  godot-package-harness:
+    name: Godot package harness (${{ matrix.godot_version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        godot_version: ["4.4.1", "4.5.2", "4.6.3", "4.7.2"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install archived addon into a clean Godot project
+        run: |
+          harness_dir="tests/godot/quantum_api_client_harness"
+          rm -rf "$harness_dir/addons"
+          mkdir -p "$harness_dir/addons"
+          git archive --format=zip HEAD addons > /tmp/quantum-api-client.zip
+          unzip -q /tmp/quantum-api-client.zip -d "$harness_dir"
+          test -f "$harness_dir/addons/quantum_api_client/quantum_api_client.gd"
+
+      - name: Download Godot ${{ matrix.godot_version }}
+        run: |
+          version="${{ matrix.godot_version }}"
+          archive="Godot_v${version}-stable_linux.x86_64.zip"
+          curl --fail --location --retry 3 --output "/tmp/$archive" \
+            "https://github.com/godotengine/godot/releases/download/${version}-stable/$archive"
+          unzip -q "/tmp/$archive" -d /tmp/godot
+          chmod +x /tmp/godot/Godot_v${version}-stable_linux.x86_64
+
+      - name: Run deterministic package harness
+        run: |
+          python3 tests/godot/fixture_server.py &
+          fixture_pid="$!"
+          trap 'kill "$fixture_pid" 2>/dev/null || true' EXIT
+          sleep 1
+          /tmp/godot/Godot_v${{ matrix.godot_version }}-stable_linux.x86_64 \
+            --headless --path tests/godot/quantum_api_client_harness
