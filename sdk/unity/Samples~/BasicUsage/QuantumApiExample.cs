@@ -7,13 +7,13 @@ namespace QuantumApi.Unity.Samples
     public sealed class QuantumApiExample : MonoBehaviour
     {
         [SerializeField]
-        private string baseUrl = "https://example.com/public-facing/api/quantum";
+        private string baseUrl = "http://127.0.0.1:8000";
 
         [SerializeField]
-        private bool backendProxyMode = true;
+        private bool backendProxyMode = false;
 
         [SerializeField]
-        private string apiKey = "";
+        private string apiKey = "qapi_devlocal_0123456789abcdef0123456789abcdef";
 
         private QuantumApiClient _client;
 
@@ -34,7 +34,76 @@ namespace QuantumApi.Unity.Samples
                 health => Debug.Log($"Quantum API ready: {health.status} ({health.runtime_mode})"),
                 error => Debug.LogWarning($"Health check failed: {error.Message}")));
 
-            _ = RunTextTransformExampleAsync();
+            StartCoroutine(_client.GetEchoTypesCoroutine(
+                response => Debug.Log($"Echo types loaded: {response.echo_types.Length}"),
+                error => Debug.LogWarning($"Echo types failed: {error.Message}")));
+
+            StartCoroutine(_client.RunGateCoroutine(
+                new GateRunRequest { gate_type = "bit_flip" },
+                response => Debug.Log($"Bit flip measurement: {response.measurement}"),
+                error => Debug.LogWarning($"Bit flip failed: {error.Message}")));
+
+            _ = RunAsyncExamples();
+        }
+
+        private async Task RunAsyncExamples()
+        {
+            await RunGateExamplesAsync();
+            await RunRandomExamplesAsync();
+            await RunReadableErrorExampleAsync();
+            await RunTextTransformExampleAsync();
+        }
+
+        private async Task RunGateExamplesAsync()
+        {
+            try
+            {
+                var phaseFlip = await _client.RunGateAsync(new GateRunRequest
+                {
+                    gate_type = "phase_flip",
+                });
+                Debug.Log($"Phase flip measurement: {phaseFlip.measurement}");
+
+                var rotation = await _client.RunGateAsync(new GateRunRequest
+                {
+                    gate_type = "rotation",
+                    sendRotationAngle = true,
+                    rotation_angle_rad = Mathf.PI / 2f,
+                });
+                Debug.Log($"Rotation measurement: {rotation.measurement}");
+            }
+            catch (QuantumApiError error)
+            {
+                Debug.LogWarning($"Gate example failed: {error.Message}");
+            }
+        }
+
+        private async Task RunRandomExamplesAsync()
+        {
+            try
+            {
+                for (var index = 0; index < 5; index += 1)
+                {
+                    var response = await _client.RandomIntAsync(0, 1);
+                    Debug.Log($"QRNG coin flip {index + 1}: {response.value} ({response.source})");
+                }
+            }
+            catch (QuantumApiError error)
+            {
+                Debug.LogWarning($"QRNG example failed: {error.Message}");
+            }
+        }
+
+        private async Task RunReadableErrorExampleAsync()
+        {
+            try
+            {
+                await _client.RandomIntAsync(1, 0);
+            }
+            catch (QuantumApiError error)
+            {
+                Debug.LogWarning($"Expected validation error: {error.ErrorCode} {error.Message}");
+            }
         }
 
         private async Task RunTextTransformExampleAsync()

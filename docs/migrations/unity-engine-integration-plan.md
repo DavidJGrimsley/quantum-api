@@ -17,15 +17,17 @@ Use the same contract as all other clients:
 - `GET /v1/health`
 - `GET /v1/echo-types`
 - `POST /v1/gates/run`
+- `POST /v1/random`
 - `POST /v1/text/transform`
 
 ## 3. Suggested Unity Client Design
 
 Create a small client layer:
 
-- `Task<HealthResponse> HealthCheckAsync()`
+- `Task<HealthResponse> HealthAsync()`
 - `Task<EchoTypesResponse> GetEchoTypesAsync()`
 - `Task<GateRunResponse> RunGateAsync(GateRunRequest request)`
+- `Task<RandomIntResponse> RandomIntAsync(int min, int max)`
 - `Task<TextTransformResponse> TransformTextAsync(TextTransformRequest request)`
 
 Keep URL and timeout in config:
@@ -52,6 +54,24 @@ Keep URL and timeout in config:
   "measurement": 1,
   "superposition_strength": 0.87,
   "success": false
+}
+```
+
+### `RandomInt` request
+
+```json
+{
+  "min": 0,
+  "max": 1
+}
+```
+
+### `RandomInt` response
+
+```json
+{
+  "value": 1,
+  "source": "qiskit-simulator"
 }
 ```
 
@@ -87,13 +107,16 @@ Keep URL and timeout in config:
 Current status:
 
 - `sdk/unity/` now contains the initial `UnityWebRequest` client scaffold.
-- Local Unity editor/package validation still needs to happen in a real Unity project.
+- `sdk/unity/` exposes `RandomIntAsync(0, 1)` and a matching coroutine wrapper for the QRNG endpoint.
+- Local Unity editor/package validation completed in a disposable Unity project.
 
 ## 6. Validation Checklist
 
 - Health endpoint reachable at runtime.
 - Gate calls succeed for all supported gate types.
+- `RandomIntAsync(0, 1)` returns bounded `0` or `1` values over repeated calls.
 - Rotation validation errors handled gracefully in gameplay.
+- Malformed QRNG requests return a readable `QuantumApiError`.
 - Text transform responses parse correctly.
 - API-down mode falls back without freezing gameplay.
 
@@ -108,16 +131,40 @@ Use a real Unity editor project for validation:
    - attach a MonoBehaviour that creates `QuantumApiClient`
    - or start from `sdk/unity/Samples~/BasicUsage/QuantumApiExample.cs`
 4. Configure:
-   - `BaseUrl` to local or mounted production URL
-   - `BackendProxyMode = true` for shipped-like testing
-   - direct API key only for local/dev/demo validation
+   - `BaseUrl = http://127.0.0.1:8000` for local beginner validation
+   - `BackendProxyMode = false` for local direct-key validation
+   - `ApiKey = qapi_devlocal_0123456789abcdef0123456789abcdef`, the documented local dev key
 5. Run Play Mode checks:
    - `HealthAsync()` succeeds
    - `GetEchoTypesAsync()` succeeds when auth is configured correctly
    - `RunGateAsync()` succeeds for `bit_flip`, `phase_flip`, and `rotation`
    - `RunGateAsync()` with `gate_type = "rotation"` and no angle yields a clean API error
+   - `RandomIntAsync(0, 1)` returns `0` or `1` across repeated calls
+   - `RandomIntAsync(1, 0)` yields a clean API validation error
    - `TransformTextAsync()` parses `transformed`, `coverage_percent`, and `category_counts`
    - `TransformTextWithFallbackAsync()` returns fallback text when the API is down
 6. Build one standalone player and repeat at least `health` plus one protected call so runtime networking matches Editor behavior.
 
-This repo does not have Unity CI or editor automation yet, so treat the current Unity helper as package-ready until a real Unity project smoke test is complete.
+## 8. Validation Evidence
+
+Validated locally on 2026-09-16 after rebasing `feature/phase-6-5-unity-plugin-trials` onto `origin/main` at `c719af1`.
+
+- Backend focused checks passed: `uv run pytest tests/test_random_api.py tests/test_api_contract.py` (`90 passed`).
+- Unity editor used: `C:\Program Files\Unity\Hub\Editor\6000.6.1f1\Editor\Unity.exe`.
+- Scratch project used: `D:\SoftwareDev\APIs\quantum-api-i2Workspace\temp\unity-plugin-trials-smoke`.
+- Package import used local Package Manager path: `D:\SoftwareDev\APIs\quantum-api-i2Workspace\quantum-api-unity-plugin-trials\sdk\unity`.
+- Local API used `http://127.0.0.1:8000`, `BackendProxyMode = false`, and the documented local dev key only.
+- Editor smoke log: `D:\SoftwareDev\APIs\quantum-api-i2Workspace\temp\unity-plugin-trials-smoke\Logs\QuantumApiUnitySmoke2.log`.
+  - Package compiled without assembly errors.
+  - Health returned `healthy` with `qiskit` runtime mode.
+  - Echo types returned 8 entries.
+  - `bit_flip`, `phase_flip`, and `rotation` gate calls succeeded.
+  - Five `RandomIntAsync(0, 1)` calls returned bounded values from `qiskit-simulator`.
+  - `RandomIntAsync(1, 0)` returned the expected readable `validation_error`.
+  - Text transform succeeded.
+  - API-down health check returned the expected readable `request_failed` path.
+  - Windows development player built at `Builds/QuantumApiSmoke/QuantumApiSmoke.exe`.
+- Standalone player smoke log: `D:\SoftwareDev\APIs\quantum-api-i2Workspace\temp\unity-plugin-trials-smoke\Logs\QuantumApiStandaloneSmoke.log`.
+  - Player emitted `[QuantumApiStandaloneSmoke] PASS health=healthy random=1 source=qiskit-simulator`.
+
+Unity CLI was not installed on `PATH`; validation used the installed Unity Editor executable directly. The scratch project, generated player, logs, local database, and Unity-generated artifacts are validation evidence only and should not be committed.
