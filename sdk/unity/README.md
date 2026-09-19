@@ -18,6 +18,10 @@ The initial Unity pass targets the gameplay subset:
 - `GET /v1/echo-types`
 - `POST /v1/gates/run`
 - `POST /v1/random`
+- `POST /v1/jobs/random`
+- `GET /v1/jobs/{job_id}`
+- `GET /v1/jobs/{job_id}/result`
+- `POST /v1/jobs/{job_id}/cancel`
 - `POST /v1/text/transform`
 
 The package lives under `sdk/unity/` so it can later be published as a Unity package without having to reshape the repo again.
@@ -105,6 +109,40 @@ for (var index = 0; index < 5; index += 1)
     Debug.Log($"QRNG coin flip {index + 1}: {random.value} ({random.source})");
 }
 ```
+
+IBM hardware QRNG job:
+
+```csharp
+var submit = await client.SubmitRandomJobAsync(new RandomJobSubmitRequest
+{
+    min = 0,
+    max = 3,
+    provider = "ibm",
+    backend_name = "ibm_fez",
+    ibm_profile = "Unreal Engine Demos",
+});
+
+while (true)
+{
+    var status = await client.GetJobAsync(submit.job_id);
+    if (status.status == "succeeded")
+    {
+        var result = await client.GetJobResultAsync(submit.job_id);
+        Debug.Log($"IBM hardware QRNG value: {result.result.value} ({result.result.source})");
+        break;
+    }
+
+    if (status.status == "failed" || status.status == "cancelled")
+    {
+        Debug.LogWarning(status.error != null ? status.error.message : $"Job ended: {status.status}");
+        break;
+    }
+
+    await Task.Delay(5000);
+}
+```
+
+For gameplay flows, keep the returned `job_id` and call `CancelJobAsync(job_id)` when the player exits before a pending hardware job reaches a terminal state.
 
 Text transform with fallback:
 

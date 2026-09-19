@@ -87,6 +87,66 @@ namespace QuantumApi.Unity
     }
 
     [Serializable]
+    public sealed class RandomJobSubmitRequest
+    {
+        public int min;
+        public int max;
+        public string provider = "ibm";
+        public string backend_name = "";
+        public string ibm_profile = "";
+    }
+
+    [Serializable]
+    public sealed class RandomJobSubmitResponse
+    {
+        public string job_id = "";
+        public string provider = "";
+        public string backend_name = "";
+        public string ibm_profile = "";
+        public string remote_job_id = "";
+        public string status = "";
+        public string created_at = "";
+    }
+
+    [Serializable]
+    public sealed class RandomJobStatusResponse
+    {
+        public string job_id = "";
+        public string provider = "";
+        public string backend_name = "";
+        public string ibm_profile = "";
+        public string remote_job_id = "";
+        public string status = "";
+        public string created_at = "";
+        public string updated_at = "";
+        public string completed_at = "";
+        public RandomJobError error;
+    }
+
+    [Serializable]
+    public sealed class RandomJobResultResponse
+    {
+        public string job_id = "";
+        public string status = "";
+        public RandomJobResultData result = new RandomJobResultData();
+    }
+
+    [Serializable]
+    public sealed class RandomJobResultData
+    {
+        public int value;
+        public string source = "";
+    }
+
+    [Serializable]
+    public sealed class RandomJobError
+    {
+        public string error = "";
+        public string message = "";
+        public string request_id = "";
+    }
+
+    [Serializable]
     public sealed class TextTransformRequest
     {
         public string text = "";
