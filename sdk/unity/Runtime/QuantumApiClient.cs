@@ -629,7 +629,9 @@ namespace QuantumApi.Unity
 
         private static string NormalizeBaseUrl(string baseUrl)
         {
-            var trimmed = (baseUrl ?? string.Empty).Trim().TrimEnd('/');
+            var trimmed = string.IsNullOrWhiteSpace(baseUrl)
+                ? QuantumApiClientOptions.ProductionBaseUrl
+                : baseUrl.Trim().TrimEnd('/');
             if (string.IsNullOrWhiteSpace(trimmed))
             {
                 throw new ArgumentException("QuantumApiClient requires a non-empty BaseUrl.", nameof(baseUrl));

@@ -31,15 +31,10 @@ The package lives under `sdk/unity/` so it can later be published as a Unity pac
 Current repo-local workflow:
 
 1. Copy the `sdk/unity/` folder into a Unity project `Packages/` directory, or add it by local path in the Unity Package Manager.
-2. Create a `QuantumApiClient` with your mounted base URL.
+2. Create a `QuantumApiClient`; the hosted production Quantum API URL is built into the package.
 3. Keep `BackendProxyMode = true` for shipped builds unless you explicitly want local/dev/demo direct-key behavior.
 
-Example base URLs:
-
-- Local API: `http://127.0.0.1:8000`
-- Mounted production API: `https://davidjgrimsley.com/public-facing/api/quantum`
-
-Both normalize to `/v1` automatically.
+The package default endpoint is `https://davidjgrimsley.com/api/public/quantum/v1`. Advanced local smoke tests can still override `QuantumApiClientOptions.BaseUrl`.
 
 ## Layout
 
@@ -61,7 +56,6 @@ public sealed class QuantumBootstrap : MonoBehaviour
     {
         _client = new QuantumApiClient(new QuantumApiClientOptions
         {
-            BaseUrl = "https://example.com/public-facing/api/quantum",
             BackendProxyMode = true,
             TimeoutSeconds = 15,
         });
@@ -93,12 +87,11 @@ StartCoroutine(_client.RunGateCoroutine(
 ));
 ```
 
-Local dev QRNG smoke test:
+Direct-key QRNG smoke test:
 
 ```csharp
 var client = new QuantumApiClient(new QuantumApiClientOptions
 {
-    BaseUrl = "http://127.0.0.1:8000",
     BackendProxyMode = false,
     ApiKey = "qapi_devlocal_0123456789abcdef0123456789abcdef",
 });
@@ -203,6 +196,6 @@ For a beginner-friendly local smoke test:
 1. Start the API with `uv run uvicorn quantum_api.main:app --host 127.0.0.1 --port 8000`.
 2. Add this package to a scratch Unity project by local path.
 3. Attach `QuantumApiExample` to an empty GameObject.
-4. Keep the sample defaults for local testing: `BaseUrl = http://127.0.0.1:8000`, `BackendProxyMode = false`, and the documented dev API key.
+4. Keep the sample defaults for hosted testing: `BackendProxyMode = false` and the documented dev API key. For local API smoke tests only, override `QuantumApiClientOptions.BaseUrl` to `http://127.0.0.1:8000`.
 5. Enter Play Mode and confirm the Console logs health, echo types, gate measurements, five QRNG coin flips, and one expected validation error.
 6. Build a Windows standalone development player and repeat at least health plus one protected call.
