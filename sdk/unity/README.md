@@ -17,6 +17,7 @@ The initial Unity pass targets the gameplay subset:
 - `GET /v1/health`
 - `GET /v1/echo-types`
 - `POST /v1/gates/run`
+- `POST /v1/random`
 - `POST /v1/text/transform`
 
 The package lives under `sdk/unity/` so it can later be published as a Unity package without having to reshape the repo again.
@@ -66,6 +67,9 @@ public sealed class QuantumBootstrap : MonoBehaviour
     {
         var health = await _client.HealthAsync();
         Debug.Log($"Quantum API status: {health.status}");
+
+        var random = await _client.RandomIntAsync(0, 1);
+        Debug.Log($"QRNG coin flip: {random.value} ({random.source})");
     }
 }
 ```
@@ -77,11 +81,29 @@ StartCoroutine(_client.RunGateCoroutine(
     new GateRunRequest
     {
         gate_type = "rotation",
+        sendRotationAngle = true,
         rotation_angle_rad = Mathf.PI / 2f,
     },
     response => Debug.Log($"Measurement: {response.measurement}"),
     error => Debug.LogWarning(error.Message)
 ));
+```
+
+Local dev QRNG smoke test:
+
+```csharp
+var client = new QuantumApiClient(new QuantumApiClientOptions
+{
+    BaseUrl = "http://127.0.0.1:8000",
+    BackendProxyMode = false,
+    ApiKey = "qapi_devlocal_0123456789abcdef0123456789abcdef",
+});
+
+for (var index = 0; index < 5; index += 1)
+{
+    var random = await client.RandomIntAsync(0, 1);
+    Debug.Log($"QRNG coin flip {index + 1}: {random.value} ({random.source})");
+}
 ```
 
 Text transform with fallback:
@@ -103,7 +125,7 @@ var response = await _client.TransformTextWithFallbackAsync(
 Default behavior:
 
 - `health` -> public
-- all other currently implemented Unity helper routes -> no auth in backend-proxy mode
+- all other currently implemented Unity helper routes, including `random` -> no auth in backend-proxy mode
 - protected routes in direct mode -> `X-API-Key`
 
 If your own backend proxy expects bearer auth, pass a default bearer token and set `DefaultAuthMode = QuantumApiAuthMode.Bearer`, or override auth per request.
@@ -138,4 +160,11 @@ The Unreal plugin path in `sdk/unreal/` is still Unreal-specific. Unity should n
 
 ## Verification
 
-This Linux VPS repo does not include a Unity editor/runtime toolchain, so this helper should be treated as a package-ready scaffold until it has been smoke-tested inside a real Unity project.
+For a beginner-friendly local smoke test:
+
+1. Start the API with `uv run uvicorn quantum_api.main:app --host 127.0.0.1 --port 8000`.
+2. Add this package to a scratch Unity project by local path.
+3. Attach `QuantumApiExample` to an empty GameObject.
+4. Keep the sample defaults for local testing: `BaseUrl = http://127.0.0.1:8000`, `BackendProxyMode = false`, and the documented dev API key.
+5. Enter Play Mode and confirm the Console logs health, echo types, gate measurements, five QRNG coin flips, and one expected validation error.
+6. Build a Windows standalone development player and repeat at least health plus one protected call.

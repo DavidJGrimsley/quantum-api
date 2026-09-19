@@ -73,6 +73,20 @@ namespace QuantumApi.Unity
     }
 
     [Serializable]
+    public sealed class RandomIntRequest
+    {
+        public int min;
+        public int max;
+    }
+
+    [Serializable]
+    public sealed class RandomIntResponse
+    {
+        public int value;
+        public string source = "";
+    }
+
+    [Serializable]
     public sealed class TextTransformRequest
     {
         public string text = "";

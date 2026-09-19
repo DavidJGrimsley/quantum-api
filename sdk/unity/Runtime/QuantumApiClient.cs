@@ -55,6 +55,18 @@ namespace QuantumApi.Unity
             return SendAsync<GateRunResponse>("/gates/run", UnityWebRequest.kHttpVerbPOST, BuildGateRunJson(request), requestOptions);
         }
 
+        public Task<RandomIntResponse> RandomIntAsync(
+            int min,
+            int max,
+            QuantumApiRequestOptions requestOptions = null)
+        {
+            return SendAsync<RandomIntResponse>(
+                "/random",
+                UnityWebRequest.kHttpVerbPOST,
+                new RandomIntRequest { min = min, max = max },
+                requestOptions);
+        }
+
         public Task<TextTransformResponse> TransformTextAsync(
             TextTransformRequest request,
             QuantumApiRequestOptions requestOptions = null)
@@ -116,6 +128,22 @@ namespace QuantumApi.Unity
             }
 
             yield return SendCoroutine("/gates/run", UnityWebRequest.kHttpVerbPOST, BuildGateRunJson(request), onSuccess, onError, requestOptions);
+        }
+
+        public IEnumerator RandomIntCoroutine(
+            int min,
+            int max,
+            Action<RandomIntResponse> onSuccess,
+            Action<QuantumApiError> onError,
+            QuantumApiRequestOptions requestOptions = null)
+        {
+            yield return SendCoroutine(
+                "/random",
+                UnityWebRequest.kHttpVerbPOST,
+                new RandomIntRequest { min = min, max = max },
+                onSuccess,
+                onError,
+                requestOptions);
         }
 
         public IEnumerator TransformTextCoroutine(
@@ -389,11 +417,10 @@ namespace QuantumApi.Unity
             var escapedGateType = EscapeJsonString(request.gate_type ?? string.Empty);
             if (request.sendRotationAngle)
             {
-                return string.Format(
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    "{{\"gate_type\":\"{0}\",\"rotation_angle_rad\":{1:R}}}",
-                    escapedGateType,
-                    request.rotation_angle_rad);
+                var rotationAngleJson = request.rotation_angle_rad.ToString(
+                    "G9",
+                    System.Globalization.CultureInfo.InvariantCulture);
+                return $"{{\"gate_type\":\"{escapedGateType}\",\"rotation_angle_rad\":{rotationAngleJson}}}";
             }
 
             return $"{{\"gate_type\":\"{escapedGateType}\"}}";

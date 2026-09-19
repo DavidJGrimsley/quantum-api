@@ -32,7 +32,12 @@ dist-cjs/
 
 # Local notes
 *.log
+quantum_api.db
 tests/test_quantum_api.db
+
+# Unity local package import metadata
+sdk/unity/**/*.meta
+sdk/unity/*.meta
 
 # Temporary files
 *.tmp
