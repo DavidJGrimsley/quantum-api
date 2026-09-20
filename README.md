@@ -1,6 +1,32 @@
 # Quantum API
 
-Quantum API is a greenfield FastAPI service for quantum-inspired runtime features:
+Quantum API is a greenfield FastAPI service for quantum-inspired runtime features.
+
+**Live API base**: `https://davidjgrimsley.com/public-facing/api/quantum/v1`
+
+## Agent Integration
+
+> Give your coding agent full knowledge of the Quantum API in one command:
+>
+> ```bash
+> npx skills add -g davidjgrimsley/quantum-api
+> ```
+>
+> After installation, agents (Antigravity, Cursor, Codex, and others) automatically
+> know the full API contract, auth model, SDK integration steps, and troubleshooting
+> procedures — no manual documentation pasting required.
+
+Agent-oriented resources:
+
+- **[Agent Contract](./agent-prompt.md)** — How agents should integrate this API.
+- **[Agent Skill](./skills/quantum-api/SKILL.md)** — Installable skill source.
+- **[llms.txt](./llms.txt)** — Machine-readable documentation index.
+- **[manifest.json](./manifest.json)** — Versions, endpoints, and auth facts in JSON.
+- **[agents.json](./agents.json)** — Capability declaration (REST API, SDKs, skill, future MCP).
+
+---
+
+## Endpoints
 
 - `/v1/health`
 - `/v1/portfolio.json`

@@ -1,0 +1,141 @@
+{
+  "product": "Quantum API",
+  "description": "FastAPI service for quantum-inspired runtime features: circuit execution, QASM interop, transpilation, IBM hardware jobs, and domain algorithms.",
+  "author": "David J. Grimsley",
+  "license": "Apache-2.0",
+  "repository": "https://github.com/davidjgrimsley/quantum-api",
+
+  "versions": {
+    "api": "0.1.0",
+    "js_sdk": "0.1.2",
+    "python_sdk": "0.1.0",
+    "pennylane_plugin": "0.1.0",
+    "unreal_plugin": "0.1.0",
+    "unity_helper": "0.1.0",
+    "godot_addon": "0.1.0"
+  },
+
+  "urls": {
+    "service_root": "https://davidjgrimsley.com/public-facing/api/quantum",
+    "api_v1_base": "https://davidjgrimsley.com/public-facing/api/quantum/v1",
+    "interactive_docs": "https://davidjgrimsley.com/public-facing/api/quantum/docs",
+    "llms_txt": "https://github.com/davidjgrimsley/quantum-api/blob/main/llms.txt",
+    "agents_json": "https://github.com/davidjgrimsley/quantum-api/blob/main/agents.json",
+    "agent_skill": "https://github.com/davidjgrimsley/quantum-api/blob/main/skills/quantum-api/SKILL.md",
+    "agent_prompt": "https://github.com/davidjgrimsley/quantum-api/blob/main/agent-prompt.md"
+  },
+
+  "runtime": {
+    "language": "Python",
+    "framework": "FastAPI",
+    "min_python_version": "3.11",
+    "qiskit_min_version": "2.1.0",
+    "qiskit_aer_min_version": "0.17.0",
+    "qiskit_ibm_runtime_min_version": "0.42.0",
+    "runtime_modes": ["qiskit", "classical-fallback"]
+  },
+
+  "authentication": {
+    "public_endpoints": ["/v1/health", "/v1/portfolio.json", "/v1/echo-types"],
+    "api_key_header": "X-API-Key",
+    "api_key_endpoints": "All /v1/* runtime endpoints except key management and IBM profiles",
+    "bearer_jwt_endpoints": ["/v1/keys", "/v1/ibm/profiles"],
+    "bearer_jwt_issuer": "Supabase (Identerest project)",
+    "dev_api_key": "qapi_devlocal_0123456789abcdef0123456789abcdef"
+  },
+
+  "endpoints": {
+    "public": [
+      "GET /v1/health",
+      "GET /v1/portfolio.json",
+      "GET /v1/echo-types"
+    ],
+    "api_key": [
+      "POST /v1/gates/run",
+      "POST /v1/circuits/run",
+      "GET /v1/list_backends",
+      "POST /v1/transpile",
+      "POST /v1/qasm/import",
+      "POST /v1/qasm/export",
+      "POST /v1/qasm/run",
+      "POST /v1/text/transform",
+      "POST /v1/jobs/circuits",
+      "POST /v1/jobs/qasm",
+      "GET /v1/jobs/{job_id}",
+      "GET /v1/jobs/{job_id}/result",
+      "POST /v1/jobs/{job_id}/cancel",
+      "POST /v1/optimization/qaoa",
+      "POST /v1/optimization/vqe",
+      "POST /v1/experiments/state_tomography",
+      "POST /v1/experiments/randomized_benchmarking",
+      "POST /v1/finance/portfolio_optimization",
+      "POST /v1/ml/kernel_classifier",
+      "POST /v1/nature/ground_state_energy"
+    ],
+    "bearer_jwt": [
+      "GET /v1/keys",
+      "POST /v1/keys",
+      "DELETE /v1/keys/{key_id}",
+      "DELETE /v1/keys/revoked",
+      "POST /v1/keys/{key_id}/revoke",
+      "POST /v1/keys/{key_id}/rotate",
+      "GET /v1/ibm/profiles",
+      "POST /v1/ibm/profiles",
+      "PATCH /v1/ibm/profiles/{profile_id}",
+      "DELETE /v1/ibm/profiles/{profile_id}",
+      "POST /v1/ibm/profiles/{profile_id}/verify"
+    ],
+    "internal": [
+      "GET /metrics"
+    ]
+  },
+
+  "sdks": {
+    "js": {
+      "package": "@mr.dj2u/quantum-api",
+      "version": "0.1.2",
+      "status": "package-ready, not yet published to npm",
+      "path": "sdk/js/"
+    },
+    "python": {
+      "package": "quantum-api-sdk",
+      "version": "0.1.0",
+      "status": "package-ready, not yet published to PyPI",
+      "path": "sdk/python/"
+    },
+    "pennylane": {
+      "package": "quantum-api-pennylane",
+      "device": "quantum.api",
+      "version": "0.1.0",
+      "status": "package-ready, not yet published to PyPI",
+      "path": "sdk/pennylane/"
+    },
+    "unreal": {
+      "plugin": "QuantumApi",
+      "version": "0.1.0",
+      "ue_versions": ["5.4", "5.5", "5.6"],
+      "status": "Phase 6 scaffold",
+      "path": "sdk/unreal/"
+    },
+    "unity": {
+      "package": "com.davidjgrimsley.quantum-api",
+      "version": "0.1.0",
+      "status": "Phase 6 scaffold",
+      "path": "sdk/unity/"
+    },
+    "godot": {
+      "addon": "quantum_api_client",
+      "version": "0.1.0",
+      "status": "Phase 6 reference integration",
+      "path": "sdk/godot/"
+    }
+  },
+
+  "phase5_extras": {
+    "optimization": "qiskit-algorithms, qiskit-optimization",
+    "experiments": "qiskit-experiments",
+    "finance": "qiskit-algorithms, qiskit-finance, qiskit-optimization",
+    "ml": "qiskit-algorithms, qiskit-machine-learning, scikit-learn",
+    "nature": "pyscf, qiskit-algorithms, qiskit-nature, qiskit-nature-pyscf"
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "$schema": "https://agents.json/schema/v1",
+  "name": "Quantum API",
+  "description": "FastAPI service for quantum-inspired runtime features: circuit execution, QASM interop, transpilation, IBM hardware job submission, and domain algorithms (optimization, experiments, finance, ML, nature).",
+  "url": "https://davidjgrimsley.com/public-facing/api/quantum",
+  "version": "0.1.0",
+
+  "capabilities": {
+    "rest_api": {
+      "type": "openapi",
+      "url": "https://davidjgrimsley.com/public-facing/api/quantum/openapi.json",
+      "docs": "https://davidjgrimsley.com/public-facing/api/quantum/docs",
+      "base_url": "https://davidjgrimsley.com/public-facing/api/quantum/v1",
+      "authentication": {
+        "api_key": {
+          "header": "X-API-Key",
+          "note": "Required for all runtime /v1/* endpoints. Obtain via POST /v1/keys (requires bearer JWT)."
+        },
+        "bearer_jwt": {
+          "header": "Authorization: Bearer <token>",
+          "note": "Supabase JWT required for key management and IBM profile endpoints only."
+        }
+      }
+    },
+
+    "agent_skill": {
+      "type": "antigravity-skill",
+      "install_command": "npx skills add -g davidjgrimsley/quantum-api",
+      "install_source": "github:davidjgrimsley/quantum-api",
+      "skill_path": "skills/quantum-api/SKILL.md",
+      "description": "Installable skill for Antigravity (AGY), Cursor, Codex, and compatible agents. Gives the agent full knowledge of the Quantum API contract, authentication, SDKs, and integration procedures.",
+      "compatible_agents": ["antigravity", "cursor", "codex", "claude-code"]
+    },
+
+    "sdks": [
+      {
+        "name": "JavaScript / TypeScript SDK",
+        "package": "@mr.dj2u/quantum-api",
+        "language": "typescript",
+        "path": "sdk/js/",
+        "status": "package-ready"
+      },
+      {
+        "name": "Python SDK",
+        "package": "quantum-api-sdk",
+        "language": "python",
+        "path": "sdk/python/",
+        "status": "package-ready"
+      },
+      {
+        "name": "PennyLane Plugin",
+        "package": "quantum-api-pennylane",
+        "language": "python",
+        "device": "quantum.api",
+        "path": "sdk/pennylane/",
+        "status": "package-ready"
+      },
+      {
+        "name": "Unreal Engine Plugin",
+        "language": "cpp",
+        "ue_versions": ["5.4", "5.5", "5.6"],
+        "path": "sdk/unreal/",
+        "status": "scaffold"
+      },
+      {
+        "name": "Unity Helper",
+        "language": "csharp",
+        "path": "sdk/unity/",
+        "status": "scaffold"
+      },
+      {
+        "name": "Godot Addon",
+        "language": "gdscript",
+        "path": "sdk/godot/",
+        "status": "reference-integration"
+      }
+    ],
+
+    "mcp_server": {
+      "status": "planned",
+      "note": "An MCP server exposing Quantum API tools is planned for a future phase. When available, it will be advertised here with its connection details."
+    }
+  },
+
+  "documentation": {
+    "llms_txt": "https://github.com/davidjgrimsley/quantum-api/blob/main/llms.txt",
+    "manifest": "https://github.com/davidjgrimsley/quantum-api/blob/main/manifest.json",
+    "agent_prompt": "https://github.com/davidjgrimsley/quantum-api/blob/main/agent-prompt.md",
+    "readme": "https://github.com/davidjgrimsley/quantum-api/blob/main/README.md",
+    "changelog": "https://github.com/davidjgrimsley/quantum-api/blob/main/CHANGELOG.md"
+  }
+}
