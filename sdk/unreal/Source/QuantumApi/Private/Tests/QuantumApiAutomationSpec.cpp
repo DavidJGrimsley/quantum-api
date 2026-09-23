@@ -1,3 +1,4 @@
+// Copyright (c) 2026 David J. Grimsley. All rights reserved.
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"

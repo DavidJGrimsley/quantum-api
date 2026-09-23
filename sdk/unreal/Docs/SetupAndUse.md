@@ -1,4 +1,4 @@
-# Quantum API Unreal Plugin
+# Quantum API Unreal Plugin — Setup and Use Guide
 
 `QuantumApi` is a UE 5.8 Runtime plugin for Windows 64-bit (Win64) projects that call the Quantum API `/v1` contract. The plugin does not support UEFN.
 It gives Blueprint and C++ developers async nodes/calls for gates, circuits,
@@ -10,8 +10,8 @@ operations. Create an account at
 and create a key in the **API Keys** panel. The key is shown once, so copy it
 to a secure development secret store. Direct API-key mode is for development
 only; shipped games should call a backend proxy that keeps the key server-side.
-See [Docs/SetupAndUse.md](Docs/SetupAndUse.md) for supported setup, first use,
-and troubleshooting. Public documentation: https://davidjgrimsley.com/public-facing/api/quantum/ue-plugin.
+This guide covers supported setup, first use, and troubleshooting. Public
+documentation: https://davidjgrimsley.com/public-facing/api/quantum/ue-plugin.
 
 ## Start here: what the Blueprint pins mean
 
@@ -49,7 +49,7 @@ For a first test, use these nodes in order:
 3. Open **Project Settings → Quantum API** and choose an authentication mode.
 
 The source-controlled UE 5.8 build harness is
-[Examples/QuantumApiDemo](Examples/QuantumApiDemo/README.md). It is a demo,
+[Examples/QuantumApiDemo](../Examples/QuantumApiDemo/README.md). It is a demo,
 not something a game team must ship or install with the plugin.
 
 ## API access prerequisite
@@ -169,7 +169,7 @@ Most projects leave `Options` empty. It is only for advanced per-call cases:
 ## C++ integration
 
 Blueprint is not the only way to use the plugin. The demo’s
-[`QuantumApiDemoActor.cpp`](Examples/QuantumApiDemo/Source/QuantumApiDemo/QuantumApiDemoActor.cpp)
+[`QuantumApiDemoActor.cpp`](../Examples/QuantumApiDemo/Source/QuantumApiDemo/QuantumApiDemoActor.cpp)
 is a C++ Actor that uses the same async-action classes exposed as Blueprint
 nodes.
 
@@ -224,7 +224,7 @@ the catalog option is the API metadata endpoint `/portfolio.json`, not finance
 portfolio optimization. Credential lifecycle routes, IBM profile management,
 metrics, and arbitrary paths are intentionally unavailable.
 
-The checked-in [endpoint coverage manifest](contract/endpoint-coverage.json)
+The checked-in [endpoint coverage manifest](../contract/endpoint-coverage.json)
 covers all 39 non-credential `/v1` operations.
 
 ## Distribution and validation

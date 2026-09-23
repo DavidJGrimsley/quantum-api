@@ -5,7 +5,7 @@
   "FriendlyName": "Quantum API",
   "Description": "Blueprint-friendly runtime HTTP client for the Quantum API mounted /v1 contract, including QRNG and jobs.",
   "Category": "Engine Tools",
-  "CreatedBy": "Quantum API",
+  "CreatedBy": "David J. Grimsley",
   "CreatedByURL": "https://davidjgrimsley.com/",
   "DocsURL": "https://davidjgrimsley.com/public-facing/api/quantum/ue-plugin",
   "MarketplaceURL": "",
@@ -19,7 +19,10 @@
     {
       "Name": "QuantumApi",
       "Type": "Runtime",
-      "LoadingPhase": "Default"
+      "LoadingPhase": "Default",
+      "PlatformAllowList": [
+        "Win64"
+      ]
     }
   ]
 }
