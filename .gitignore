@@ -38,9 +38,7 @@ dist-cjs/
 quantum_api.db
 tests/test_quantum_api.db
 
-# Unity local package import metadata
-sdk/unity/**/*.meta
-sdk/unity/*.meta
+# Keep Unity package .meta files so imported script references retain stable GUIDs.
 
 # Temporary files
 *.tmp
