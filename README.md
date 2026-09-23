@@ -1,6 +1,6 @@
 # Quantum API
 
-Quantum API is a greenfield FastAPI service for quantum-inspired runtime features.
+Quantum API is a FastAPI service for quantum-inspired runtime features.
 
 **Live API base**: `https://davidjgrimsley.com/public-facing/api/quantum/v1`
 
@@ -9,7 +9,7 @@ Quantum API is a greenfield FastAPI service for quantum-inspired runtime feature
 > Give your coding agent full knowledge of the Quantum API in one command:
 >
 > ```bash
-> npx skills add -g davidjgrimsley/quantum-api
+> npx skills add davidjgrimsley/quantum-api -g
 > ```
 >
 > After installation, agents (Antigravity, Cursor, Codex, and others) automatically
@@ -36,30 +36,36 @@ Agent-oriented resources:
 - `/v1/random`
 - `/v1/list_backends`
 - `/v1/transpile`
-- `/v1/qasm/import`
 - `/v1/qasm/export`
+- `/v1/qasm/import`
 - `/v1/qasm/run`
 - `/v1/text/transform`
-- `/v1/keys`
-- `/v1/ibm/profiles`
-- `/v1/ibm/profiles/{profile_id}`
-- `/v1/ibm/profiles/{profile_id}/verify`
 - `/v1/jobs/circuits`
 - `/v1/jobs/qasm`
 - `/v1/jobs/random`
 - `/v1/jobs/{job_id}`
-- `/v1/jobs/{job_id}/result`
 - `/v1/jobs/{job_id}/cancel`
-- `/v1/keys/{key_id}` (delete revoked key)
-- `/v1/keys/revoked` (bulk delete revoked keys)
-- `/v1/keys/{key_id}/revoke`
-- `/v1/keys/{key_id}/rotate`
+- `/v1/jobs/{job_id}/result`
+- `/v1/algorithms/amplitude_estimation`
+- `/v1/algorithms/grover_search`
+- `/v1/algorithms/phase_estimation`
+- `/v1/algorithms/time_evolution`
+- `/v1/optimization/knapsack`
+- `/v1/optimization/maxcut`
 - `/v1/optimization/qaoa`
+- `/v1/optimization/tsp`
 - `/v1/optimization/vqe`
-- `/v1/experiments/state_tomography`
+- `/v1/experiments/quantum_volume`
 - `/v1/experiments/randomized_benchmarking`
+- `/v1/experiments/state_tomography`
+- `/v1/experiments/t1`
+- `/v1/experiments/t2ramsey`
+- `/v1/finance/portfolio_diversification`
 - `/v1/finance/portfolio_optimization`
 - `/v1/ml/kernel_classifier`
+- `/v1/ml/qsvr_regressor`
+- `/v1/ml/vqc_classifier`
+- `/v1/nature/fermionic_mapping_preview`
 - `/v1/nature/ground_state_energy`
 - `/metrics` (internal metrics endpoint)
 
@@ -100,8 +106,7 @@ uv sync --extra phase5-optimization --extra phase5-experiments --extra phase5-fi
 ### Authentication and Rate Limits
 
 - `GET /v1/health` and `GET /v1/portfolio.json` are public.
-- `GET /v1/keys`, `POST /v1/keys`, `DELETE /v1/keys/{key_id}`, `DELETE /v1/keys/revoked`, `POST /v1/keys/{key_id}/revoke`, `POST /v1/keys/{key_id}/rotate`, and all `/v1/ibm/profiles*` endpoints require `Authorization: Bearer <supabase_jwt>`.
-- All other protected `/v1/*` endpoints require `X-API-Key` (DB-managed key records only; no `API_KEYS_JSON` fallback).
+- Protected runtime `/v1/*` endpoints require a supplied `X-API-Key`.
 - Successful protected responses include:
   - `X-Request-ID`
   - `RateLimit-Limit`
@@ -136,7 +141,6 @@ Response fields:
 - Built dynamically from the current OpenAPI surface with endpoint auth classification:
   - `public`
   - `api_key`
-  - `bearer_jwt`
 - When the API is mounted behind a prefix such as `/public-facing/api/quantum`, each endpoint `path` in `portfolio.json` is emitted as a request-ready mounted path.
 - `operationPath` keeps the canonical FastAPI/OpenAPI route such as `/v1/optimization/qaoa`.
 
@@ -144,46 +148,6 @@ For a plain-English live VPS testing walkthrough, see [docs/operations/phase5-be
 
 ### `GET /v1/echo-types`
 Lists canonical transformation categories and descriptions from one enum source.
-
-### Key Management Endpoints (`/v1/keys*`)
-
-- `GET /v1/keys`: list current user's keys (masked metadata only).
-- `POST /v1/keys`: create a key and return the raw key exactly once.
-- `DELETE /v1/keys/{key_id}`: permanently delete one revoked key from history.
-- `DELETE /v1/keys/revoked`: permanently delete all revoked keys for the current user.
-- `POST /v1/keys/{key_id}/revoke`: revoke an existing key.
-- `POST /v1/keys/{key_id}/rotate`: atomically rotate key (old key becomes invalid, new raw key shown once).
-
-All key-management endpoints are user-scoped to the JWT subject (`sub`) and require a valid Supabase bearer token.
-
-### IBM Profile Endpoints (`/v1/ibm/profiles*`)
-
-- `GET /v1/ibm/profiles`: list the current user's saved IBM credential profiles.
-- `POST /v1/ibm/profiles`: save a new named IBM credential profile.
-- `PATCH /v1/ibm/profiles/{profile_id}`: rename a profile, replace token/instance/channel, or switch the default profile.
-- `DELETE /v1/ibm/profiles/{profile_id}`: remove one saved profile.
-- `POST /v1/ibm/profiles/{profile_id}/verify`: attempt a live IBM Runtime lookup and persist `verified` or `invalid`.
-
-IBM profile rules:
-
-- Profiles are user-scoped to the bearer JWT subject.
-- `profile_name` must be unique per user.
-- Raw IBM tokens are write-only. Responses return masked token metadata only.
-- Stored-profile support requires `IBM_CREDENTIAL_ENCRYPTION_KEY` on the server.
-- `IBM_CHANNEL` defaults to `ibm_quantum_platform`.
-- Server-level `IBM_TOKEN` and `IBM_INSTANCE` remain available as a local/self-host fallback when no stored BYO profile is available.
-
-Create request example:
-
-```json
-{
-  "profile_name": "my-open-plan",
-  "token": "ibm_api_token_here",
-  "instance": "crn:v1:bluemix:public:quantum-computing:us-east:...",
-  "channel": "ibm_quantum_platform",
-  "is_default": true
-}
-```
 
 ### `POST /v1/random`
 
@@ -374,7 +338,7 @@ Response fields:
 
 Notes:
 
-- Jobs are scoped by the owning API key's `owner_user_id`, not by bearer JWT.
+- Jobs are scoped by the owning API key's `owner_user_id`.
 - Submit persists a local job row immediately, then status/result endpoints poll IBM on read and cache terminal state.
 
 ### `POST /v1/jobs/qasm`
@@ -619,7 +583,6 @@ Copy `.env.example` to `.env` and adjust values as needed.
 - `IBM_TOKEN` (optional local/self-host fallback)
 - `IBM_INSTANCE` (optional local/self-host fallback)
 - `IBM_CHANNEL` (optional, default `ibm_quantum_platform`)
-- `IBM_CREDENTIAL_ENCRYPTION_KEY` (required for stored BYO IBM profiles)
 - `AUTH_ENABLED`
 - `API_KEY_HEADER`
 - `API_KEY_HASH_SECRET`
@@ -630,13 +593,9 @@ Copy `.env.example` to `.env` and adjust values as needed.
 - `DEFAULT_KEY_RATE_LIMIT_PER_SECOND`
 - `DEFAULT_KEY_RATE_LIMIT_PER_MINUTE`
 - `DEFAULT_KEY_DAILY_QUOTA`
-- `MAX_ACTIVE_API_KEYS_PER_USER`
-- `MAX_TOTAL_API_KEYS_PER_USER`
 - `DATABASE_URL`
 - `DATABASE_AUTO_CREATE`
 - `SUPABASE_URL`
-- `SUPABASE_JWT_AUDIENCE`
-- `SUPABASE_JWT_ISSUER`
 - `SUPABASE_JWKS_CACHE_SECONDS`
 - `DEV_BOOTSTRAP_API_KEY_ENABLED`
 - `DEV_BOOTSTRAP_API_KEY`
@@ -661,8 +620,6 @@ Security defaults and guardrails:
 - `staging`/`production` require `METRICS_TOKEN` when metrics are enabled.
 - `staging`/`production` require `DATABASE_AUTO_CREATE=false`.
 - `staging`/`production` require `API_KEY_HASH_SECRET` to be rotated from dev default.
-- Active API key creation is capped per owner by `MAX_ACTIVE_API_KEYS_PER_USER`.
-- Total API key history per owner (active + revoked + rotated) is capped by `MAX_TOTAL_API_KEYS_PER_USER`.
 
 ## Operations and SLOs
 
@@ -671,39 +628,6 @@ Security defaults and guardrails:
 - Staging deployment playbook: `docs/operations/deploy-staging.md`
 - Production deployment playbook: `docs/operations/deploy-production.md`
 - Supabase Phase 3.5 schema script (includes `pgcrypto`, RLS, and owner policies): `docs/operations/phase3_5_supabase_schema.sql`
-
-## Identerest Rollout (Phase 3.75)
-
-1. Point `SUPABASE_URL` and `DATABASE_URL` at the Identerest Supabase project.
-   - If using Supabase pooler (`*.pooler.supabase.com:6543`) with `asyncpg`, statement cache is auto-disabled by the service bootstrap for PgBouncer compatibility.
-2. Apply `docs/operations/phase3_5_supabase_schema.sql` in that project.
-3. Ensure OAuth providers and redirect URLs are configured for portfolio login.
-4. Keep `/v1/keys*` on bearer JWT and runtime `/v1/*` on `X-API-Key` (already enforced in middleware).
-5. Restart service and validate create/list/revoke/rotate flows.
-6. For BYO IBM rollout, also set `IBM_CREDENTIAL_ENCRYPTION_KEY`, apply the updated Phase 3.5 schema script, and validate `/v1/ibm/profiles*` plus `/v1/jobs*`.
-
-## BYO IBM Live Verification
-
-Use the reusable Phase 4 smoke verifier to validate the real BYO IBM flow end-to-end with a live bearer JWT and live IBM credentials.
-
-```bash
-export VERIFY_API_BASE_URL=https://davidjgrimsley.com/public-facing/api/quantum
-export VERIFY_BEARER_JWT=<supabase_jwt>
-export VERIFY_IBM_TOKEN=<ibm_api_token>
-export VERIFY_IBM_INSTANCE=<ibm_instance_or_crn>
-export VERIFY_IBM_CHANNEL=ibm_quantum_platform
-
-uv run python scripts/verify_byo_ibm_flow.py --timeout-seconds 1800
-```
-
-Notes:
-
-- `VERIFY_API_BASE_URL` may be the service root or the full `/v1` base URL. The script appends `/v1` when missing.
-- `IBM_CREDENTIAL_ENCRYPTION_KEY` must already be configured on the deployed server for stored-profile verification to work.
-- Use `--backend-name <backend>` to force a specific IBM backend.
-- Cleanup is enabled by default. Use `--no-cleanup` if you want to inspect the created verification resources afterward.
-- A passing run proves: IBM profile save + verify, Quantum API key creation, IBM backend listing, IBM transpile, hardware job submission, and a terminal result or structured provider error.
-- Record the run date, environment, backend, terminal job status, result/error artifact, and cleanup outcome in your release notes or roadmap notes.
 
 ## Docker
 

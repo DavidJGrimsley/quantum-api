@@ -46,7 +46,6 @@ Validation error from Pydantic. Check:
 ### `401 Unauthorized`
 
 - `X-API-Key` header is missing or the key is invalid/revoked/rotated-away.
-- `Authorization: Bearer` JWT is missing, expired, or invalid for key-management endpoints.
 - The dev bootstrap key (`qapi_devlocal_...`) is being used on a non-development server.
 
 ---
@@ -54,7 +53,6 @@ Validation error from Pydantic. Check:
 ### `403 Forbidden`
 
 - The API key does not have permission to access the requested resource (keys are user-scoped).
-- JWT `sub` does not match the owner of the requested key or IBM profile.
 
 ---
 
@@ -89,7 +87,7 @@ Validation error from Pydantic. Check:
 }
 ```
 - The user has no saved IBM profile and the server has no fallback `IBM_TOKEN`.
-- Fix: create an IBM profile via `POST /v1/ibm/profiles` and verify it.
+- Ask the owner for an existing IBM profile name or to configure access.
 
 **`result_not_ready`** (on `GET /v1/jobs/{job_id}/result`):
 ```json
@@ -134,19 +132,3 @@ RateLimit-Reset: 1748800000
 Implement exponential backoff with jitter for `429` responses. Use the `Retry-After` header value as the minimum wait.
 
 ---
-
-## Verifying End-to-End with the BYO IBM Smoke Verifier
-
-For full end-to-end verification of the IBM flow (profiles, keys, transpile, hardware job), use the built-in smoke verifier:
-
-```bash
-export VERIFY_API_BASE_URL=https://davidjgrimsley.com/public-facing/api/quantum
-export VERIFY_BEARER_JWT=<supabase_jwt>
-export VERIFY_IBM_TOKEN=<ibm_api_token>
-export VERIFY_IBM_INSTANCE=<ibm_instance_or_crn>
-export VERIFY_IBM_CHANNEL=ibm_quantum_platform
-
-uv run python scripts/verify_byo_ibm_flow.py --timeout-seconds 1800
-```
-
-A passing run validates: IBM profile save + verify, API key creation, IBM backend listing, transpile, hardware job submission, terminal result or structured provider error, and cleanup.

@@ -54,9 +54,9 @@ VQE (Variational Quantum Eigensolver) for ground state energy.
 
 Refer to domain doc: [`docs/domains/optimization-vqe.md`](../../../docs/domains/optimization-vqe.md)
 
-Additional endpoints (see individual domain docs in `docs/domains/`):
-- `POST /v1/optimization/qaoa` — QAOA general
-- Knapsack, MaxCut, TSP via QAOA — see [`docs/domains/`](../../../docs/domains/)
+Additional routes: `POST /v1/optimization/knapsack`,
+`POST /v1/optimization/maxcut`, and `POST /v1/optimization/tsp`.
+See [the domain guides](../../../docs/domains/) for their payloads.
 
 ---
 
@@ -72,10 +72,11 @@ Randomized benchmarking of gate fidelity.
 
 Refer to: [`docs/domains/experiments-randomized-benchmarking.md`](../../../docs/domains/experiments-randomized-benchmarking.md)
 
-Additional experiment endpoints (see `docs/domains/`):
-- Quantum Volume: [`docs/domains/experiments-quantum-volume.md`](../../../docs/domains/experiments-quantum-volume.md)
-- T1 relaxation: [`docs/domains/experiments-t1.md`](../../../docs/domains/experiments-t1.md)
-- T2 Ramsey: [`docs/domains/experiments-t2ramsey.md`](../../../docs/domains/experiments-t2ramsey.md)
+Additional routes: `POST /v1/experiments/quantum_volume`,
+`POST /v1/experiments/t1`, and `POST /v1/experiments/t2ramsey`. See the
+[Quantum Volume](../../../docs/domains/experiments-quantum-volume.md),
+[T1](../../../docs/domains/experiments-t1.md), and
+[T2 Ramsey](../../../docs/domains/experiments-t2ramsey.md) guides.
 
 ---
 
@@ -86,8 +87,8 @@ Quantum portfolio optimization.
 
 Refer to: [`docs/domains/finance-portfolio-optimization.md`](../../../docs/domains/finance-portfolio-optimization.md)
 
-Additional finance endpoints:
-- Portfolio diversification: [`docs/domains/finance-portfolio-diversification.md`](../../../docs/domains/finance-portfolio-diversification.md)
+Also available: `POST /v1/finance/portfolio_diversification`; see the
+[diversification guide](../../../docs/domains/finance-portfolio-diversification.md).
 
 ---
 
@@ -98,9 +99,10 @@ Quantum kernel-based classifier (QSVC).
 
 Refer to: [`docs/domains/ml-kernel-classifier.md`](../../../docs/domains/ml-kernel-classifier.md)
 
-Additional ML endpoints:
-- QSVR regressor: [`docs/domains/ml-qsvr-regressor.md`](../../../docs/domains/ml-qsvr-regressor.md)
-- VQC classifier: [`docs/domains/ml-vqc-classifier.md`](../../../docs/domains/ml-vqc-classifier.md)
+Additional routes: `POST /v1/ml/qsvr_regressor` and
+`POST /v1/ml/vqc_classifier`; see
+the [QSVR](../../../docs/domains/ml-qsvr-regressor.md) and
+[VQC](../../../docs/domains/ml-vqc-classifier.md) guides.
 
 ---
 
@@ -113,19 +115,20 @@ Requires `phase5-nature` extra (includes `pyscf`, `qiskit-nature`, `qiskit-natur
 
 Refer to: [`docs/domains/nature-ground-state-energy.md`](../../../docs/domains/nature-ground-state-energy.md)
 
-Additional nature endpoints:
-- Fermionic mapping preview: [`docs/domains/nature-fermionic-mapping-preview.md`](../../../docs/domains/nature-fermionic-mapping-preview.md)
+Also available: `POST /v1/nature/fermionic_mapping_preview`; see the
+[mapping guide](../../../docs/domains/nature-fermionic-mapping-preview.md).
 
 ---
 
 ## Algorithms
 
-Available via the algorithms service layer (not yet direct REST endpoints — accessed through VQE/QAOA/optimization routes):
+The following algorithms have direct REST endpoints. Read the linked guides or
+current OpenAPI schema for payloads:
 
-- Amplitude Estimation: [`docs/domains/algorithms-amplitude-estimation.md`](../../../docs/domains/algorithms-amplitude-estimation.md)
-- Grover Search: [`docs/domains/algorithms-grover-search.md`](../../../docs/domains/algorithms-grover-search.md)
-- Phase Estimation: [`docs/domains/algorithms-phase-estimation.md`](../../../docs/domains/algorithms-phase-estimation.md)
-- Time Evolution: [`docs/domains/algorithms-time-evolution.md`](../../../docs/domains/algorithms-time-evolution.md)
+- `POST /v1/algorithms/amplitude_estimation`: [guide](../../../docs/domains/algorithms-amplitude-estimation.md)
+- `POST /v1/algorithms/grover_search`: [guide](../../../docs/domains/algorithms-grover-search.md)
+- `POST /v1/algorithms/phase_estimation`: [guide](../../../docs/domains/algorithms-phase-estimation.md)
+- `POST /v1/algorithms/time_evolution`: [guide](../../../docs/domains/algorithms-time-evolution.md)
 
 ---
 

@@ -43,8 +43,6 @@
     ["POST", "/v1/nature/fermionic_mapping_preview"]
   ],
   "intentionally_excluded": [
-    "/v1/keys*",
-    "/v1/ibm/profiles*",
     "/metrics"
   ]
 }

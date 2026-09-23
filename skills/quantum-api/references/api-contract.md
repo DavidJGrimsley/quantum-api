@@ -1,9 +1,11 @@
-# Quantum API — Full REST API Contract
+# Quantum API — Core REST API Contract
 
 **Service root (production)**: `https://davidjgrimsley.com/public-facing/api/quantum`  
 **API v1 base (production)**: `https://davidjgrimsley.com/public-facing/api/quantum/v1`  
 **Local dev API v1 base**: `http://127.0.0.1:8000/v1`  
-**All endpoint paths below are relative to the API v1 base.** Full example: `POST https://davidjgrimsley.com/public-facing/api/quantum/v1/circuits/run`
+Endpoint headings use canonical `/v1/...` paths. If a client is configured
+with the API v1 base, append only the suffix after `/v1`. Full example:
+`POST https://davidjgrimsley.com/public-facing/api/quantum/v1/circuits/run`.
 
 ---
 
@@ -12,9 +14,7 @@
 | Endpoint group | Auth required |
 |---|---|
 | `GET /v1/health`, `GET /v1/portfolio.json` | None (public) |
-| `GET /v1/echo-types` | None (public) |
-| `/v1/keys*`, `/v1/ibm/profiles*` | `Authorization: Bearer <supabase_jwt>` |
-| All other `/v1/*` endpoints | `X-API-Key: <key>` header |
+| Other documented `/v1/*` endpoints | `X-API-Key: <key>` header |
 
 ---
 
@@ -59,8 +59,8 @@ Always check `error` (machine code) + `message` (human text) + `details` (contex
 **Response**:
 ```json
 {
-  "status": "ok",
-  "service": "quantum-api",
+  "status": "healthy",
+  "service": "Quantum API",
   "version": "0.1.0",
   "qiskit_available": true,
   "runtime_mode": "qiskit"
@@ -74,14 +74,34 @@ Always check `error` (machine code) + `message` (human text) + `details` (contex
 ### `GET /v1/portfolio.json`
 **Auth**: None
 
-Public metadata contract. Lists all endpoints with their `path`, `operationPath`, `method`, and auth classification (`public` | `api_key` | `bearer_jwt`). Used by portfolio pages and app integrations.
+Public metadata contract. Lists discoverable endpoints with their `path`, `operationPath`, `method`, and auth classification (`public` | `api_key`). Used by portfolio pages and app integrations.
 
 ---
 
 ### `GET /v1/echo-types`
-**Auth**: None
+**Auth**: `X-API-Key`
 
 Returns canonical transformation categories and descriptions for the `/v1/text/transform` endpoint.
+
+---
+
+### `POST /v1/random`
+**Auth**: `X-API-Key`
+
+Generates one local integer in an inclusive range:
+
+```json
+{"min": 0, "max": 1}
+```
+
+```json
+{"value": 1, "source": "qiskit-simulator"}
+```
+
+Both bounds must be JSON integers within signed 32-bit range, with `min <= max`.
+Extra fields and non-integer bounds return `422`. The source can be
+`qiskit-simulator` or `classical-fallback`. Both are local simulation and
+neither provides IBM hardware entropy or cryptographic randomness.
 
 ---
 
@@ -323,55 +343,9 @@ Set `shots: null` for analytic mode (returns `statevector`, `counts: null`).
 
 ---
 
-### Key Management (`/v1/keys*`)
-**Auth**: `Authorization: Bearer <supabase_jwt>`
-
-| Method | Path | Action |
-|---|---|---|
-| `GET` | `/v1/keys` | List current user's keys (masked metadata only) |
-| `POST` | `/v1/keys` | Create a key — **raw key shown exactly once** |
-| `POST` | `/v1/keys/{key_id}/revoke` | Revoke a key |
-| `POST` | `/v1/keys/{key_id}/rotate` | Rotate (old becomes invalid, new raw key shown once) |
-| `DELETE` | `/v1/keys/{key_id}` | Permanently delete one revoked key |
-| `DELETE` | `/v1/keys/revoked` | Permanently delete all revoked keys |
-
-All operations are user-scoped to the JWT `sub`. Raw key values are write-only after creation/rotation.
-
----
-
-### IBM Profile Endpoints (`/v1/ibm/profiles*`)
-**Auth**: `Authorization: Bearer <supabase_jwt>`
-
-| Method | Path | Action |
-|---|---|---|
-| `GET` | `/v1/ibm/profiles` | List saved IBM profiles (masked token) |
-| `POST` | `/v1/ibm/profiles` | Save a new named IBM credential profile |
-| `PATCH` | `/v1/ibm/profiles/{profile_id}` | Rename, replace token/instance/channel, or set default |
-| `DELETE` | `/v1/ibm/profiles/{profile_id}` | Remove a profile |
-| `POST` | `/v1/ibm/profiles/{profile_id}/verify` | Live IBM Runtime lookup; persists `verified` or `invalid` |
-
-**Create request**:
-```json
-{
-  "profile_name": "my-open-plan",
-  "token": "ibm_api_token_here",
-  "instance": "crn:v1:bluemix:public:quantum-computing:us-east:...",
-  "channel": "ibm_quantum_platform",
-  "is_default": true
-}
-```
-
-Rules:
-- `profile_name` must be unique per user.
-- Raw IBM tokens are write-only; responses return masked metadata only.
-- Requires `IBM_CREDENTIAL_ENCRYPTION_KEY` on the server.
-- `channel` defaults to `ibm_quantum_platform`.
-
----
-
 ### Hardware Job Endpoints (`/v1/jobs*`)
 **Auth**: `X-API-Key`  
-**Note**: Jobs are scoped by the owning API key's `owner_user_id`, not by bearer JWT.
+Jobs are scoped to the supplied API key's owner.
 
 #### `POST /v1/jobs/circuits`
 Submit async IBM hardware job from JSON circuit.
@@ -403,7 +377,26 @@ Submit async IBM hardware job from OpenQASM source.
 }
 ```
 
-**Both job submission endpoints return**:
+#### `POST /v1/jobs/random`
+Submit an inclusive-range random integer job to an IBM hardware backend:
+
+```json
+{
+  "min": 0,
+  "max": 1,
+  "provider": "ibm",
+  "backend_name": "ibm_kingston",
+  "ibm_profile": "supplied-profile-name"
+}
+```
+
+`backend_name` is required; `ibm_profile` is optional when the owner has a
+default. Bounds are signed 32-bit integers and follow the local random
+endpoint's validation. Poll the common job status and result routes. A
+successful result contains `{"value": 1, "source": "ibm-hardware"}`.
+The source label is not a cryptographic randomness guarantee.
+
+**Job submission returns**:
 ```json
 {
   "job_id": "...",

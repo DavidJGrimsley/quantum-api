@@ -28,8 +28,7 @@ run in an exported game.
 
 For a small jam game, direct mode is the shortest path: the game sends its
 configured key to Quantum API. Be aware that players can extract any key put
-in a native or Web build. Rotate the key after the jam if that is acceptable
-for your project. Proxy mode is the safer choice for a long-lived public game.
+in a native or Web build. Proxy mode keeps the key on your server.
 
 ## Project Settings
 
@@ -108,23 +107,9 @@ an unreachable server, timeout, malformed or empty JSON, request-start errors,
 and HTTP errors. `transform_text` also gives you the original text as its
 fallback value, so dialogue can keep moving.
 
-## IBM Profiles (Per-User IBM Credentials)
+## IBM runtime jobs
 
-How to set up IBM hardware:
-
-1. Open `https://davidjgrimsley.com/public-facing/api/quantum` and sign in with an Identerest account.
-2. In the `Api Keys` panel, create a Quantum API key and copy the raw key immediately (it is shown once).
-3. In the `IBM Credentials` panel, create an IBM profile (`profile_name`, IBM API token, IBM instance/CRN, channel), then click verify.
-4. Optionally mark one profile as default on that same public page.
-5. Back in Godot, either leave **Default Ibm Profile** blank to use that API
-   account default, or enter the profile name exactly as you created it.
-
-Profile management (create/list/update/delete/verify) stays on your portfolio website.
-This addon only consumes existing profile names for IBM runtime calls.
-
-The profile is stored by Quantum API, not copied into the Godot project. Godot
-only sends its profile name. For IBM-specific runtime routes, pass
-`ibm_profile` explicitly or configure `default_ibm_profile` in project settings.
+Use an existing IBM profile name supplied by the owner, or leave **Default Ibm Profile** blank to use the owner's default. The addon sends only the profile name; it does not administer credentials.
 
 ## Sample Usage
 

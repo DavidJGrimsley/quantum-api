@@ -1,20 +1,18 @@
 {
   "product": "Quantum API",
-  "description": "FastAPI service for quantum-inspired runtime features: circuit execution, QASM interop, transpilation, IBM hardware jobs, and domain algorithms.",
+  "description": "FastAPI service for circuit execution, QASM, local and IBM random jobs, and domain algorithms.",
   "author": "David J. Grimsley",
   "license": "Apache-2.0",
   "repository": "https://github.com/davidjgrimsley/quantum-api",
-
   "versions": {
     "api": "0.1.0",
     "js_sdk": "0.1.2",
     "python_sdk": "0.1.0",
     "pennylane_plugin": "0.1.0",
-    "unreal_plugin": "0.1.0",
+    "unreal_plugin": "0.3.0-beta",
     "unity_helper": "0.1.0",
-    "godot_addon": "0.1.0"
+    "godot_addon": "0.1.2"
   },
-
   "urls": {
     "service_root": "https://davidjgrimsley.com/public-facing/api/quantum",
     "api_v1_base": "https://davidjgrimsley.com/public-facing/api/quantum/v1",
@@ -24,7 +22,6 @@
     "agent_skill": "https://github.com/davidjgrimsley/quantum-api/blob/main/skills/quantum-api/SKILL.md",
     "agent_prompt": "https://github.com/davidjgrimsley/quantum-api/blob/main/agent-prompt.md"
   },
-
   "runtime": {
     "language": "Python",
     "framework": "FastAPI",
@@ -32,110 +29,118 @@
     "qiskit_min_version": "2.1.0",
     "qiskit_aer_min_version": "0.17.0",
     "qiskit_ibm_runtime_min_version": "0.42.0",
-    "runtime_modes": ["qiskit", "classical-fallback"]
+    "runtime_modes": [
+      "qiskit",
+      "classical-fallback"
+    ]
   },
-
   "authentication": {
-    "public_endpoints": ["/v1/health", "/v1/portfolio.json", "/v1/echo-types"],
+    "public_endpoints": [
+      "/v1/health",
+      "/v1/portfolio.json"
+    ],
     "api_key_header": "X-API-Key",
-    "api_key_endpoints": "All /v1/* runtime endpoints except key management and IBM profiles",
-    "bearer_jwt_endpoints": ["/v1/keys", "/v1/ibm/profiles"],
-    "bearer_jwt_issuer": "Supabase (Identerest project)",
+    "api_key_endpoints": "Discoverable protected runtime /v1/* endpoints",
     "dev_api_key": "qapi_devlocal_0123456789abcdef0123456789abcdef"
   },
-
   "endpoints": {
     "public": [
       "GET /v1/health",
-      "GET /v1/portfolio.json",
-      "GET /v1/echo-types"
+      "GET /v1/portfolio.json"
     ],
     "api_key": [
       "POST /v1/gates/run",
       "POST /v1/circuits/run",
+      "POST /v1/random",
       "GET /v1/list_backends",
       "POST /v1/transpile",
-      "POST /v1/qasm/import",
       "POST /v1/qasm/export",
+      "POST /v1/qasm/import",
       "POST /v1/qasm/run",
       "POST /v1/text/transform",
       "POST /v1/jobs/circuits",
       "POST /v1/jobs/qasm",
+      "POST /v1/jobs/random",
       "GET /v1/jobs/{job_id}",
-      "GET /v1/jobs/{job_id}/result",
       "POST /v1/jobs/{job_id}/cancel",
+      "GET /v1/jobs/{job_id}/result",
+      "POST /v1/algorithms/amplitude_estimation",
+      "POST /v1/algorithms/grover_search",
+      "POST /v1/algorithms/phase_estimation",
+      "POST /v1/algorithms/time_evolution",
+      "POST /v1/optimization/knapsack",
+      "POST /v1/optimization/maxcut",
       "POST /v1/optimization/qaoa",
+      "POST /v1/optimization/tsp",
       "POST /v1/optimization/vqe",
-      "POST /v1/experiments/state_tomography",
+      "POST /v1/experiments/quantum_volume",
       "POST /v1/experiments/randomized_benchmarking",
+      "POST /v1/experiments/state_tomography",
+      "POST /v1/experiments/t1",
+      "POST /v1/experiments/t2ramsey",
+      "POST /v1/finance/portfolio_diversification",
       "POST /v1/finance/portfolio_optimization",
       "POST /v1/ml/kernel_classifier",
-      "POST /v1/nature/ground_state_energy"
-    ],
-    "bearer_jwt": [
-      "GET /v1/keys",
-      "POST /v1/keys",
-      "DELETE /v1/keys/{key_id}",
-      "DELETE /v1/keys/revoked",
-      "POST /v1/keys/{key_id}/revoke",
-      "POST /v1/keys/{key_id}/rotate",
-      "GET /v1/ibm/profiles",
-      "POST /v1/ibm/profiles",
-      "PATCH /v1/ibm/profiles/{profile_id}",
-      "DELETE /v1/ibm/profiles/{profile_id}",
-      "POST /v1/ibm/profiles/{profile_id}/verify"
+      "POST /v1/ml/qsvr_regressor",
+      "POST /v1/ml/vqc_classifier",
+      "POST /v1/nature/fermionic_mapping_preview",
+      "POST /v1/nature/ground_state_energy",
+      "GET /v1/echo-types"
     ],
     "internal": [
       "GET /metrics"
     ]
   },
-
   "sdks": {
     "js": {
       "package": "@mr.dj2u/quantum-api",
       "version": "0.1.2",
-      "status": "package-ready, not yet published to npm",
+      "status": "published to npm",
       "path": "sdk/js/"
     },
     "python": {
       "package": "quantum-api-sdk",
       "version": "0.1.0",
-      "status": "package-ready, not yet published to PyPI",
+      "status": "published to PyPI",
       "path": "sdk/python/"
     },
     "pennylane": {
       "package": "quantum-api-pennylane",
       "device": "quantum.api",
       "version": "0.1.0",
-      "status": "package-ready, not yet published to PyPI",
+      "status": "published to PyPI",
       "path": "sdk/pennylane/"
     },
     "unreal": {
       "plugin": "QuantumApi",
-      "version": "0.1.0",
-      "ue_versions": ["5.4", "5.5", "5.6"],
-      "status": "Phase 6 scaffold",
+      "version": "0.3.0-beta",
+      "ue_versions": [
+        "5.8"
+      ],
+      "status": "beta runtime plugin for Win64",
       "path": "sdk/unreal/"
     },
     "unity": {
-      "package": "com.davidjgrimsley.quantum-api",
+      "package": "com.quantumapi.runtime",
       "version": "0.1.0",
-      "status": "Phase 6 scaffold",
+      "status": "repo-local runtime package",
       "path": "sdk/unity/"
     },
     "godot": {
       "addon": "quantum_api_client",
-      "version": "0.1.0",
-      "status": "Phase 6 reference integration",
-      "path": "sdk/godot/"
+      "version": "0.1.2",
+      "status": "reusable addon",
+      "path": "addons/quantum_api_client/"
     }
   },
-
   "phase5_extras": {
     "optimization": "qiskit-algorithms, qiskit-optimization",
     "experiments": "qiskit-experiments",
     "finance": "qiskit-algorithms, qiskit-finance, qiskit-optimization",
     "ml": "qiskit-algorithms, qiskit-machine-learning, scikit-learn",
     "nature": "pyscf, qiskit-algorithms, qiskit-nature, qiskit-nature-pyscf"
+  },
+  "pending": {
+    "unity_0_2_0": "Shared manager is proposed in PR #19 and is unavailable on main until merged"
   }
 }

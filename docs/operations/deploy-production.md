@@ -30,7 +30,6 @@
    - public health endpoint
    - protected endpoint with and without a DB-backed Quantum API key
    - metrics endpoint with and without metrics token
-   - if validating BYO IBM rollout, run `uv run python scripts/verify_byo_ibm_flow.py ...` with a real bearer JWT and real IBM credentials
 
 ## Incident and Rollback
 

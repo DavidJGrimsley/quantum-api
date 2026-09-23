@@ -239,12 +239,6 @@ def custom_openapi() -> dict[str, object]:
         "name": settings.api_key_header,
         "description": f"Send a valid Quantum API key in the {settings.api_key_header} header.",
     }
-    security_schemes["BearerAuth"] = {
-        "type": "http",
-        "scheme": "bearer",
-        "bearerFormat": "JWT",
-        "description": "Send a Supabase bearer token in the Authorization header.",
-    }
 
     for path, operations in openapi_schema.get("paths", {}).items():
         if not isinstance(operations, dict):
@@ -258,8 +252,6 @@ def custom_openapi() -> dict[str, object]:
 
             if not settings.auth_enabled:
                 operation.pop("security", None)
-            elif settings.requires_user_jwt(str(path)):
-                operation["security"] = [{"BearerAuth": []}]
             elif settings.requires_api_key(str(path)):
                 operation["security"] = [{"ApiKeyAuth": []}]
             else:

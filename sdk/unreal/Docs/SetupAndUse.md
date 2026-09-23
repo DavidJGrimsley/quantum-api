@@ -5,11 +5,9 @@ It gives Blueprint and C++ developers async nodes/calls for gates, circuits,
 QASM, QRNG, IBM jobs, and the allowlisted advanced API operations.
 
 The plugin requires internet access and Quantum API access for protected
-operations. Create an account at
-[Quantum API](https://davidjgrimsley.com/public-facing/api/quantum), sign in,
-and create a key in the **API Keys** panel. The key is shown once, so copy it
-to a secure development secret store. Direct API-key mode is for development
-only; shipped games should call a backend proxy that keeps the key server-side.
+operations. Obtain an existing API key from the owner and keep it in a secure
+development secret store. Direct API-key mode is for development only;
+shipped games should call a backend proxy that keeps the key server-side.
 This guide covers supported setup, first use, and troubleshooting. Public
 documentation: https://davidjgrimsley.com/public-facing/api/quantum/ue-plugin.
 
@@ -55,15 +53,12 @@ not something a game team must ship or install with the plugin.
 ## API access prerequisite
 
 Protected requests require internet access and an active Quantum API key, or a
-backend proxy that authenticates requests on the game's behalf. To get a key,
-open [Quantum API account access](https://davidjgrimsley.com/public-facing/api/quantum),
-sign in, open **API Keys**, create a key, and copy it when shown. The raw key is
-shown once. Enter it in **Project Settings → Quantum API → API Key** for local
+backend proxy that authenticates requests on the game's behalf. Enter a key
+supplied by the owner in **Project Settings → Quantum API → API Key** for local
 development. Do not put a production key in a distributed game. For a shipped
 game, select **Backend Proxy** and route requests through a service you control;
 that service should keep the Quantum API key private and apply your own access
-controls. API access is required; the plugin does not create an API account or
-issue keys itself.
+controls. API access is required; the plugin does not issue keys.
 
 **Supported target:** Unreal Engine 5.8, Win64. UEFN is unsupported because the
 plugin makes runtime API requests.
@@ -249,8 +244,7 @@ consumer project.
 
 ## Common errors
 
-- **Unauthorized (401):** create a key in the Quantum API account page and
-  configure it in Direct mode, or confirm that your proxy adds `X-API-Key`.
+- **Unauthorized (401):** configure an existing key in Direct mode, or confirm that your proxy adds `X-API-Key`.
 - **Forbidden (403):** confirm the account/key has access to that operation and
   that any IBM service-side profile and backend are configured.
 - **Connection or timeout errors:** check internet access, the API service

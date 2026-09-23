@@ -1,4 +1,6 @@
+import json
 import re
+from pathlib import Path
 from typing import Any
 
 from fastapi.testclient import TestClient
@@ -6,28 +8,9 @@ from fastapi.testclient import TestClient
 from quantum_api.config import get_settings
 from quantum_api.main import app
 from quantum_api.services.quantum_runtime import runtime
-from quantum_api.supabase_auth import AuthenticatedUser
 
 _PATH_PARAMETER_RE = re.compile(r"{([^}]+)}")
 _ALLOWED_SMOKE_ERROR_STATUSES = {400, 409, 503}
-
-
-def _mock_bearer_user(
-    monkeypatch,
-    *,
-    user_id: str = "portfolio-smoke-user",
-    expected_token: str = "Bearer portfolio-smoke-token",
-) -> dict[str, str]:
-    async def fake_verify(authorization_header: str | None) -> AuthenticatedUser:
-        assert authorization_header == expected_token
-        return AuthenticatedUser(
-            user_id=user_id,
-            email=f"{user_id}@example.test",
-            claims={"sub": user_id, "aud": "authenticated"},
-        )
-
-    monkeypatch.setattr(app.state.jwt_verifier, "verify_authorization_header", fake_verify)
-    return {"Authorization": expected_token}
 
 
 def _materialize_portfolio_request(
@@ -74,10 +57,6 @@ def _materialize_portfolio_request(
 
     if isinstance(request_body, dict):
         request_body = dict(request_body)
-        if original_path == "/v1/ibm/profiles" and str(endpoint["method"]).upper() == "POST":
-            request_body["profile_name"] = "IBM Portfolio Smoke"
-        if original_path == "/v1/keys" and str(endpoint["method"]).upper() == "POST":
-            request_body["name"] = "Portfolio smoke key"
         if original_path in {"/v1/jobs/circuits", "/v1/jobs/qasm", "/v1/jobs/random", "/v1/transpile"}:
             request_body.pop("ibm_profile", None)
 
@@ -125,8 +104,7 @@ def test_portfolio_metadata_contract(unauth_client):
     }
     assert ("GET", "/v1/health") in by_signature
     assert ("GET", "/v1/echo-types") in by_signature
-    assert ("GET", "/v1/keys") in by_signature
-    assert ("GET", "/v1/ibm/profiles") in by_signature
+    assert not any(path.startswith(("/v1/keys", "/v1/ibm/profiles")) for _, path in by_signature)
     assert ("POST", "/v1/jobs/circuits") in by_signature
     assert ("POST", "/v1/jobs/qasm") in by_signature
     assert ("POST", "/v1/jobs/random") in by_signature
@@ -145,8 +123,6 @@ def test_portfolio_metadata_contract(unauth_client):
 
     assert by_signature[("GET", "/v1/health")]["auth"] == "public"
     assert by_signature[("GET", "/v1/echo-types")]["auth"] == "api_key"
-    assert by_signature[("GET", "/v1/keys")]["auth"] == "bearer_jwt"
-    assert by_signature[("GET", "/v1/ibm/profiles")]["auth"] == "bearer_jwt"
     assert by_signature[("POST", "/v1/jobs/circuits")]["auth"] == "api_key"
     assert by_signature[("POST", "/v1/jobs/qasm")]["auth"] == "api_key"
     assert by_signature[("POST", "/v1/jobs/random")]["auth"] == "api_key"
@@ -199,8 +175,8 @@ def test_openapi_declares_security_schemes_for_docs(unauth_client):
     assert security_schemes["ApiKeyAuth"]["type"] == "apiKey"
     assert security_schemes["ApiKeyAuth"]["in"] == "header"
     assert security_schemes["ApiKeyAuth"]["name"] == "X-API-Key"
-    assert security_schemes["BearerAuth"]["type"] == "http"
-    assert security_schemes["BearerAuth"]["scheme"] == "bearer"
+    assert "BearerAuth" not in security_schemes
+    assert not any(path.startswith(("/v1/keys", "/v1/ibm/profiles")) for path in payload["paths"])
 
     assert payload["paths"]["/v1/echo-types"]["get"]["security"] == [{"ApiKeyAuth": []}]
     assert payload["paths"]["/v1/random"]["post"]["security"] == [{"ApiKeyAuth": []}]
@@ -212,10 +188,24 @@ def test_openapi_declares_security_schemes_for_docs(unauth_client):
         "$ref": "#/components/schemas/RandomIntResponse"
     }
     assert payload["paths"]["/v1/optimization/qaoa"]["post"]["security"] == [{"ApiKeyAuth": []}]
-    assert payload["paths"]["/v1/keys"]["get"]["security"] == [{"BearerAuth": []}]
-    assert payload["paths"]["/v1/ibm/profiles"]["get"]["security"] == [{"BearerAuth": []}]
     assert "security" not in payload["paths"]["/v1/health"]["get"]
     assert "security" not in payload["paths"]["/v1/portfolio.json"]["get"]
+
+
+def test_public_manifest_matches_openapi_catalog(unauth_client):
+    manifest_path = Path(__file__).resolve().parents[1] / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    schema = unauth_client.get("/openapi.json").json()
+    expected = {
+        f"{method.upper()} {path}"
+        for path, operations in schema["paths"].items()
+        if path.startswith("/v1/")
+        for method in operations
+        if method.upper() in {"GET", "POST", "PUT", "PATCH", "DELETE"}
+    }
+    documented = set(manifest["endpoints"]["public"] + manifest["endpoints"]["api_key"])
+    assert documented == expected
+    assert set(manifest["endpoints"]["public"]) == {"GET /v1/health", "GET /v1/portfolio.json"}
 
 
 def test_openapi_and_portfolio_drop_auth_requirements_when_auth_is_disabled(unauth_client):
@@ -229,7 +219,7 @@ def test_openapi_and_portfolio_drop_auth_requirements_when_auth_is_disabled(unau
         openapi_payload = openapi_response.json()
         assert "security" not in openapi_payload["paths"]["/v1/echo-types"]["get"]
         assert "security" not in openapi_payload["paths"]["/v1/optimization/qaoa"]["post"]
-        assert "security" not in openapi_payload["paths"]["/v1/keys"]["get"]
+        assert "/v1/keys" not in openapi_payload["paths"]
 
         portfolio_response = unauth_client.get("/v1/portfolio.json")
         assert portfolio_response.status_code == 200
@@ -239,7 +229,7 @@ def test_openapi_and_portfolio_drop_auth_requirements_when_auth_is_disabled(unau
         }
         assert by_signature[("GET", "/v1/echo-types")]["auth"] == "public"
         assert by_signature[("POST", "/v1/optimization/qaoa")]["auth"] == "public"
-        assert by_signature[("GET", "/v1/keys")]["auth"] == "public"
+        assert ("GET", "/v1/keys") not in by_signature
     finally:
         settings.auth_enabled = original
         app.openapi_schema = None
@@ -258,8 +248,7 @@ def test_openapi_orders_meta_routes_after_runtime_routes(unauth_client):
     assert ordered_paths.index("/v1/nature/fermionic_mapping_preview") < ordered_paths.index("/v1/portfolio.json")
     assert ordered_paths.index("/v1/experiments/quantum_volume") < ordered_paths.index("/v1/portfolio.json")
     assert ordered_paths.index("/v1/optimization/qaoa") < ordered_paths.index("/v1/portfolio.json")
-    assert ordered_paths.index("/v1/echo-types") > ordered_paths.index("/v1/ibm/profiles")
-    assert ordered_paths.index("/v1/nature/ground_state_energy") < ordered_paths.index("/v1/ibm/profiles")
+    assert ordered_paths.index("/v1/echo-types") > ordered_paths.index("/v1/nature/ground_state_energy")
 
 
 def test_auth_and_cors_respected_with_root_path():
@@ -289,12 +278,10 @@ def test_auth_and_cors_respected_with_root_path():
         }
 
 
-def test_portfolio_examples_are_route_valid_for_public_api_key_and_bearer_auth(
+def test_portfolio_examples_are_route_valid_for_public_and_api_key_auth(
     client,
     unauth_client,
-    monkeypatch,
 ):
-    bearer_headers = _mock_bearer_user(monkeypatch)
     response = unauth_client.get("/v1/portfolio.json")
     assert response.status_code == 200
     payload = response.json()
@@ -302,7 +289,7 @@ def test_portfolio_examples_are_route_valid_for_public_api_key_and_bearer_auth(
     exercised_auth_modes: set[str] = set()
     for item in payload["endpoints"]:
         auth_mode = item.get("auth")
-        if auth_mode not in {"public", "api_key", "bearer_jwt"}:
+        if auth_mode not in {"public", "api_key"}:
             continue
 
         materialized = _materialize_portfolio_request(item)
@@ -310,7 +297,6 @@ def test_portfolio_examples_are_route_valid_for_public_api_key_and_bearer_auth(
             continue
 
         path, query_params, request_body = materialized
-        request_headers = bearer_headers if auth_mode == "bearer_jwt" else None
         request_client = client if auth_mode == "api_key" else unauth_client
 
         request_kwargs: dict[str, Any] = {}
@@ -323,7 +309,6 @@ def test_portfolio_examples_are_route_valid_for_public_api_key_and_bearer_auth(
         smoke_response = request_client.request(
             item["method"],
             path,
-            headers=request_headers,
             **request_kwargs,
         )
 
@@ -335,7 +320,7 @@ def test_portfolio_examples_are_route_valid_for_public_api_key_and_bearer_auth(
             f"{smoke_response.status_code} {smoke_response.text}"
         )
 
-    assert exercised_auth_modes == {"public", "api_key", "bearer_jwt"}
+    assert exercised_auth_modes == {"public", "api_key"}
 
 
 def test_gate_run_contract_bit_flip(client):

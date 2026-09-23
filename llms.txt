@@ -2,7 +2,7 @@
 
 > Documentation, SDK, and agent integration resources for the Quantum API —
 > a FastAPI service for quantum-inspired runtime features including circuit
-> execution, QASM interop, transpilation, IBM hardware jobs, 
+> execution, QASM interop, transpilation, local and IBM random jobs,
 > and domain algorithms (optimization, experiments, finance, ML, nature).
 
 ## Start Here
@@ -18,18 +18,18 @@
 
 - [Agent Skill](https://github.com/davidjgrimsley/quantum-api/blob/main/skills/quantum-api/SKILL.md):
   Installable skill for Antigravity, Cursor, and other supported coding agents.
-  Install: `npx skills add -g davidjgrimsley/quantum-api`
+  Install: `npx skills add davidjgrimsley/quantum-api -g`
 
 - [Machine-Readable Manifest](https://github.com/davidjgrimsley/quantum-api/blob/main/manifest.json):
   API version, SDK versions, endpoint list, and auth modes in JSON.
 
 ## REST API
 
-- [Full API Contract](https://github.com/davidjgrimsley/quantum-api/blob/main/skills/quantum-api/references/api-contract.md):
-  Every endpoint, request/response shapes, error envelope, rate-limit headers.
+- [Core API Contract](https://github.com/davidjgrimsley/quantum-api/blob/main/skills/quantum-api/references/api-contract.md):
+  Core request/response shapes, error envelope, rate-limit headers; use OpenAPI for the exhaustive route catalog.
 
-- [Authentication Guide](https://github.com/davidjgrimsley/quantum-api/blob/main/skills/quantum-api/references/authentication.md):
-  API key lifecycle, Supabase bearer JWT, IBM credential profiles.
+- [Runtime Credentials](https://github.com/davidjgrimsley/quantum-api/blob/main/skills/quantum-api/references/authentication.md):
+  Using a supplied API key and existing IBM profile name.
 
 - [Domain Endpoints (Phase 5)](https://github.com/davidjgrimsley/quantum-api/blob/main/skills/quantum-api/references/domain-endpoints.md):
   Optimization, experiments, finance, ML, and nature algorithm endpoints.
@@ -52,13 +52,13 @@
   PennyLane device `quantum.api`. Package: `quantum-api-pennylane`.
 
 - [Unreal Engine Plugin](https://github.com/davidjgrimsley/quantum-api/blob/main/sdk/unreal/README.md):
-  C++ runtime plugin for UE 5.4, 5.5, 5.6.
+  C++ runtime plugin for UE 5.8 Win64.
 
 - [Unity Helper](https://github.com/davidjgrimsley/quantum-api/blob/main/sdk/unity/README.md):
   C# runtime helper package for Unity.
 
-- [Godot Addon](https://github.com/davidjgrimsley/quantum-api/blob/main/sdk/godot/quantum_api_client/README.MD):
-  GDScript client addon for Godot 4.x.
+- [Godot Addon](https://github.com/davidjgrimsley/quantum-api/blob/main/addons/quantum_api_client/README.md):
+  Reusable GDScript client addon for Godot 4.x, version 0.1.2.
 
 - [SDK Compatibility Matrix](https://github.com/davidjgrimsley/quantum-api/blob/main/docs/sdk/compatibility-matrix.md):
   Per-SDK readiness, supported surface, and auth modes.
