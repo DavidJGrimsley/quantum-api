@@ -16,6 +16,12 @@ namespace QuantumApi.Unity
         public bool BackendProxyMode => backendProxyMode;
         public bool IsConfigured => backendProxyMode || !string.IsNullOrWhiteSpace(apiKey);
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetInstance()
+        {
+            Instance = null;
+        }
+
         private void Awake()
         {
             if (Instance != null && Instance != this)
