@@ -1,0 +1,83 @@
+# David J. Grimsley — Quantum API
+
+> Documentation, SDK, and agent integration resources for the Quantum API —
+> a FastAPI service for quantum-inspired runtime features including circuit
+> execution, QASM interop, transpilation, local and IBM random jobs,
+> and domain algorithms (optimization, experiments, finance, ML, nature).
+
+## Start Here
+
+- [Quantum API Overview](https://davidjgrimsley.com/public-facing/api/quantum):
+  Interactive API docs, service overview, and endpoint explorer.
+
+- [API Reference (Markdown)](https://github.com/davidjgrimsley/quantum-api/blob/main/README.md):
+  Full REST contract, authentication, configuration, and operations documentation.
+
+- [Agent Contract](https://github.com/davidjgrimsley/quantum-api/blob/main/agent-prompt.md):
+  Instructions specifically for coding agents integrating the Quantum API.
+
+- [Agent Skill](https://github.com/davidjgrimsley/quantum-api/blob/main/skills/quantum-api/SKILL.md):
+  Installable skill for Antigravity, Cursor, and other supported coding agents.
+  Install: `npx skills add davidjgrimsley/quantum-api -g`
+
+- [Machine-Readable Manifest](https://github.com/davidjgrimsley/quantum-api/blob/main/manifest.json):
+  API version, SDK versions, endpoint list, and auth modes in JSON.
+
+## REST API
+
+- [Core API Contract](https://github.com/davidjgrimsley/quantum-api/blob/main/skills/quantum-api/references/api-contract.md):
+  Core request/response shapes, error envelope, rate-limit headers; use OpenAPI for the exhaustive route catalog.
+
+- [Runtime Credentials](https://github.com/davidjgrimsley/quantum-api/blob/main/skills/quantum-api/references/authentication.md):
+  Using a supplied API key and existing IBM profile name.
+
+- [Domain Endpoints (Phase 5)](https://github.com/davidjgrimsley/quantum-api/blob/main/skills/quantum-api/references/domain-endpoints.md):
+  Optimization, experiments, finance, ML, and nature algorithm endpoints.
+
+- [Troubleshooting](https://github.com/davidjgrimsley/quantum-api/blob/main/skills/quantum-api/references/troubleshooting.md):
+  Common errors, runtime modes, IBM provider issues, rate limits.
+
+## SDKs
+
+- [SDK Integration Guide](https://github.com/davidjgrimsley/quantum-api/blob/main/skills/quantum-api/references/sdks.md):
+  Integration instructions for all first-party SDKs.
+
+- [JavaScript / TypeScript SDK](https://github.com/davidjgrimsley/quantum-api/blob/main/sdk/js/README.md):
+  TypeScript client for browser, Node.js, and Expo. Package: `@mr.dj2u/quantum-api`.
+
+- [Python SDK](https://github.com/davidjgrimsley/quantum-api/blob/main/sdk/python/README.md):
+  Sync Python client. Package: `quantum-api-sdk`.
+
+- [PennyLane Plugin](https://github.com/davidjgrimsley/quantum-api/blob/main/sdk/pennylane/README.md):
+  PennyLane device `quantum.api`. Package: `quantum-api-pennylane`.
+
+- [Unreal Engine Plugin](https://github.com/davidjgrimsley/quantum-api/blob/main/sdk/unreal/README.md):
+  C++ runtime plugin for UE 5.8 Win64.
+
+- [Unity Helper](https://github.com/davidjgrimsley/quantum-api/blob/main/sdk/unity/README.md):
+  C# runtime helper package for Unity.
+
+- [Godot Addon](https://github.com/davidjgrimsley/quantum-api/blob/main/addons/quantum_api_client/README.md):
+  Reusable GDScript client addon for Godot 4.x, version 0.1.2.
+
+- [SDK Compatibility Matrix](https://github.com/davidjgrimsley/quantum-api/blob/main/docs/sdk/compatibility-matrix.md):
+  Per-SDK readiness, supported surface, and auth modes.
+
+## Operations
+
+- [Staging Deployment](https://github.com/davidjgrimsley/quantum-api/blob/main/docs/operations/deploy-staging.md):
+  Staging deployment playbook.
+
+- [Production Deployment](https://github.com/davidjgrimsley/quantum-api/blob/main/docs/operations/deploy-production.md):
+  Production deployment playbook.
+
+- [SLOs and Alerts](https://github.com/davidjgrimsley/quantum-api/blob/main/docs/operations/slo.md):
+  SLO definitions and Prometheus alert rules.
+
+- [Beginner Testing Guide](https://github.com/davidjgrimsley/quantum-api/blob/main/docs/operations/phase5-beginner-testing.md):
+  Plain-English walkthrough for testing against the live VPS.
+
+## Changelog
+
+- [CHANGELOG.md](https://github.com/davidjgrimsley/quantum-api/blob/main/CHANGELOG.md):
+  Version history and breaking changes.

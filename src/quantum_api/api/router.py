@@ -20,7 +20,7 @@ router = APIRouter(prefix=initial_settings.api_prefix)
 
 router.include_router(portfolio_router)
 router.include_router(core_router)
-router.include_router(auth_router)
+router.include_router(auth_router, include_in_schema=False)
 router.include_router(runtime_router)
 router.include_router(jobs_router)
 router.include_router(algorithms_router)

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 David J. Grimsley. All rights reserved.
 #include "QuantumApiClient.h"
 
 #include "Containers/Ticker.h"

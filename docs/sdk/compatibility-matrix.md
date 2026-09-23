@@ -4,13 +4,13 @@ This matrix tracks first-party client readiness against the current `Quantum API
 
 | Client | Status | Supported surface | Auth modes | Notes |
 |---|---|---|---|---|
-| API `/v1` | Active | Full current contract | Public, `X-API-Key`, bearer JWT | Canonical server contract |
-| JS SDK | Phase 6 package-ready target | Full `/v1` | `X-API-Key`, bearer JWT, per-request override | Primary frontend-friendly client for TS/Expo/browser usage |
-| Python SDK | Phase 6 package-ready target | Full `/v1` | `X-API-Key`, bearer JWT, per-request override | Sync-first client with context-manager ergonomics |
-| PennyLane plugin | Phase 6 package-ready target | `/v1/qasm/run` (finite-shot + analytic statevector mode) | `X-API-Key` by default via SDK client auth routing | Device name `quantum.api`; packaged as `quantum-api-pennylane` |
-| Godot addon/client | Phase 6 reference integration | `health`, `text/transform`, `gates/run` first; expand from there | Backend proxy by default, optional direct `X-API-Key` dev mode | Mounted `/v1` base required |
-| Unreal plugin | Phase 6 scaffold and follow-on integration | `health`, `text/transform`, `gates/run` first; optional `circuits/run` and `jobs/*` later | Backend proxy by default, optional direct `X-API-Key` dev mode | Packaged runtime uses HTTP, not Unreal Python |
-| Unity client | Phase 6 scaffold/package-ready helper | `health`, `text/transform`, `gates/run` first; optional `circuits/run` and `jobs/*` later | Backend proxy by default, optional direct `X-API-Key` dev mode | Runtime helper scaffold added in Phase 6; Unity editor smoke test and package publishing not yet validated |
+| API `/v1` | Active | Full current contract | Public, `X-API-Key` | Canonical server contract |
+| JS SDK | 0.1.2 on npm | Core, jobs, QASM, domains; QRNG via HTTP | `X-API-Key`, per-request override | Browser, Node, Expo |
+| Python SDK | 0.1.0 on PyPI | Core, jobs, QASM, domains; QRNG via HTTP | `X-API-Key`, per-call override | Synchronous client |
+| PennyLane plugin | 0.1.0 on PyPI | `/v1/qasm/run` (finite shots or analytic statevector) | `X-API-Key` | Device `quantum.api` |
+| Godot addon/client | 0.1.2 reusable addon | Health, text, gates, backends, transpile, IBM circuit jobs | Proxy or direct development key | Runtime node with optional editor settings helper |
+| Unreal plugin | 0.3.0-beta, UE 5.8 Win64 | Core, QRNG, IBM jobs, allowlisted advanced routes | Proxy or direct development key | UEFN unsupported |
+| Unity client | 0.1.0 repo-local package | Health, echo, gates, text, local QRNG, IBM random jobs | Proxy or direct development key | Shared manager 0.2.0 remains pending in PR #19 |
 
 ## Update rules
 

@@ -26,6 +26,8 @@ The format is based on Keep a Changelog and uses semantic versioning expectation
 
 - Unity package: corrected the fixed production endpoint, removed the unsupported proxy toggle, restored the manager under Fast Enter Play Mode, and advanced the package to `1.0.0` for breaking configuration changes.
 
+- Public OpenAPI and portfolio catalogs now omit owner-only key and IBM credential routes while those routes retain their existing behavior.
+- Refreshed the installable agent skill and discovery resources for QRNG, current engine clients, and published SDK packages.
 - Local unseeded Qubit measurements now use Qiskit `Statevector.measure()` when available; explicitly injected RNG behavior remains deterministic.
 - Completed hardware jobs with no cached result now retrieve their result on polling, including immediately completed circuit/QASM jobs.
 - Release governance now distinguishes `package-ready` from public package publishing.
