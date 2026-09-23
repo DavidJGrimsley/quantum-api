@@ -1,0 +1,90 @@
+{
+  "$schema": "https://agents.json/schema/v1",
+  "name": "Quantum API",
+  "description": "Quantum API runtime: circuits, QASM, local and IBM random jobs, and domain algorithms.",
+  "url": "https://davidjgrimsley.com/public-facing/api/quantum",
+  "version": "0.1.0",
+  "capabilities": {
+    "rest_api": {
+      "type": "openapi",
+      "url": "https://davidjgrimsley.com/public-facing/api/quantum/openapi.json",
+      "docs": "https://davidjgrimsley.com/public-facing/api/quantum/docs",
+      "base_url": "https://davidjgrimsley.com/public-facing/api/quantum/v1",
+      "authentication": {
+        "api_key": {
+          "header": "X-API-Key",
+          "note": "Required for protected runtime endpoints; supply an existing key or use a backend proxy."
+        }
+      }
+    },
+    "agent_skill": {
+      "type": "antigravity-skill",
+      "install_command": "npx skills add davidjgrimsley/quantum-api -g",
+      "install_source": "github:davidjgrimsley/quantum-api",
+      "skill_path": "skills/quantum-api/SKILL.md",
+      "description": "Installable runtime integration skill for supported coding agents.",
+      "compatible_agents": [
+        "antigravity",
+        "cursor",
+        "codex",
+        "claude-code"
+      ]
+    },
+    "sdks": [
+      {
+        "name": "JavaScript / TypeScript SDK",
+        "package": "@mr.dj2u/quantum-api",
+        "language": "typescript",
+        "path": "sdk/js/",
+        "status": "published"
+      },
+      {
+        "name": "Python SDK",
+        "package": "quantum-api-sdk",
+        "language": "python",
+        "path": "sdk/python/",
+        "status": "published"
+      },
+      {
+        "name": "PennyLane Plugin",
+        "package": "quantum-api-pennylane",
+        "language": "python",
+        "device": "quantum.api",
+        "path": "sdk/pennylane/",
+        "status": "published"
+      },
+      {
+        "name": "Unreal Engine Plugin",
+        "language": "cpp",
+        "ue_versions": [
+          "5.8"
+        ],
+        "path": "sdk/unreal/",
+        "status": "beta runtime plugin for Win64"
+      },
+      {
+        "name": "Unity Helper",
+        "language": "csharp",
+        "path": "sdk/unity/",
+        "status": "repo-local runtime package"
+      },
+      {
+        "name": "Godot Addon",
+        "language": "gdscript",
+        "path": "addons/quantum_api_client/",
+        "status": "reusable addon 0.1.2"
+      }
+    ],
+    "mcp_server": {
+      "status": "planned",
+      "note": "An MCP server exposing Quantum API tools is planned for a future phase. When available, it will be advertised here with its connection details."
+    }
+  },
+  "documentation": {
+    "llms_txt": "https://github.com/davidjgrimsley/quantum-api/blob/main/llms.txt",
+    "manifest": "https://github.com/davidjgrimsley/quantum-api/blob/main/manifest.json",
+    "agent_prompt": "https://github.com/davidjgrimsley/quantum-api/blob/main/agent-prompt.md",
+    "readme": "https://github.com/davidjgrimsley/quantum-api/blob/main/README.md",
+    "changelog": "https://github.com/davidjgrimsley/quantum-api/blob/main/CHANGELOG.md"
+  }
+}

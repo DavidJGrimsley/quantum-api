@@ -7,14 +7,13 @@ The default runtime fetch is browser-safe: it binds `window.fetch` in browser-li
 
 ## Current Scope
 
-- Full current `/v1` method surface
+- Typed core, jobs, and domain methods; use HTTP for QRNG routes
 - Mounted base URL normalization:
   - `http://127.0.0.1:8000` -> `http://127.0.0.1:8000/v1`
   - `https://DavidJGrimsley.com/public-facing/api/quantum` -> `https://DavidJGrimsley.com/public-facing/api/quantum/v1`
   - `https://DavidJGrimsley.com/public-facing/api/quantum/v1` stays unchanged
 - Auth support for:
   - `X-API-Key` runtime endpoints
-  - bearer-token `/keys*` and `/ibm/profiles*` flows
   - per-request auth override
 - Structured `QuantumApiError` with normalized error data and response headers
 - Browser-safe default fetch binding with `fetchImpl` override support
@@ -38,9 +37,8 @@ npm --prefix sdk/js run build
 import { QuantumApiClient } from "@mr.dj2u/quantum-api";
 
 const client = new QuantumApiClient({
-  baseUrl: process.env.EXPO_PUBLIC_QUANTUM_API_BASE_URL ?? "http://127.0.0.1:8000",
-  apiKey: process.env.EXPO_PUBLIC_QUANTUM_API_KEY,
-  bearerToken: process.env.EXPO_PUBLIC_SUPABASE_JWT,
+  baseUrl: process.env.QUANTUM_API_BASE_URL ?? "http://127.0.0.1:8000",
+  apiKey: process.env.QUANTUM_API_KEY,
 });
 
 const health = await client.health();
@@ -67,7 +65,6 @@ Use direct `apiKey` client configuration for local development, prototypes, and 
 The client defaults to `auto` auth mode:
 
 - `health` and `portfolio.json` -> public
-- `/keys*` and `/ibm/profiles*` -> bearer token (you don't need these, they are just how you're able to sign in and get keys and store ibm accounts)
 - all other `/v1` routes -> API key
 
 You can override auth per request:
@@ -75,83 +72,11 @@ You can override auth per request:
 ```ts
 await client.health({ auth: "none" });
 await client.echoTypes({ auth: "apiKey" });
-await client.listKeys({ auth: "bearer" });
 ```
 
-## Account Setup (Public Identerest Sign-In)
+## Runtime credentials
 
-If you are using the hosted Quantum API account flow (not self-hosting), credentials come from signing in at `https://davidjgrimsley.com/public-facing/api/quantum`.
-
-1. Open `https://davidjgrimsley.com/public-facing/api/quantum` and sign in with an Identerest account.
-2. In the `Api Keys` panel, create a Quantum API key and copy it immediately (raw key is shown once).
-3. In the `IBM Credentials` panel, create an IBM profile (`profile_name`, IBM API token, IBM instance/CRN, channel), then verify it.
-4. Optionally set one IBM profile as default on that same public page.
-
-How those values map into the SDK:
-
-- bearer token from that Identerest-backed sign-in session -> `bearerToken` (used for `/keys*` and `/ibm/profiles*`).
-- created Quantum API key -> `apiKey` (used for protected runtime `/v1` routes).
-- selected IBM profile name -> `ibm_profile` in IBM backend/transpile/job requests.
-
-## IBM Profiles (Per-User IBM Credentials)
-
-This is the flow behind profile cards/actions like Verify, Set Default, Edit, and Delete.
-
-The JS SDK exposes full profile lifecycle methods:
-
-- `listIbmProfiles()`
-- `createIbmProfile(payload)`
-- `updateIbmProfile(profileId, payload)`
-- `verifyIbmProfile(profileId)`
-- `deleteIbmProfile(profileId)`
-
-Profile routes use bearer auth, so pass the bearer token issued after signing in at `https://davidjgrimsley.com/public-facing/api/quantum` with Identerest.
-
-```ts
-import { QuantumApiClient } from "@mr.dj2u/quantum-api";
-
-const client = new QuantumApiClient({
-  baseUrl: process.env.EXPO_PUBLIC_QUANTUM_API_BASE_URL ?? "https://davidjgrimsley.com/public-facing/api/quantum",
-  bearerToken: userSession.access_token,
-});
-
-const created = await client.createIbmProfile({
-  profile_name: "Echo Text Adventure Godot Game",
-  token: "your-ibm-token",
-  instance: "crn:v1:bluemix:public:quantum-computing:us-east:a/1234567890abcdef::",
-  channel: "ibm_quantum_platform",
-  is_default: true,
-});
-
-const verified = await client.verifyIbmProfile(created.profile_id);
-const profiles = await client.listIbmProfiles();
-
-await client.updateIbmProfile(created.profile_id, {
-  profile_name: "Echo Text Adventure Godot Game (Prod)",
-  is_default: true,
-});
-
-// Later, if needed:
-// await client.deleteIbmProfile(created.profile_id);
-```
-
-When you submit IBM jobs, pass `ibm_profile` as the selected saved profile name.
-If omitted, the backend can use the default profile.
-
-```ts
-await client.submitCircuitJob({
-  provider: "ibm",
-  backend_name: "ibm_brisbane",
-  ibm_profile: created.profile_name,
-  circuit: {
-    qubits: 1,
-    operations: [{ gate: "h", target: 0 }],
-  },
-  shots: 1024,
-});
-```
-
-For shipped production clients, keep IBM tokens server-side and run profile create/update/delete through your backend proxy.
+Use an existing API key supplied by the owner or a backend proxy. For IBM jobs, use an existing profile name or the owner's default.
 
 ## Expo Example
 
@@ -159,12 +84,14 @@ For shipped production clients, keep IBM tokens server-side and run profile crea
 import { QuantumApiClient, QuantumApiError } from "@mr.dj2u/quantum-api";
 
 const quantum = new QuantumApiClient({
-  baseUrl: process.env.EXPO_PUBLIC_QUANTUM_API_BASE_URL ?? "https://example.com/public-facing/api/quantum",
-  apiKey: process.env.EXPO_PUBLIC_QUANTUM_API_KEY,
+  baseUrl: process.env.EXPO_PUBLIC_QUANTUM_API_BASE_URL ?? "https://example.com/quantum-proxy/v1",
 });
 
 try {
-  const transformed = await quantum.transformText({ text: "memory and quantum signal" });
+  const transformed = await quantum.transformText(
+    { text: "memory and quantum signal" },
+    { auth: "none" }, // the backend proxy adds the upstream API key
+  );
   console.log(transformed.transformed);
 } catch (error) {
   if (error instanceof QuantumApiError) {
@@ -179,7 +106,7 @@ For shipped game or app clients, use a backend-proxy pattern so long-lived API k
 
 - Client app authenticates users and calls your backend.
 - Your backend injects `X-API-Key` for runtime routes and enforces your own quota/abuse controls.
-- Bearer-token flows (`/keys*`, `/ibm/profiles*`) stay server-mediated for key lifecycle and profile management.
+- Use `{ auth: "none" }` on SDK calls to a proxy that supplies upstream authentication.
 
 Direct API-key mode is best kept for local development, prototypes, demos, or game jams.
 
@@ -197,18 +124,6 @@ Direct API-key mode is best kept for local development, prototypes, demos, or ga
   - `transpile`
   - `importQasm`
   - `exportQasm`
-- Auth:
-  - `listKeys`
-  - `createKey`
-  - `revokeKey`
-  - `rotateKey`
-  - `deleteRevokedKeys`
-  - `deleteKey`
-  - `listIbmProfiles`
-  - `createIbmProfile`
-  - `updateIbmProfile`
-  - `deleteIbmProfile`
-  - `verifyIbmProfile`
 - Jobs:
   - `submitCircuitJob`
   - `getCircuitJob`

@@ -4,7 +4,7 @@
 
 1. Confirm image tag is built and available.
 2. Confirm Redis is reachable from staging runtime network.
-3. Confirm staging secrets are set: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_JWT_AUDIENCE`, `REDIS_URL`, `METRICS_TOKEN`, and `API_KEY_HASH_SECRET` (non-default when `AUTH_ENABLED=true` in staging).
+3. Confirm staging secrets are set: `DATABASE_URL`, `SUPABASE_URL`, `REDIS_URL`, `METRICS_TOKEN`, and `API_KEY_HASH_SECRET` (non-default when `AUTH_ENABLED=true` in staging).
 4. If staging is validating BYO IBM rollout, also confirm `IBM_CREDENTIAL_ENCRYPTION_KEY` is set on the API runtime.
 5. Confirm `APP_ENV=staging` and `ALLOW_ORIGINS` is explicit (no `*`).
 
@@ -18,7 +18,6 @@
    - `GET /v1/echo-types` with a DB-backed Quantum API key returns `200` and `RateLimit-*` headers.
    - `GET /metrics` without metrics token returns `401`.
    - `GET /metrics` with metrics token returns `200`.
-4. If this release includes BYO IBM rollout validation, run `uv run python scripts/verify_byo_ibm_flow.py ...` with a real bearer JWT and real IBM credentials after the general smoke checks pass.
 
 ## Post-deploy Verification
 
