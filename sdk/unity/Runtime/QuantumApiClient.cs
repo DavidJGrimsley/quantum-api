@@ -55,6 +55,82 @@ namespace QuantumApi.Unity
             return SendAsync<GateRunResponse>("/gates/run", UnityWebRequest.kHttpVerbPOST, BuildGateRunJson(request), requestOptions);
         }
 
+        public Task<RandomIntResponse> RandomIntAsync(
+            int min,
+            int max,
+            QuantumApiRequestOptions requestOptions = null)
+        {
+            return SendAsync<RandomIntResponse>(
+                "/random",
+                UnityWebRequest.kHttpVerbPOST,
+                new RandomIntRequest { min = min, max = max },
+                requestOptions);
+        }
+
+        public Task<RandomJobSubmitResponse> SubmitRandomJobAsync(
+            RandomJobSubmitRequest request,
+            QuantumApiRequestOptions requestOptions = null)
+        {
+            if (request == null)
+            {
+                return FailTask<RandomJobSubmitResponse>("invalid_request", "Quantum API random hardware job submission requires a payload.");
+            }
+
+            return SendAsync<RandomJobSubmitResponse>(
+                "/jobs/random",
+                UnityWebRequest.kHttpVerbPOST,
+                BuildRandomJobSubmitJson(request),
+                requestOptions);
+        }
+
+        public Task<RandomJobStatusResponse> GetJobAsync(
+            string jobId,
+            QuantumApiRequestOptions requestOptions = null)
+        {
+            if (string.IsNullOrWhiteSpace(jobId))
+            {
+                return FailTask<RandomJobStatusResponse>("invalid_request", "Quantum API job status requires a job id.");
+            }
+
+            return SendAsync<RandomJobStatusResponse>(
+                $"/jobs/{EscapePathSegment(jobId)}",
+                UnityWebRequest.kHttpVerbGET,
+                null,
+                requestOptions);
+        }
+
+        public Task<RandomJobResultResponse> GetJobResultAsync(
+            string jobId,
+            QuantumApiRequestOptions requestOptions = null)
+        {
+            if (string.IsNullOrWhiteSpace(jobId))
+            {
+                return FailTask<RandomJobResultResponse>("invalid_request", "Quantum API job result requires a job id.");
+            }
+
+            return SendAsync<RandomJobResultResponse>(
+                $"/jobs/{EscapePathSegment(jobId)}/result",
+                UnityWebRequest.kHttpVerbGET,
+                null,
+                requestOptions);
+        }
+
+        public Task<RandomJobStatusResponse> CancelJobAsync(
+            string jobId,
+            QuantumApiRequestOptions requestOptions = null)
+        {
+            if (string.IsNullOrWhiteSpace(jobId))
+            {
+                return FailTask<RandomJobStatusResponse>("invalid_request", "Quantum API job cancellation requires a job id.");
+            }
+
+            return SendAsync<RandomJobStatusResponse>(
+                $"/jobs/{EscapePathSegment(jobId)}/cancel",
+                UnityWebRequest.kHttpVerbPOST,
+                null,
+                requestOptions);
+        }
+
         public Task<TextTransformResponse> TransformTextAsync(
             TextTransformRequest request,
             QuantumApiRequestOptions requestOptions = null)
@@ -116,6 +192,106 @@ namespace QuantumApi.Unity
             }
 
             yield return SendCoroutine("/gates/run", UnityWebRequest.kHttpVerbPOST, BuildGateRunJson(request), onSuccess, onError, requestOptions);
+        }
+
+        public IEnumerator RandomIntCoroutine(
+            int min,
+            int max,
+            Action<RandomIntResponse> onSuccess,
+            Action<QuantumApiError> onError,
+            QuantumApiRequestOptions requestOptions = null)
+        {
+            yield return SendCoroutine(
+                "/random",
+                UnityWebRequest.kHttpVerbPOST,
+                new RandomIntRequest { min = min, max = max },
+                onSuccess,
+                onError,
+                requestOptions);
+        }
+
+        public IEnumerator SubmitRandomJobCoroutine(
+            RandomJobSubmitRequest request,
+            Action<RandomJobSubmitResponse> onSuccess,
+            Action<QuantumApiError> onError,
+            QuantumApiRequestOptions requestOptions = null)
+        {
+            if (request == null)
+            {
+                onError?.Invoke(QuantumApiError.Local("invalid_request", "Quantum API random hardware job submission requires a payload."));
+                yield break;
+            }
+
+            yield return SendCoroutine(
+                "/jobs/random",
+                UnityWebRequest.kHttpVerbPOST,
+                BuildRandomJobSubmitJson(request),
+                onSuccess,
+                onError,
+                requestOptions);
+        }
+
+        public IEnumerator GetJobCoroutine(
+            string jobId,
+            Action<RandomJobStatusResponse> onSuccess,
+            Action<QuantumApiError> onError,
+            QuantumApiRequestOptions requestOptions = null)
+        {
+            if (string.IsNullOrWhiteSpace(jobId))
+            {
+                onError?.Invoke(QuantumApiError.Local("invalid_request", "Quantum API job status requires a job id."));
+                yield break;
+            }
+
+            yield return SendCoroutine(
+                $"/jobs/{EscapePathSegment(jobId)}",
+                UnityWebRequest.kHttpVerbGET,
+                null,
+                onSuccess,
+                onError,
+                requestOptions);
+        }
+
+        public IEnumerator GetJobResultCoroutine(
+            string jobId,
+            Action<RandomJobResultResponse> onSuccess,
+            Action<QuantumApiError> onError,
+            QuantumApiRequestOptions requestOptions = null)
+        {
+            if (string.IsNullOrWhiteSpace(jobId))
+            {
+                onError?.Invoke(QuantumApiError.Local("invalid_request", "Quantum API job result requires a job id."));
+                yield break;
+            }
+
+            yield return SendCoroutine(
+                $"/jobs/{EscapePathSegment(jobId)}/result",
+                UnityWebRequest.kHttpVerbGET,
+                null,
+                onSuccess,
+                onError,
+                requestOptions);
+        }
+
+        public IEnumerator CancelJobCoroutine(
+            string jobId,
+            Action<RandomJobStatusResponse> onSuccess,
+            Action<QuantumApiError> onError,
+            QuantumApiRequestOptions requestOptions = null)
+        {
+            if (string.IsNullOrWhiteSpace(jobId))
+            {
+                onError?.Invoke(QuantumApiError.Local("invalid_request", "Quantum API job cancellation requires a job id."));
+                yield break;
+            }
+
+            yield return SendCoroutine(
+                $"/jobs/{EscapePathSegment(jobId)}/cancel",
+                UnityWebRequest.kHttpVerbPOST,
+                null,
+                onSuccess,
+                onError,
+                requestOptions);
         }
 
         public IEnumerator TransformTextCoroutine(
@@ -389,14 +565,37 @@ namespace QuantumApi.Unity
             var escapedGateType = EscapeJsonString(request.gate_type ?? string.Empty);
             if (request.sendRotationAngle)
             {
-                return string.Format(
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    "{{\"gate_type\":\"{0}\",\"rotation_angle_rad\":{1:R}}}",
-                    escapedGateType,
-                    request.rotation_angle_rad);
+                var rotationAngleJson = request.rotation_angle_rad.ToString(
+                    "G9",
+                    System.Globalization.CultureInfo.InvariantCulture);
+                return $"{{\"gate_type\":\"{escapedGateType}\",\"rotation_angle_rad\":{rotationAngleJson}}}";
             }
 
             return $"{{\"gate_type\":\"{escapedGateType}\"}}";
+        }
+
+        private static string BuildRandomJobSubmitJson(RandomJobSubmitRequest request)
+        {
+            var provider = string.IsNullOrWhiteSpace(request.provider) ? "ibm" : request.provider.Trim();
+            var builder = new StringBuilder();
+            builder.Append("{");
+            builder.Append("\"min\":").Append(request.min.ToString(System.Globalization.CultureInfo.InvariantCulture)).Append(",");
+            builder.Append("\"max\":").Append(request.max.ToString(System.Globalization.CultureInfo.InvariantCulture)).Append(",");
+            builder.Append("\"provider\":\"").Append(EscapeJsonString(provider)).Append("\",");
+            builder.Append("\"backend_name\":\"").Append(EscapeJsonString(request.backend_name ?? string.Empty)).Append("\"");
+
+            if (!string.IsNullOrWhiteSpace(request.ibm_profile))
+            {
+                builder.Append(",\"ibm_profile\":\"").Append(EscapeJsonString(request.ibm_profile.Trim())).Append("\"");
+            }
+
+            builder.Append("}");
+            return builder.ToString();
+        }
+
+        private static string EscapePathSegment(string value)
+        {
+            return Uri.EscapeDataString(value.Trim());
         }
 
         private static string EscapeJsonString(string value)
@@ -430,7 +629,9 @@ namespace QuantumApi.Unity
 
         private static string NormalizeBaseUrl(string baseUrl)
         {
-            var trimmed = (baseUrl ?? string.Empty).Trim().TrimEnd('/');
+            var trimmed = string.IsNullOrWhiteSpace(baseUrl)
+                ? QuantumApiClientOptions.ProductionBaseUrl
+                : baseUrl.Trim().TrimEnd('/');
             if (string.IsNullOrWhiteSpace(trimmed))
             {
                 throw new ArgumentException("QuantumApiClient requires a non-empty BaseUrl.", nameof(baseUrl));

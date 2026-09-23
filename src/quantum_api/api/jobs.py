@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 
@@ -19,11 +21,57 @@ from quantum_api.models.api import (
     CircuitJobSubmitRequest,
     CircuitJobSubmitResponse,
     QasmJobSubmitRequest,
+    RandomJobSubmitRequest,
 )
 from quantum_api.services.hardware_jobs import HardwareJobService
 from quantum_api.services.service_errors import JobNotFoundError, QuantumApiServiceError
 
 router = APIRouter()
+
+
+@router.post(
+    "/jobs/random",
+    response_model=CircuitJobSubmitResponse,
+    summary="Submit a bounded IBM hardware random job",
+    description="Submits one measured Hadamard qubit on a non-simulator IBM backend. Poll the existing job status and result routes.",
+)
+async def submit_random_job(
+    request: Request, request_data: RandomJobSubmitRequest
+) -> CircuitJobSubmitResponse | JSONResponse:
+    owner_user_id = api_key_owner_user_id_from(request)
+    if owner_user_id is None:
+        raise HTTPException(status_code=401, detail="API key authentication required")
+    try:
+        ibm_credentials = await resolve_ibm_credentials(
+            request, profile_name=request_data.ibm_profile, required=True
+        )
+        assert ibm_credentials is not None
+        if not ibm_credentials.token_ciphertext:
+            ibm_credentials = replace(
+                ibm_credentials,
+                token_ciphertext=request.app.state.ibm_profile_service.encrypt_token(ibm_credentials.token),
+            )
+        record = await request.app.state.hardware_job_service.submit_random_job(
+            owner_user_id=owner_user_id,
+            api_key_id=api_key_id_from(request),
+            request_data=request_data,
+            ibm_credentials=ibm_credentials,
+        )
+    except IBMProfileEncryptionUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except QuantumApiServiceError as exc:
+        return service_error_response(request, exc)
+    return CircuitJobSubmitResponse.model_validate(
+        {
+            "job_id": record.job_id,
+            "provider": record.provider,
+            "backend_name": record.backend_name,
+            "ibm_profile": record.ibm_profile_name,
+            "remote_job_id": record.remote_job_id,
+            "status": record.status,
+            "created_at": record.created_at,
+        }
+    )
 
 
 @router.post("/jobs/circuits", response_model=CircuitJobSubmitResponse)

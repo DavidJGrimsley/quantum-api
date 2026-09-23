@@ -4,16 +4,21 @@ extends Node
 const DEFAULT_BASE_URL := "https://davidjgrimsley.com/public-facing/api/quantum/v1"
 const DIRECT_API_KEY := ""
 const DEFAULT_IBM_PROFILE := ""
+const PROJECT_SETTINGS_ACCOUNT_DEFAULT_PROFILE := "__quantum_api_use_account_default__"
 const SETTINGS_BASE_URL := "quantum_api/base_url"
 const SETTINGS_BACKEND_PROXY_MODE := "quantum_api/backend_proxy_mode"
 const SETTINGS_DIRECT_API_KEY := "quantum_api/direct_api_key"
 const SETTINGS_DEFAULT_IBM_PROFILE := "quantum_api/default_ibm_profile"
+const SETTINGS_REQUEST_TIMEOUT_SECONDS := "quantum_api/request_timeout_seconds"
 const DEFAULT_BACKEND_PROXY_MODE := true
+const DEFAULT_REQUEST_TIMEOUT_SECONDS := 10.0
 
 var base_url: String = DEFAULT_BASE_URL
 var api_key: String = DIRECT_API_KEY
 var default_ibm_profile: String = DEFAULT_IBM_PROFILE
 var backend_proxy_mode: bool = DIRECT_API_KEY.is_empty()
+var request_timeout_seconds: float = DEFAULT_REQUEST_TIMEOUT_SECONDS
+var _active_requests: Dictionary = {}
 
 func _init(
 	custom_base_url: String = DEFAULT_BASE_URL,
@@ -33,10 +38,18 @@ func set_api_key(key: String) -> void:
 	api_key = key.strip_edges()
 
 func set_default_ibm_profile(profile_name: String) -> void:
-	default_ibm_profile = profile_name.strip_edges()
+	var normalized_profile := profile_name.strip_edges()
+	if normalized_profile == PROJECT_SETTINGS_ACCOUNT_DEFAULT_PROFILE:
+		normalized_profile = ""
+	default_ibm_profile = normalized_profile
 
 func set_backend_proxy_mode(enabled: bool) -> void:
 	backend_proxy_mode = enabled
+
+func set_request_timeout_seconds(seconds: float) -> void:
+	# HTTPRequest uses 0.0 as "never time out". A small positive floor keeps a
+	# malformed project setting from leaving gameplay waiting indefinitely.
+	request_timeout_seconds = maxf(seconds, 0.1)
 
 func apply_project_settings() -> void:
 	var configured_base_url := str(ProjectSettings.get_setting(SETTINGS_BASE_URL, DEFAULT_BASE_URL)).strip_edges()
@@ -52,6 +65,9 @@ func apply_project_settings() -> void:
 	)
 	set_api_key(str(ProjectSettings.get_setting(SETTINGS_DIRECT_API_KEY, DIRECT_API_KEY)).strip_edges())
 	set_default_ibm_profile(str(ProjectSettings.get_setting(SETTINGS_DEFAULT_IBM_PROFILE, DEFAULT_IBM_PROFILE)).strip_edges())
+	set_request_timeout_seconds(
+		float(ProjectSettings.get_setting(SETTINGS_REQUEST_TIMEOUT_SECONDS, DEFAULT_REQUEST_TIMEOUT_SECONDS))
+	)
 
 func get_default_base_url() -> String:
 	return DEFAULT_BASE_URL
@@ -62,6 +78,7 @@ func get_config_snapshot() -> Dictionary:
 		"backend_proxy_mode": backend_proxy_mode,
 		"api_key_present": !api_key.is_empty(),
 		"default_ibm_profile": default_ibm_profile,
+		"request_timeout_seconds": request_timeout_seconds,
 	}
 
 func health_check(callback: Callable) -> void:
@@ -166,7 +183,6 @@ func _request_json(
 ) -> void:
 	var request_url: String = _build_request_url(endpoint_path, query_params)
 	var method_name: String = _http_method_to_string(method)
-
 	if requires_api_key and !backend_proxy_mode and api_key.is_empty():
 		callback.call(
 			false,
@@ -182,22 +198,19 @@ func _request_json(
 		return
 
 	var http_request := HTTPRequest.new()
+	http_request.timeout = request_timeout_seconds
 	add_child(http_request)
-
+	var request_id := http_request.get_instance_id()
+	_active_requests[request_id] = {"callback": callback, "request": http_request}
 	http_request.request_completed.connect(
-		func(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
-			var parsed := _parse_response(
-				result,
-				response_code,
-				headers,
-				body,
-				request_url,
-				endpoint_path,
-				method_name,
-				requires_api_key
-			)
-			http_request.queue_free()
-			callback.call(parsed["success"], parsed["payload"])
+		_on_http_request_completed.bind(
+			request_id,
+			request_url,
+			endpoint_path,
+			method_name,
+			requires_api_key
+		),
+		CONNECT_ONE_SHOT
 	)
 
 	var body_string := ""
@@ -207,8 +220,8 @@ func _request_json(
 
 	var error := http_request.request(request_url, headers, method, body_string)
 	if error != OK:
-		http_request.queue_free()
-		callback.call(
+		_complete_request(
+			request_id,
 			false,
 			_local_error_payload(
 				"request_start_failed",
@@ -220,6 +233,43 @@ func _request_json(
 				error
 			)
 		)
+
+func _on_http_request_completed(
+	result: int,
+	response_code: int,
+	headers: PackedStringArray,
+	body: PackedByteArray,
+	request_id: int,
+	request_url: String,
+	endpoint_path: String,
+	method_name: String,
+	requires_api_key: bool,
+) -> void:
+	var parsed := _parse_response(
+		result,
+		response_code,
+		headers,
+		body,
+		request_url,
+		endpoint_path,
+		method_name,
+		requires_api_key
+	)
+	_complete_request(request_id, parsed["success"], parsed["payload"])
+
+func _complete_request(request_id: int, success: bool, response_payload: Dictionary) -> void:
+	var request_state: Dictionary = _active_requests.get(request_id, {})
+	if request_state.is_empty():
+		return
+	_active_requests.erase(request_id)
+
+	var completed_request: Variant = request_state.get("request")
+	if is_instance_valid(completed_request):
+		completed_request.queue_free()
+
+	var request_callback: Callable = request_state.get("callback", Callable())
+	if request_callback.is_valid():
+		request_callback.call(success, response_payload)
 
 func _build_headers(requires_api_key: bool, include_json_content_type: bool) -> PackedStringArray:
 	var headers: PackedStringArray = []
@@ -240,22 +290,27 @@ func _parse_response(
 	requires_api_key: bool,
 ) -> Dictionary:
 	var response_text := body.get_string_from_utf8()
+	var trimmed_response_text := response_text.strip_edges()
 	var payload: Dictionary = {}
 	var request_id := _extract_response_header(headers, "x-request-id")
+	var parsed_dictionary := false
+	var json_parse_result := OK
 
-	if !response_text.is_empty():
+	if !trimmed_response_text.is_empty():
 		var json := JSON.new()
-		if json.parse(response_text) == OK and json.data is Dictionary:
+		json_parse_result = json.parse(response_text)
+		if json_parse_result == OK and json.data is Dictionary:
 			payload = json.data
+			parsed_dictionary = true
 
 	if result != HTTPRequest.RESULT_SUCCESS:
 		if payload.is_empty():
 			payload = {
-				"error": "transport_error",
-				"message": "HTTP transport failed: " + _http_request_result_to_message(result),
+				"error": "timeout" if result == HTTPRequest.RESULT_TIMEOUT else "transport_error",
+				"message": _transport_error_message(result),
 			}
 		elif !payload.has("message"):
-			payload["message"] = "HTTP transport failed: " + _http_request_result_to_message(result)
+			payload["message"] = _transport_error_message(result)
 
 		_attach_diagnostics(
 			payload,
@@ -271,12 +326,47 @@ func _parse_response(
 		return {"success": false, "payload": payload}
 
 	if response_code >= 200 and response_code < 300:
+		if trimmed_response_text.is_empty():
+			payload = {
+				"error": "empty_response",
+				"message": "Quantum API returned an empty response.",
+			}
+			_attach_diagnostics(
+				payload,
+				result,
+				response_code,
+				request_url,
+				endpoint_path,
+				method_name,
+				requires_api_key,
+				response_text,
+				request_id
+			)
+			return {"success": false, "payload": payload}
+		if !parsed_dictionary:
+			payload = {
+				"error": "malformed_json",
+				"message": "Quantum API returned malformed JSON.",
+				"json_parse_result": json_parse_result,
+			}
+			_attach_diagnostics(
+				payload,
+				result,
+				response_code,
+				request_url,
+				endpoint_path,
+				method_name,
+				requires_api_key,
+				response_text,
+				request_id
+			)
+			return {"success": false, "payload": payload}
 		return {"success": true, "payload": payload}
 
 	if payload.is_empty():
 		var default_message := response_text if !response_text.is_empty() else "Quantum API request failed"
 		if response_code == 401 and requires_api_key:
-			default_message = "Unauthorized (401). Configure quantum_api/direct_api_key or use a backend proxy endpoint that injects authentication."
+			default_message = "Unauthorized (401). Configure a developer-only runtime key or use a backend proxy endpoint that injects authentication."
 
 		payload = {
 			"error": "http_error",
@@ -288,7 +378,7 @@ func _parse_response(
 	if response_code == 401:
 		payload["error"] = "unauthorized"
 		if requires_api_key:
-			payload["auth_hint"] = "Set [quantum_api] direct_api_key and ensure the endpoint accepts your auth mode."
+			payload["auth_hint"] = "Set a developer-only runtime key or use a credential-free backend proxy endpoint."
 
 	_attach_diagnostics(
 		payload,
@@ -425,7 +515,9 @@ func _resolve_optional_ibm_profile(override_profile: String = "") -> String:
 	return default_ibm_profile.strip_edges()
 
 func _normalize_base_url(url: String) -> String:
-	var normalized := url.strip_edges().trim_suffix("/")
+	var normalized := url.strip_edges()
+	while normalized.ends_with("/"):
+		normalized = normalized.trim_suffix("/").strip_edges()
 	if normalized.is_empty():
 		return DEFAULT_BASE_URL
 	if normalized.ends_with("/v1"):
@@ -492,3 +584,8 @@ func _http_request_result_to_message(result: int) -> String:
 			return "TIMEOUT"
 		_:
 			return "RESULT_" + str(result)
+
+func _transport_error_message(result: int) -> String:
+	if result == HTTPRequest.RESULT_TIMEOUT:
+		return "Quantum API request timed out after %.1f seconds." % request_timeout_seconds
+	return "HTTP transport failed: " + _http_request_result_to_message(result)

@@ -1,19 +1,28 @@
 {
   "FileVersion": 3,
-  "Version": 1,
-  "VersionName": "0.1.0",
+  "Version": 3,
+  "VersionName": "0.3.0-beta",
   "FriendlyName": "Quantum API",
-  "Description": "Runtime HTTP client for the Quantum API mounted /v1 contract.",
-  "Category": "Networking",
-  "CreatedBy": "Quantum API",
+  "Description": "Blueprint-friendly runtime HTTP client for the Quantum API mounted /v1 contract, including QRNG and jobs.",
+  "Category": "Engine Tools",
+  "CreatedBy": "David J. Grimsley",
+  "CreatedByURL": "https://davidjgrimsley.com/",
+  "DocsURL": "https://davidjgrimsley.com/public-facing/api/quantum/ue-plugin",
+  "MarketplaceURL": "",
+  "SupportURL": "https://davidjgrimsley.com/contact",
   "EnabledByDefault": false,
   "CanContainContent": false,
+  "IsBetaVersion": true,
+  "IsExperimentalVersion": false,
   "Installed": false,
   "Modules": [
     {
       "Name": "QuantumApi",
       "Type": "Runtime",
-      "LoadingPhase": "Default"
+      "LoadingPhase": "Default",
+      "PlatformAllowList": [
+        "Win64"
+      ]
     }
   ]
 }

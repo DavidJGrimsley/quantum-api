@@ -33,6 +33,7 @@ Agent-oriented resources:
 - `/v1/echo-types`
 - `/v1/gates/run`
 - `/v1/circuits/run`
+- `/v1/random`
 - `/v1/list_backends`
 - `/v1/transpile`
 - `/v1/qasm/import`
@@ -45,6 +46,7 @@ Agent-oriented resources:
 - `/v1/ibm/profiles/{profile_id}/verify`
 - `/v1/jobs/circuits`
 - `/v1/jobs/qasm`
+- `/v1/jobs/random`
 - `/v1/jobs/{job_id}`
 - `/v1/jobs/{job_id}/result`
 - `/v1/jobs/{job_id}/cancel`
@@ -182,6 +184,31 @@ Create request example:
   "is_default": true
 }
 ```
+
+### `POST /v1/random`
+
+Generate one local random integer in an inclusive range. Requires `X-API-Key` under the
+normal runtime authentication policy.
+
+```json
+{"min": 0, "max": 1}
+```
+
+```json
+{"value": 1, "source": "qiskit-simulator"}
+```
+
+Both bounds must be JSON integers between `-2147483648` and `2147483647`. Strings,
+booleans, floats, missing bounds, extra fields, and `min > max` return the standard
+422 validation envelope. Equal bounds return that value without measuring.
+
+One reusable `Qubit` receives a Hadamard before each measurement. The normal Qiskit
+path calls `Statevector.measure()` and reports `qiskit-simulator`. When Qiskit is
+unavailable and `REQUIRE_QISKIT=false`, mathematical qubit simulation with classical
+random sampling reports `classical-fallback`; `REQUIRE_QISKIT=true` instead returns 503.
+Bits form candidates and out-of-range candidates are rejected, avoiding modulo bias.
+Both local modes use classical pseudorandomness; neither is hardware entropy or a
+cryptographic randomness guarantee. No seed, shots, attempts, or batch controls are exposed.
 
 ### `POST /v1/gates/run`
 Request:
@@ -376,6 +403,56 @@ Response fields:
 - `remote_job_id`
 - `created_at`
 - `updated_at`
+
+### `POST /v1/jobs/random`
+
+Submit one asynchronous bounded random integer job to an explicitly selected IBM
+hardware backend. Requires an API key with an owner and the same stored IBM profile
+or server environment credentials used by circuit/QASM jobs. The job stores an
+encrypted credential snapshot, uses existing ownership rules, and supports the
+existing status, result, and cancellation routes.
+
+```json
+{
+  "min": 0,
+  "max": 1,
+  "provider": "ibm",
+  "backend_name": "ibm_kingston",
+  "ibm_profile": "my-open-plan"
+}
+```
+
+`provider` defaults to `ibm`; `ibm_profile` is optional. Bounds follow the strict local
+contract above. Submission returns `job_id`, `provider`, `backend_name`, `ibm_profile`,
+`remote_job_id`, `status`, and `created_at`. Poll `GET /v1/jobs/{job_id}/result` for:
+
+```json
+{
+  "job_id": "job-id",
+  "status": "succeeded",
+  "result": {"value": 1, "source": "ibm-hardware"}
+}
+```
+
+The submitted circuit has one Hadamard qubit and one measurement. Ordered
+`BitArray.get_bitstrings()` shots form candidates, with the first shot as the most
+significant bit. For span `max - min + 1`, a candidate uses `(span - 1).bit_length()`
+bits. Power-of-two spans submit one candidate; other spans submit 32 candidates and
+return the first in-range candidate. At most 1,024 shots are submitted. Equal bounds
+still submit one hardware shot and return the bound after a valid result arrives.
+
+Simulator backends and backends without a verified non-simulator flag return
+`hardware_backend_required` (400). Missing credentials/dependencies return 503; no
+local fallback occurs. Malformed ordered results, failed result retrieval, or 32
+rejected candidates persist a `failed` job with a structured reason in status
+`error.details`. Its result route returns `result_not_ready` (409) with status `failed`.
+There is no automatic resubmission. Counts alone cannot substitute for ordered shots.
+
+IBM queue time, backend availability, account access, and provider usage limits apply.
+`ibm-hardware` identifies the measurement source, not certified or unbiased entropy:
+hardware noise, readout bias, and correlations are not corrected or certified. This
+endpoint does not promise cryptographic randomness. SDK and circuit/QASM contracts
+are unchanged; call the new routes directly until client support is added.
 
 ### `GET /v1/jobs/{job_id}`
 Returns the normalized job contract with local status values:
@@ -694,6 +771,15 @@ RUN_PERF_BENCHMARKS=true uv run pytest tests/perf -s
 - `sdk/python/` is the package that would become the published PyPI package later in the roadmap.
 - `sdk/pennylane/` is the package that would become the published PennyLane plugin on PyPI later in the roadmap.
 - `sdk/godot/`, `sdk/unreal/`, and `sdk/unity/` are engine-specific delivery artifacts, not npm packages.
+
+### Godot Quick Start
+
+The Godot client is a copy-in addon, not a package-manager dependency. Install
+the archive contents at `addons/quantum_api_client/`, enable the optional
+**Quantum API Client Settings** helper once in **Project Settings > Plugins**,
+then configure your API connection in **General > Quantum Api**. The complete
+beginner guide, including direct versus proxy authentication and the IBM job
+workflow, is in [addons/quantum_api_client/README.md](addons/quantum_api_client/README.md).
 
 ## License
 

@@ -20,11 +20,14 @@ dist/
 
 # Environment
 .env
+tests/godot/quantum_api_client_harness/addons/
 
 # Editors and OS
+.godot/
 .vscode/
 .idea/
 .DS_Store
+tests/godot/quantum_api_client_harness/*.gd.uid
 
 # Node (SDK)
 node_modules/
@@ -32,7 +35,12 @@ dist-cjs/
 
 # Local notes
 *.log
+quantum_api.db
 tests/test_quantum_api.db
+
+# Unity local package import metadata
+sdk/unity/**/*.meta
+sdk/unity/*.meta
 
 # Temporary files
 *.tmp

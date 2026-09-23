@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import math
 import random
 from dataclasses import dataclass
@@ -8,6 +9,8 @@ from typing import Any
 from quantum_api.config import get_settings
 from quantum_api.enums import GateType
 from quantum_api.services.quantum_runtime import runtime
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -99,6 +102,10 @@ class Qubit:
         return p0 / total, p1 / total
 
     def measure(self, rng: random.Random | None = None) -> int:
+        if rng is None and self._state is not None and runtime.qiskit_available:
+            outcome, self._state = self._state.measure()
+            self._sync_from_statevector()
+            return int(outcome)
         random_source = rng or random.Random()
         p0, _ = self.probabilities()
         measured = 0 if random_source.random() < p0 else 1
@@ -195,11 +202,17 @@ class QuantumCircuitManager:
             and aer_simulator is not None
             and transpile_fn is not None
         ):
-            backend = aer_simulator(method="statevector")
-            self.circuit.save_statevector()
-            transpiled = transpile_fn(self.circuit, backend)
-            result = backend.run(transpiled, shots=1).result()
-            statevector = result.get_statevector()
-            raw_values = getattr(statevector, "data", statevector)
-            return [complex(value) for value in raw_values]
+            try:
+                backend = aer_simulator(method="statevector")
+                self.circuit.save_statevector()
+                transpiled = transpile_fn(self.circuit, backend)
+                result = backend.run(transpiled, shots=1).result()
+                statevector = result.get_statevector()
+                raw_values = getattr(statevector, "data", statevector)
+                return [complex(value) for value in raw_values]
+            except Exception:
+                # Text effects must stay available when an installed Aer/Qiskit
+                # version cannot execute a statevector circuit. The equivalent
+                # math simulator is deterministic and needs no external runtime.
+                logger.warning("Qiskit statevector simulation failed; using math fallback", exc_info=True)
         return self._simulate_math()
