@@ -30,22 +30,41 @@ uv sync --extra phase5-nature         # ground state energy, fermionic mapping
 ### `POST /v1/optimization/qaoa`
 QAOA (Quantum Approximate Optimization Algorithm).
 
-```json
-// Request
-{
-  "problem_type": "maxcut",
-  "graph_edges": [[0, 1], [1, 2], [2, 0]],
-  "p": 1,
-  "shots": 1024
-}
+Example request (a binary quadratic problem):
 
-// Response
+```json
 {
-  "optimal_value": 3.0,
-  "optimal_parameters": [...],
-  "bitstring": "101",
-  "counts": { "101": 512, "010": 512 },
-  "backend_mode": "qiskit"
+  "problem": {
+    "num_variables": 2,
+    "linear": [1.0, -2.0],
+    "quadratic": [{"i": 0, "j": 1, "value": 2.0}],
+    "sense": "minimize"
+  },
+  "reps": 1,
+  "optimizer": {"name": "cobyla", "maxiter": 25},
+  "shots": 512,
+  "seed": 7
+}
+```
+
+Illustrative response (values vary by problem and execution):
+
+```json
+{
+  "best_bitstring": "01",
+  "objective_value": -2.0,
+  "solution_samples": [
+    {"bitstring": "01", "objective_value": -2.0, "probability": 0.6, "status": "SUCCESS"}
+  ],
+  "optimizer_metadata": {
+    "name": "cobyla",
+    "maxiter": 25,
+    "evaluations": 30,
+    "optimizer_time_seconds": 0.2
+  },
+  "provider": "qiskit-algorithms",
+  "backend_mode": "statevector_sampler",
+  "warnings": null
 }
 ```
 
@@ -134,17 +153,18 @@ current OpenAPI schema for payloads:
 
 ## Checking Availability
 
-Before calling Phase 5 endpoints, confirm `runtime_mode` and whether the relevant extra is installed:
+`GET /v1/health` reports base Qiskit availability only. It does not report
+which Phase 5 extras are installed. Call the desired endpoint and handle a
+`503 provider_unavailable` if its dependency is missing; the response names
+the unavailable provider and includes `details.reason`.
 
-```http
-GET /v1/health
-```
+For example, if `qiskit-algorithms` is unavailable:
 
-If a Phase 5 endpoint is hit on a server without the required extra:
 ```json
 {
-  "error": "feature_unavailable",
-  "message": "This endpoint requires the phase5-optimization extra.",
+  "error": "provider_unavailable",
+  "message": "Provider 'qiskit-algorithms' is unavailable.",
+  "details": {"reason": "missing_dependency"},
   "request_id": "..."
 }
 ```

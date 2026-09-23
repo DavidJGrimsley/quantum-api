@@ -11,9 +11,12 @@ The API operates in one of two modes, reported in `GET /v1/health`:
 | `"qiskit"` | Full Qiskit simulation available |
 | `"classical-fallback"` | Qiskit not installed; math-backed simulation used instead |
 
-**Important**: `/v1/circuits/run` **always requires Qiskit** and returns `503` when it is unavailable, regardless of `REQUIRE_QISKIT` config. All other endpoints function in classical-fallback mode.
-
-Set `REQUIRE_QISKIT=true` (server env var) to force `503` responses for all runtime endpoints when Qiskit is unavailable.
+`/v1/circuits/run`, `/v1/list_backends`, `/v1/transpile`, and all
+`/v1/qasm/*` routes require base Qiskit and return `503` without it.
+`/v1/gates/run`, `/v1/random`, and `/v1/text/transform` can use the
+classical fallback unless the server sets `REQUIRE_QISKIT=true`. Phase 5
+domain routes also require their respective optional dependencies. Health
+reports base Qiskit availability, not the availability of those extras.
 
 ---
 
@@ -21,13 +24,16 @@ Set `REQUIRE_QISKIT=true` (server env var) to force `503` responses for all runt
 
 ### `503 Service Unavailable`
 
-**`qiskit_unavailable`** — Qiskit is not installed on the server.
-- For `/v1/circuits/run`: always fails without Qiskit.
-- For other endpoints: only fails if `REQUIRE_QISKIT=true`.
-- Fix: install Qiskit on the server (`uv sync` with Qiskit extras).
+**Base Qiskit unavailable** — `/v1/list_backends`, `/v1/transpile`, and
+`/v1/qasm/*` return `error: "provider_unavailable"` with status `503`.
+`/v1/circuits/run` returns `503` with `error: "service_unavailable"`.
+The fallback-capable core routes return that same error only when
+`REQUIRE_QISKIT=true`. Read the response's `message` and ask the server
+owner to install or enable Qiskit.
 
-**`feature_unavailable`** — A Phase 5 domain endpoint was called but the required extra is not installed.
-- Fix: install the relevant extra (see [domain-endpoints.md](./domain-endpoints.md)).
+**`provider_unavailable`** — A Phase 5 domain endpoint's required dependency
+is absent. Check `details.reason` for `missing_dependency` and ask the server
+owner to install the relevant extra (see [domain-endpoints.md](./domain-endpoints.md)).
 
 ---
 
@@ -97,8 +103,10 @@ Validation error from Pydantic. Check:
   "details": { "job_id": "job-id", "status": "running" }
 }
 ```
-- The IBM hardware job is still queued or running.
-- Poll `GET /v1/jobs/{job_id}` until `status` is `succeeded` or `failed`, then fetch the result.
+- Poll `GET /v1/jobs/{job_id}` until a terminal status. Fetch the result
+  only when `status` is `succeeded`; for `failed` or `cancelled`, inspect
+  the status and any `error` in that response instead. `result_not_ready` can occur for
+  any status other than `succeeded`.
 
 ---
 
@@ -126,9 +134,11 @@ Always inspect rate-limit headers on successful responses to implement proper ba
 ```
 RateLimit-Limit: 100
 RateLimit-Remaining: 87
-RateLimit-Reset: 1748800000
+RateLimit-Reset: 42
 ```
 
-Implement exponential backoff with jitter for `429` responses. Use the `Retry-After` header value as the minimum wait.
+`RateLimit-Reset` is seconds until the current window resets. Implement
+exponential backoff with jitter for `429` responses. Use the `Retry-After`
+header value as the minimum wait.
 
 ---

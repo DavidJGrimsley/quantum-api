@@ -26,7 +26,7 @@ Successful responses on protected endpoints include:
 X-Request-ID: <uuid>
 RateLimit-Limit: <n>
 RateLimit-Remaining: <n>
-RateLimit-Reset: <unix_timestamp>
+RateLimit-Reset: <seconds_until_reset>
 ```
 
 `429` responses also include `Retry-After: <seconds>`.
@@ -189,11 +189,20 @@ neither provides IBM hardware entropy or cryptographic randomness.
       "is_hardware": false,
       "num_qubits": 32,
       "basis_gates": ["cx", "id", "rz", "sx", "x"],
-      "coupling_map_summary": null
+      "coupling_map_summary": {
+        "present": false,
+        "edge_count": 0,
+        "connected_qubit_count": 0
+      }
     }
   ],
   "total": 1,
-  "filters_applied": { "provider": "aer" },
+  "filters_applied": {
+    "provider": "aer",
+    "simulator_only": false,
+    "min_qubits": 1,
+    "ibm_profile": null
+  },
   "warnings": []
 }
 ```
@@ -266,7 +275,7 @@ Accepts exactly one of `circuit` or `qasm` (not both — sending both returns `4
   "num_qubits": 1,
   "depth": 1,
   "size": 1,
-  "operations": [{ "gate": "h", "target": 0 }]
+  "operations": [{ "gate": "h", "qubits": [0], "clbits": [], "params": [] }]
 }
 ```
 
@@ -405,8 +414,7 @@ The source label is not a cryptographic randomness guarantee.
   "ibm_profile": "my-open-plan",
   "status": "queued",
   "remote_job_id": "...",
-  "created_at": "...",
-  "updated_at": "..."
+  "created_at": "..."
 }
 ```
 
