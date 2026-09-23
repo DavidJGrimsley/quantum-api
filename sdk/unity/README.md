@@ -2,9 +2,10 @@
 
 Package-style Unity runtime helper for the Quantum API mounted `/v1` contract.
 
-This scaffold is aimed at gameplay/runtime use, not editor tooling. It gives Unity projects the same baseline posture as the Godot and Unreal clients:
+This package is aimed at gameplay/runtime use. It includes:
 
-- mounted base URL normalization
+- a fixed production endpoint in the client source
+- a shared `QuantumApiManager` component for Inspector configuration
 - backend-proxy mode by default for shipped builds
 - optional direct `X-API-Key` mode for local/dev/demo use
 - coroutine and `Task` entry points built on `UnityWebRequest`
@@ -28,19 +29,23 @@ The package lives under `sdk/unity/` so it can later be published as a Unity pac
 
 ## Install
 
-Current repo-local workflow:
+Unity Package Manager workflow:
 
-1. Copy the `sdk/unity/` folder into a Unity project `Packages/` directory, or add it by local path in the Unity Package Manager.
-2. Create a `QuantumApiClient`; the hosted production Quantum API URL is built into the package.
-3. Keep `BackendProxyMode = true` for shipped builds unless you explicitly want local/dev/demo direct-key behavior.
+1. Add `sdk/unity/package.json` through Unity Package Manager's local-path flow, or copy the package into `Packages/com.quantumapi.runtime`.
+2. Add `QuantumApiManager` to one GameObject in your first scene.
+3. In the Inspector, select backend-proxy mode or enter your own API key for direct mode. Set the timeout if needed.
+4. Other scripts use `QuantumApiManager.Instance.Client`. The manager survives scene changes and removes duplicate instances.
 
-The package default endpoint is `https://davidjgrimsley.com/api/public/quantum/v1`. Advanced local smoke tests can still override `QuantumApiClientOptions.BaseUrl`.
+The endpoint is fixed to `https://davidjgrimsley.com/api/public/quantum/v1` in `QuantumApiClient.cs`. There is no Inspector setting or runtime option to change it; changing it requires editing the plugin source.
+
+While in Play Mode, use the manager component's **Check Health** or **Request Random (0-1)** context-menu action to try the connection without writing code. Health also runs once at startup. Results and errors appear in Unity's Console. Leave the API key empty in scenes and enter it locally; a key saved into a scene is included in a build and can be read by others.
 
 ## Layout
 
 - `package.json` - Unity package manifest
-- `Runtime/` - runtime assembly, DTOs, client, and error handling
+- `Runtime/` - runtime assembly, DTOs, client, manager, and error handling
 - `Samples~/BasicUsage/` - starter MonoBehaviour example
+- `CHANGELOG.md` and `LICENSE.md` - release notes and license
 
 ## Basic Usage
 
@@ -50,23 +55,13 @@ using UnityEngine;
 
 public sealed class QuantumBootstrap : MonoBehaviour
 {
-    private QuantumApiClient _client;
-
-    private void Awake()
-    {
-        _client = new QuantumApiClient(new QuantumApiClientOptions
-        {
-            BackendProxyMode = true,
-            TimeoutSeconds = 15,
-        });
-    }
-
     private async void Start()
     {
-        var health = await _client.HealthAsync();
+        var client = QuantumApiManager.Instance.Client;
+        var health = await client.HealthAsync();
         Debug.Log($"Quantum API status: {health.status}");
 
-        var random = await _client.RandomIntAsync(0, 1);
+        var random = await client.RandomIntAsync(0, 1);
         Debug.Log($"QRNG coin flip: {random.value} ({random.source})");
     }
 }
@@ -75,7 +70,7 @@ public sealed class QuantumBootstrap : MonoBehaviour
 Coroutine-based gate call:
 
 ```csharp
-StartCoroutine(_client.RunGateCoroutine(
+StartCoroutine(QuantumApiManager.Instance.Client.RunGateCoroutine(
     new GateRunRequest
     {
         gate_type = "rotation",
@@ -93,7 +88,7 @@ Direct-key QRNG smoke test:
 var client = new QuantumApiClient(new QuantumApiClientOptions
 {
     BackendProxyMode = false,
-    ApiKey = "qapi_devlocal_0123456789abcdef0123456789abcdef",
+    ApiKey = "YOUR_API_KEY",
 });
 
 for (var index = 0; index < 5; index += 1)
@@ -191,11 +186,10 @@ The Unreal plugin path in `sdk/unreal/` is still Unreal-specific. Unity should n
 
 ## Verification
 
-For a beginner-friendly local smoke test:
+For a beginner-friendly hosted smoke test:
 
-1. Start the API with `uv run uvicorn quantum_api.main:app --host 127.0.0.1 --port 8000`.
-2. Add this package to a scratch Unity project by local path.
-3. Attach `QuantumApiExample` to an empty GameObject.
-4. Keep the sample defaults for hosted testing: `BackendProxyMode = false` and the documented dev API key. For local API smoke tests only, override `QuantumApiClientOptions.BaseUrl` to `http://127.0.0.1:8000`.
-5. Enter Play Mode and confirm the Console logs health, echo types, gate measurements, five QRNG coin flips, and one expected validation error.
-6. Build a Windows standalone development player and repeat at least health plus one protected call.
+1. Add this package to a scratch Unity project by local path.
+2. Add `QuantumApiManager` to one GameObject and enter your own API key in direct mode.
+3. Enter Play Mode and confirm the Console logs a health response.
+4. Use the manager's **Request Random (0-1)** context-menu action; confirm the result and source are logged.
+5. Build a Windows standalone development player and repeat at least health plus one protected call.

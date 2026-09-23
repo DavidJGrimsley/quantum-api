@@ -6,30 +6,17 @@ namespace QuantumApi.Unity.Samples
 {
     public sealed class QuantumApiExample : MonoBehaviour
     {
-        [SerializeField]
-        private string baseUrl = "http://127.0.0.1:8000";
-
-        [SerializeField]
-        private bool backendProxyMode = false;
-
-        [SerializeField]
-        private string apiKey = "qapi_devlocal_0123456789abcdef0123456789abcdef";
-
         private QuantumApiClient _client;
-
-        private void Awake()
-        {
-            _client = new QuantumApiClient(new QuantumApiClientOptions
-            {
-                BaseUrl = baseUrl,
-                BackendProxyMode = backendProxyMode,
-                ApiKey = apiKey,
-                TimeoutSeconds = 15,
-            });
-        }
 
         private void Start()
         {
+            _client = QuantumApiManager.Instance?.Client;
+            if (_client == null)
+            {
+                Debug.LogError("Add QuantumApiManager to the scene before using QuantumApiExample.", this);
+                return;
+            }
+
             StartCoroutine(_client.HealthCoroutine(
                 health => Debug.Log($"Quantum API ready: {health.status} ({health.runtime_mode})"),
                 error => Debug.LogWarning($"Health check failed: {error.Message}")));

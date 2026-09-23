@@ -14,9 +14,6 @@ namespace QuantumApi.Unity
     [Serializable]
     public sealed class QuantumApiClientOptions
     {
-        public const string ProductionBaseUrl = "https://davidjgrimsley.com/api/public/quantum/v1";
-
-        public string BaseUrl = ProductionBaseUrl;
         public bool BackendProxyMode = true;
         public string ApiKey = "";
         public string BearerToken = "";

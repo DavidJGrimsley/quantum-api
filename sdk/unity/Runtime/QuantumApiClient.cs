@@ -9,7 +9,7 @@ namespace QuantumApi.Unity
 {
     public sealed class QuantumApiClient
     {
-        private readonly string _baseUrl;
+        private const string BaseUrl = "https://davidjgrimsley.com/api/public/quantum/v1";
         private readonly bool _backendProxyMode;
         private readonly string _apiKey;
         private readonly string _bearerToken;
@@ -23,15 +23,12 @@ namespace QuantumApi.Unity
                 throw new ArgumentNullException(nameof(options));
             }
 
-            _baseUrl = NormalizeBaseUrl(options.BaseUrl);
             _backendProxyMode = options.BackendProxyMode;
             _apiKey = (options.ApiKey ?? string.Empty).Trim();
             _bearerToken = (options.BearerToken ?? string.Empty).Trim();
             _defaultAuthMode = options.DefaultAuthMode;
             _timeoutSeconds = options.TimeoutSeconds > 0 ? options.TimeoutSeconds : 15;
         }
-
-        public string BaseUrl => _baseUrl;
 
         public bool BackendProxyMode => _backendProxyMode;
 
@@ -475,7 +472,7 @@ namespace QuantumApi.Unity
                 return null;
             }
 
-            var request = new UnityWebRequest(_baseUrl + path, method)
+            var request = new UnityWebRequest(BaseUrl + path, method)
             {
                 downloadHandler = new DownloadHandlerBuffer(),
                 timeout = requestOptions != null && requestOptions.TimeoutSeconds.HasValue && requestOptions.TimeoutSeconds.Value > 0
@@ -625,19 +622,6 @@ namespace QuantumApi.Unity
                 }
             }
             return sb.ToString();
-        }
-
-        private static string NormalizeBaseUrl(string baseUrl)
-        {
-            var trimmed = string.IsNullOrWhiteSpace(baseUrl)
-                ? QuantumApiClientOptions.ProductionBaseUrl
-                : baseUrl.Trim().TrimEnd('/');
-            if (string.IsNullOrWhiteSpace(trimmed))
-            {
-                throw new ArgumentException("QuantumApiClient requires a non-empty BaseUrl.", nameof(baseUrl));
-            }
-
-            return trimmed.EndsWith("/v1", StringComparison.Ordinal) ? trimmed : trimmed + "/v1";
         }
 
         private static Task<T> FailTask<T>(string errorCode, string message) where T : class
