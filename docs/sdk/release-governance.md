@@ -6,7 +6,7 @@ This document defines how Quantum API client releases work during and after Phas
 
 - `sdk/js`, `sdk/python`, `sdk/pennylane`, the Godot addon/client path, the Unreal plugin, and the Unity runtime helper (`sdk/unity/`) should be treated as `package-ready`. The Unity helper awaits in-editor validation and package publishing, but the scaffold and package metadata are in place.
 - Public publication is a separate release decision and is not implied by a passing implementation branch.
-- Engine clients should default their production guidance to backend-proxy usage.
+- Engine clients should default their production guidance to backend-proxy usage where a proxy destination is configurable. The Unity package intentionally fixes its endpoint and currently supports direct API-key authentication only; it must not imply that its hosted API is a user's game backend proxy.
 - Direct `X-API-Key` mode remains supported for local, prototype, and demo workflows only.
 
 ## Versioning policy
@@ -50,9 +50,9 @@ This document defines how Quantum API client releases work during and after Phas
 - Package metadata is complete and not marked as internal/private.
 - Install/build output is deterministic.
 - README usage examples match the current `/v1` contract.
-- Auth guidance documents both backend-proxy and direct-dev modes.
+- Auth guidance documents the modes actually supported by the client. Unity must disclose that it has no configurable proxy URL and that private API keys must not ship in a client build.
 - Error handling preserves `error`, `message`, `details`, `request_id`, HTTP status, and headers where available.
-- Base URL rules cover both local `/v1` and mounted `/public-facing/api/quantum/v1`.
+- Endpoint rules must be documented per client. Unity's fixed production URL must match the mounted `/public-facing/api/quantum/v1` contract; local URLs require editing the source and are not a runtime option.
 - The client has smoke coverage for install/build plus contract-level request handling.
 
 ## Public publishing checklist

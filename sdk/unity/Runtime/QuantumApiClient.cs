@@ -9,8 +9,7 @@ namespace QuantumApi.Unity
 {
     public sealed class QuantumApiClient
     {
-        private const string BaseUrl = "https://davidjgrimsley.com/api/public/quantum/v1";
-        private readonly bool _backendProxyMode;
+        private const string BaseUrl = "https://davidjgrimsley.com/public-facing/api/quantum/v1";
         private readonly string _apiKey;
         private readonly string _bearerToken;
         private readonly QuantumApiAuthMode _defaultAuthMode;
@@ -23,14 +22,11 @@ namespace QuantumApi.Unity
                 throw new ArgumentNullException(nameof(options));
             }
 
-            _backendProxyMode = options.BackendProxyMode;
             _apiKey = (options.ApiKey ?? string.Empty).Trim();
             _bearerToken = (options.BearerToken ?? string.Empty).Trim();
             _defaultAuthMode = options.DefaultAuthMode;
             _timeoutSeconds = options.TimeoutSeconds > 0 ? options.TimeoutSeconds : 15;
         }
-
-        public bool BackendProxyMode => _backendProxyMode;
 
         public Task<HealthResponse> HealthAsync(QuantumApiRequestOptions requestOptions = null)
         {
@@ -517,11 +513,6 @@ namespace QuantumApi.Unity
             }
 
             if (path == "/health" || path == "/portfolio.json")
-            {
-                return QuantumApiAuthMode.None;
-            }
-
-            if (_backendProxyMode)
             {
                 return QuantumApiAuthMode.None;
             }

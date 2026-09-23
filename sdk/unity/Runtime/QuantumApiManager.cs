@@ -7,14 +7,12 @@ namespace QuantumApi.Unity
     public sealed class QuantumApiManager : MonoBehaviour
     {
         [Header("Quantum API")]
-        [SerializeField] private bool backendProxyMode;
         [SerializeField] private string apiKey = "";
         [SerializeField, Min(1)] private int timeoutSeconds = 20;
 
         public static QuantumApiManager Instance { get; private set; }
         public QuantumApiClient Client { get; private set; }
-        public bool BackendProxyMode => backendProxyMode;
-        public bool IsConfigured => backendProxyMode || !string.IsNullOrWhiteSpace(apiKey);
+        public bool IsConfigured => !string.IsNullOrWhiteSpace(apiKey);
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetInstance()
@@ -22,7 +20,27 @@ namespace QuantumApi.Unity
             Instance = null;
         }
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void RestoreInstanceAfterSceneLoad()
+        {
+            if (Instance != null)
+            {
+                return;
+            }
+
+            var existingManager = FindObjectOfType<QuantumApiManager>();
+            if (existingManager != null)
+            {
+                existingManager.InitializeAsSingleton();
+            }
+        }
+
         private void Awake()
+        {
+            InitializeAsSingleton();
+        }
+
+        private void InitializeAsSingleton()
         {
             if (Instance != null && Instance != this)
             {
@@ -34,8 +52,7 @@ namespace QuantumApi.Unity
             DontDestroyOnLoad(gameObject);
             Client = new QuantumApiClient(new QuantumApiClientOptions
             {
-                BackendProxyMode = backendProxyMode,
-                ApiKey = backendProxyMode ? "" : (apiKey ?? "").Trim(),
+                ApiKey = (apiKey ?? "").Trim(),
                 TimeoutSeconds = timeoutSeconds > 0 ? timeoutSeconds : 20,
             });
         }

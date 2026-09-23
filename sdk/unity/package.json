@@ -1,7 +1,7 @@
 {
   "name": "com.quantumapi.runtime",
   "displayName": "Quantum API Unity Helper",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "unity": "2021.3",
   "description": "Runtime Unity helper for the Quantum API mounted /v1 contract.",
   "keywords": [

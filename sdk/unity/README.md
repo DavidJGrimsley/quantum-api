@@ -6,8 +6,7 @@ This package is aimed at gameplay/runtime use. It includes:
 
 - a fixed production endpoint in the client source
 - a shared `QuantumApiManager` component for Inspector configuration
-- backend-proxy mode by default for shipped builds
-- optional direct `X-API-Key` mode for local/dev/demo use
+- direct `X-API-Key` authentication for protected routes
 - coroutine and `Task` entry points built on `UnityWebRequest`
 - structured `QuantumApiError` parsing for normalized API failures
 
@@ -33,10 +32,10 @@ Unity Package Manager workflow:
 
 1. Add `sdk/unity/package.json` through Unity Package Manager's local-path flow, or copy the package into `Packages/com.quantumapi.runtime`.
 2. Add `QuantumApiManager` to one GameObject in your first scene.
-3. In the Inspector, select backend-proxy mode or enter your own API key for direct mode. Set the timeout if needed.
+3. Enter your API key in the Inspector. Set the timeout if needed.
 4. Other scripts use `QuantumApiManager.Instance.Client`. The manager survives scene changes and removes duplicate instances.
 
-The endpoint is fixed to `https://davidjgrimsley.com/api/public/quantum/v1` in `QuantumApiClient.cs`. There is no Inspector setting or runtime option to change it; changing it requires editing the plugin source.
+The endpoint is fixed to `https://davidjgrimsley.com/public-facing/api/quantum/v1` in `QuantumApiClient.cs`. There is no Inspector setting or runtime option to change it; changing it requires editing the plugin source. Protected requests require an API key. This package does not offer a configurable backend-proxy URL. Do not ship a private API key in a distributed client; use a server-side integration if your game must keep credentials secret.
 
 While in Play Mode, use the manager component's **Check Health** or **Request Random (0-1)** context-menu action to try the connection without writing code. Health also runs once at startup. Results and errors appear in Unity's Console. Leave the API key empty in scenes and enter it locally; a key saved into a scene is included in a build and can be read by others.
 
@@ -87,7 +86,6 @@ Direct-key QRNG smoke test:
 ```csharp
 var client = new QuantumApiClient(new QuantumApiClientOptions
 {
-    BackendProxyMode = false,
     ApiKey = "YOUR_API_KEY",
 });
 
@@ -146,15 +144,14 @@ var response = await _client.TransformTextWithFallbackAsync(
 );
 ```
 
-## Auth Modes
+## Authentication
 
 Default behavior:
 
 - `health` -> public
-- all other currently implemented Unity helper routes, including `random` -> no auth in backend-proxy mode
-- protected routes in direct mode -> `X-API-Key`
+- protected routes -> `X-API-Key`
 
-If your own backend proxy expects bearer auth, pass a default bearer token and set `DefaultAuthMode = QuantumApiAuthMode.Bearer`, or override auth per request.
+The package has no configurable proxy URL. Keep private credentials on a server you control when building a distributed game; do not embed a private API key in a client build.
 
 ## IBM Profiles (Per-User IBM Credentials)
 
@@ -189,7 +186,7 @@ The Unreal plugin path in `sdk/unreal/` is still Unreal-specific. Unity should n
 For a beginner-friendly hosted smoke test:
 
 1. Add this package to a scratch Unity project by local path.
-2. Add `QuantumApiManager` to one GameObject and enter your own API key in direct mode.
+2. Add `QuantumApiManager` to one GameObject and enter your own API key.
 3. Enter Play Mode and confirm the Console logs a health response.
 4. Use the manager's **Request Random (0-1)** context-menu action; confirm the result and source are logged.
 5. Build a Windows standalone development player and repeat at least health plus one protected call.

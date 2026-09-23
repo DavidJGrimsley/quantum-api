@@ -14,7 +14,6 @@ namespace QuantumApi.Unity
     [Serializable]
     public sealed class QuantumApiClientOptions
     {
-        public bool BackendProxyMode = true;
         public string ApiKey = "";
         public string BearerToken = "";
         public QuantumApiAuthMode DefaultAuthMode = QuantumApiAuthMode.Auto;
