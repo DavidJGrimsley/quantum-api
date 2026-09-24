@@ -1,3 +1,4 @@
+// Copyright (c) 2026 David J. Grimsley. All rights reserved.
 using System.Threading.Tasks;
 using QuantumApi.Unity;
 using UnityEngine;

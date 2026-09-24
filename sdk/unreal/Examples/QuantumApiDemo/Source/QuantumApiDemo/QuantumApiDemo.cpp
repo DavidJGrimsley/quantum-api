@@ -1,3 +1,4 @@
+// Copyright (c) 2026 David J. Grimsley. All rights reserved.
 #include "QuantumApiDemo.h"
 #include "Modules/ModuleManager.h"
 

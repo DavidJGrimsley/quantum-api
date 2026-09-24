@@ -1,3 +1,4 @@
+// Copyright (c) 2026 David J. Grimsley. All rights reserved.
 using QuantumApi.Unity;
 using UnityEditor;
 

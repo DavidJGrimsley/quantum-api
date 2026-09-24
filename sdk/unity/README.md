@@ -30,7 +30,11 @@ See [QRNG Unity Demo](https://github.com/DavidJGrimsley/qrng-unity-demo) for a s
 
 ## Install
 
-Unity Package Manager workflow:
+For the `.unitypackage` from Fab, choose **Assets → Import Package → Custom Package**
+in Unity, select the downloaded file, and import its contents. The scripts,
+sample, and documentation appear under `Assets/QuantumApi`.
+
+Unity Package Manager workflow for the source package:
 
 1. In Unity Package Manager, choose **Add package from disk** and select `sdk/unity/package.json`, or copy the package into `Packages/com.quantumapi.runtime`.
 2. Add `QuantumApiManager` to one GameObject in your first scene.
@@ -49,6 +53,9 @@ While in Play Mode, use the manager component's **Check Health** or **Request Ra
 - `Runtime/` - runtime assembly, DTOs, client, manager, and error handling
 - `Samples~/BasicUsage/` - starter MonoBehaviour example
 - `CHANGELOG.md` and `LICENSE.md` - release notes and license
+
+The Fab asset package presents `Samples~/BasicUsage` as `Samples/BasicUsage`
+because Unity ignores folders ending in `~` under a project's `Assets` folder.
 
 ## Basic Usage
 
@@ -164,14 +171,13 @@ Direct mode requires an API key for protected routes. Proxy mode requires a vali
 
 Set optional default backend and profile names on `QuantumApiManager`. Blank IBM job request fields use these defaults; explicit values take priority. The Unity client does not administer IBM credentials.
 
-## Publishing Direction
+## Distribution
 
-This folder is intentionally shaped like a Unity package first.
+The Fab Unity download is a native `.unitypackage` that imports into one
+`Assets/QuantumApi` folder. This source folder is also a Unity Package Manager
+package for local development. It has no third-party Unity package dependencies.
 
-- Best future fit: Unity package distribution (`sdk/unity` as the package source)
-- Possible later channels: git-based UPM install, OpenUPM, Unity Asset Store, or a Fab listing that points to Unity-compatible package files
-
-The Unreal plugin path in `sdk/unreal/` is still Unreal-specific. Unity should not be forced through the Unreal-style plugin install flow.
+The Unreal plugin in `sdk/unreal/` is a separate product format.
 
 ## Verification
 

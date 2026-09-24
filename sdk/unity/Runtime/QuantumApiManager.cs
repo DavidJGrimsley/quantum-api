@@ -1,3 +1,4 @@
+// Copyright (c) 2026 David J. Grimsley. All rights reserved.
 using UnityEngine;
 
 namespace QuantumApi.Unity
@@ -39,7 +40,11 @@ namespace QuantumApi.Unity
                 return;
             }
 
+#if UNITY_2022_2_OR_NEWER
+            var existingManager = FindAnyObjectByType<QuantumApiManager>();
+#else
             var existingManager = FindObjectOfType<QuantumApiManager>();
+#endif
             if (existingManager != null)
             {
                 existingManager.InitializeAsSingleton();
