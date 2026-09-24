@@ -11,6 +11,10 @@ namespace QuantumApi.Unity
     {
         private const string BaseUrl = "https://davidjgrimsley.com/public-facing/api/quantum/v1";
         private readonly string _apiKey;
+        private readonly bool _backendProxyMode;
+        private readonly string _baseUrl;
+        private readonly string _defaultIbmBackend;
+        private readonly string _defaultIbmProfile;
         private readonly string _bearerToken;
         private readonly QuantumApiAuthMode _defaultAuthMode;
         private readonly int _timeoutSeconds;
@@ -23,6 +27,10 @@ namespace QuantumApi.Unity
             }
 
             _apiKey = (options.ApiKey ?? string.Empty).Trim();
+            _backendProxyMode = options.BackendProxyMode;
+            _baseUrl = _backendProxyMode ? NormalizeProxyUrl(options.BackendProxyUrl) : BaseUrl;
+            _defaultIbmBackend = (options.DefaultIbmBackend ?? string.Empty).Trim();
+            _defaultIbmProfile = (options.DefaultIbmProfile ?? string.Empty).Trim();
             _bearerToken = (options.BearerToken ?? string.Empty).Trim();
             _defaultAuthMode = options.DefaultAuthMode;
             _timeoutSeconds = options.TimeoutSeconds > 0 ? options.TimeoutSeconds : 15;
@@ -452,7 +460,13 @@ namespace QuantumApi.Unity
                 ? requestOptions.BearerToken.Trim()
                 : _bearerToken;
 
-            if (resolvedAuthMode == QuantumApiAuthMode.ApiKey && string.IsNullOrWhiteSpace(apiKey))
+            if (_backendProxyMode && string.IsNullOrEmpty(_baseUrl))
+            {
+                configurationError = QuantumApiError.Local("missing_proxy_url", "Backend proxy mode requires a valid HTTP or HTTPS URL.");
+                return null;
+            }
+
+            if (!_backendProxyMode && resolvedAuthMode == QuantumApiAuthMode.ApiKey && string.IsNullOrWhiteSpace(apiKey))
             {
                 configurationError = QuantumApiError.Local(
                     "missing_api_key",
@@ -460,7 +474,7 @@ namespace QuantumApi.Unity
                 return null;
             }
 
-            if (resolvedAuthMode == QuantumApiAuthMode.Bearer && string.IsNullOrWhiteSpace(bearerToken))
+            if (!_backendProxyMode && resolvedAuthMode == QuantumApiAuthMode.Bearer && string.IsNullOrWhiteSpace(bearerToken))
             {
                 configurationError = QuantumApiError.Local(
                     "missing_bearer_token",
@@ -468,7 +482,7 @@ namespace QuantumApi.Unity
                 return null;
             }
 
-            var request = new UnityWebRequest(BaseUrl + path, method)
+            var request = new UnityWebRequest(_baseUrl + path, method)
             {
                 downloadHandler = new DownloadHandlerBuffer(),
                 timeout = requestOptions != null && requestOptions.TimeoutSeconds.HasValue && requestOptions.TimeoutSeconds.Value > 0
@@ -480,7 +494,11 @@ namespace QuantumApi.Unity
             {
                 foreach (var pair in requestOptions.Headers)
                 {
-                    request.SetRequestHeader(pair.Key, pair.Value);
+                    if (!_backendProxyMode || (!string.Equals(pair.Key, "X-API-Key", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(pair.Key, "Authorization", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        request.SetRequestHeader(pair.Key, pair.Value);
+                    }
                 }
             }
 
@@ -493,11 +511,11 @@ namespace QuantumApi.Unity
                 request.SetRequestHeader("Content-Type", "application/json");
             }
 
-            if (resolvedAuthMode == QuantumApiAuthMode.ApiKey)
+            if (!_backendProxyMode && resolvedAuthMode == QuantumApiAuthMode.ApiKey)
             {
                 request.SetRequestHeader("X-API-Key", apiKey);
             }
-            else if (resolvedAuthMode == QuantumApiAuthMode.Bearer)
+            else if (!_backendProxyMode && resolvedAuthMode == QuantumApiAuthMode.Bearer)
             {
                 request.SetRequestHeader("Authorization", $"Bearer {bearerToken}");
             }
@@ -562,23 +580,42 @@ namespace QuantumApi.Unity
             return $"{{\"gate_type\":\"{escapedGateType}\"}}";
         }
 
-        private static string BuildRandomJobSubmitJson(RandomJobSubmitRequest request)
+        private string BuildRandomJobSubmitJson(RandomJobSubmitRequest request)
         {
             var provider = string.IsNullOrWhiteSpace(request.provider) ? "ibm" : request.provider.Trim();
+            var useIbmDefaults = string.Equals(provider, "ibm", StringComparison.OrdinalIgnoreCase);
+            var backend = string.IsNullOrWhiteSpace(request.backend_name) && useIbmDefaults
+                ? _defaultIbmBackend : (request.backend_name ?? string.Empty).Trim();
+            var profile = string.IsNullOrWhiteSpace(request.ibm_profile) && useIbmDefaults
+                ? _defaultIbmProfile : (request.ibm_profile ?? string.Empty).Trim();
             var builder = new StringBuilder();
             builder.Append("{");
             builder.Append("\"min\":").Append(request.min.ToString(System.Globalization.CultureInfo.InvariantCulture)).Append(",");
             builder.Append("\"max\":").Append(request.max.ToString(System.Globalization.CultureInfo.InvariantCulture)).Append(",");
             builder.Append("\"provider\":\"").Append(EscapeJsonString(provider)).Append("\",");
-            builder.Append("\"backend_name\":\"").Append(EscapeJsonString(request.backend_name ?? string.Empty)).Append("\"");
+            builder.Append("\"backend_name\":\"").Append(EscapeJsonString(backend)).Append("\"");
 
-            if (!string.IsNullOrWhiteSpace(request.ibm_profile))
+            if (!string.IsNullOrWhiteSpace(profile))
             {
-                builder.Append(",\"ibm_profile\":\"").Append(EscapeJsonString(request.ibm_profile.Trim())).Append("\"");
+                builder.Append(",\"ibm_profile\":\"").Append(EscapeJsonString(profile)).Append("\"");
             }
 
             builder.Append("}");
             return builder.ToString();
+        }
+
+        private static string NormalizeProxyUrl(string value)
+        {
+            var url = (value ?? string.Empty).Trim().TrimEnd('/');
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var parsed)
+                || (parsed.Scheme != Uri.UriSchemeHttp && parsed.Scheme != Uri.UriSchemeHttps)
+                || !string.IsNullOrEmpty(parsed.Query) || !string.IsNullOrEmpty(parsed.Fragment)
+                || !string.IsNullOrEmpty(parsed.UserInfo))
+            {
+                return string.Empty;
+            }
+
+            return url.EndsWith("/v1", StringComparison.OrdinalIgnoreCase) ? url : url + "/v1";
         }
 
         private static string EscapePathSegment(string value)
