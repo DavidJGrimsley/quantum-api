@@ -7,12 +7,23 @@ namespace QuantumApi.Unity
     public sealed class QuantumApiManager : MonoBehaviour
     {
         [Header("Quantum API")]
+        [SerializeField] private bool backendProxyMode;
         [SerializeField] private string apiKey = "";
+        [SerializeField] private string backendProxyUrl = "";
         [SerializeField, Min(1)] private int timeoutSeconds = 20;
+
+        [Header("IBM Hardware Defaults")]
+        [SerializeField] private string defaultIbmBackend = "";
+        [SerializeField] private string defaultIbmProfile = "";
 
         public static QuantumApiManager Instance { get; private set; }
         public QuantumApiClient Client { get; private set; }
-        public bool IsConfigured => !string.IsNullOrWhiteSpace(apiKey);
+        public bool BackendProxyMode => backendProxyMode;
+        public string DefaultIbmBackend => (defaultIbmBackend ?? "").Trim();
+        public string DefaultIbmProfile => (defaultIbmProfile ?? "").Trim();
+        public bool IsConfigured => backendProxyMode
+            ? !string.IsNullOrWhiteSpace(backendProxyUrl)
+            : !string.IsNullOrWhiteSpace(apiKey);
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetInstance()
@@ -52,7 +63,11 @@ namespace QuantumApi.Unity
             DontDestroyOnLoad(gameObject);
             Client = new QuantumApiClient(new QuantumApiClientOptions
             {
-                ApiKey = (apiKey ?? "").Trim(),
+                BackendProxyMode = backendProxyMode,
+                BackendProxyUrl = backendProxyMode ? backendProxyUrl : "",
+                ApiKey = backendProxyMode ? "" : (apiKey ?? "").Trim(),
+                DefaultIbmBackend = DefaultIbmBackend,
+                DefaultIbmProfile = DefaultIbmProfile,
                 TimeoutSeconds = timeoutSeconds > 0 ? timeoutSeconds : 20,
             });
         }
@@ -93,7 +108,9 @@ namespace QuantumApi.Unity
 
             if (!IsConfigured)
             {
-                Debug.LogWarning("Quantum API key is empty. Set API Key on QuantumApiManager in the Inspector.", this);
+                Debug.LogWarning(backendProxyMode
+                    ? "Set Backend Proxy URL on QuantumApiManager in the Inspector."
+                    : "Set API Key on QuantumApiManager in the Inspector.", this);
                 return;
             }
 

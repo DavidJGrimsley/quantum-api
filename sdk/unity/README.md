@@ -4,9 +4,9 @@ Package-style Unity runtime helper for the Quantum API mounted `/v1` contract.
 
 This package is aimed at gameplay/runtime use. It includes:
 
-- a fixed production endpoint in the client source
+- the hosted production endpoint for direct mode and a configurable backend proxy URL
 - a shared `QuantumApiManager` component for Inspector configuration
-- direct `X-API-Key` authentication for protected routes
+- direct `X-API-Key` authentication or credential-free calls to your backend proxy
 - coroutine and `Task` entry points built on `UnityWebRequest`
 - structured `QuantumApiError` parsing for normalized API failures
 
@@ -32,12 +32,12 @@ Unity Package Manager workflow:
 
 1. Add `sdk/unity/package.json` through Unity Package Manager's local-path flow, or copy the package into `Packages/com.quantumapi.runtime`.
 2. Add `QuantumApiManager` to one GameObject in your first scene.
-3. Enter your API key in the Inspector. Set the timeout if needed.
+3. Choose direct mode and enter an API key, or enable **Backend Proxy Mode** and enter your proxy URL. Set the timeout and optional IBM defaults if needed.
 4. Other scripts use `QuantumApiManager.Instance.Client`. The manager survives scene changes and removes duplicate instances.
 
-The endpoint is fixed to `https://davidjgrimsley.com/public-facing/api/quantum/v1` in `QuantumApiClient.cs`. There is no Inspector setting or runtime option to change it; changing it requires editing the plugin source. Protected requests require an API key. This package does not offer a configurable backend-proxy URL. Do not ship a private API key in a distributed client; use a server-side integration if your game must keep credentials secret.
+Direct mode uses `https://davidjgrimsley.com/public-facing/api/quantum/v1` and sends the manager's API key on protected requests. Proxy mode sends requests to your proxy URL, normalized to end in `/v1`, without sending an API key or bearer token. The proxy must implement the compatible API and hold the upstream credential server-side. The Inspector shows only the connection field for the selected mode.
 
-While in Play Mode, use the manager component's **Check Health** or **Request Random (0-1)** context-menu action to try the connection without writing code. Health also runs once at startup. Results and errors appear in Unity's Console. Leave the API key empty in scenes and enter it locally; a key saved into a scene is included in a build and can be read by others.
+While in Play Mode, use the manager component's **Check Health** or **Request Random (0-1)** context-menu action to try the connection without writing code. Health also runs once at startup. Results and errors appear in Unity's Console. Leave the API key empty in committed scenes and enter it locally; a key serialized into a scene or distributed build can be read by others.
 
 ## Layout
 
@@ -151,11 +151,11 @@ Default behavior:
 - `health` -> public
 - protected routes -> `X-API-Key`
 
-The package has no configurable proxy URL. Keep private credentials on a server you control when building a distributed game; do not embed a private API key in a client build.
+Direct mode requires an API key for protected routes. Proxy mode requires a valid HTTP or HTTPS URL and sends no `X-API-Key` or `Authorization` header, including when request options provide one. Keep upstream credentials on the proxy server for a distributed game.
 
 ## IBM runtime jobs
 
-Supply an existing `ibm_profile` name in a job request or use the owner's default profile. The Unity client does not administer credentials.
+Set optional default backend and profile names on `QuantumApiManager`. Blank IBM job request fields use these defaults; explicit values take priority. The Unity client does not administer IBM credentials.
 
 ## Publishing Direction
 
