@@ -4,10 +4,12 @@ Reusable Godot runtime client for the mounted Quantum API `/v1` contract.
 
 ## What This Is
 
-This folder is the promoted home for the reusable Godot addon/client.
+This folder contains the reusable runtime script. The distributable addon, including the optional Project Settings editor helper, is in [`addons/quantum_api_client/`](../../../addons/quantum_api_client/README.md).
 
-- Runtime-focused, not an editor plugin
-- Intended to be copied into a Godot project as `addons/quantum_api_client/`
+For a community Godot project, see the [Quantum Jam Godot project](https://github.com/ReneJSchwartz/quantum-jam-2025-choose-your-own-adventure/tree/main/godot_project).
+
+- Runtime script with no editor dependency
+- Installed through the repository's `addons/quantum_api_client/` folder
 - Supports gameplay/runtime plus IBM hardware profile usage:
   - `health_check`
   - `transform_text`
@@ -18,8 +20,7 @@ This folder is the promoted home for the reusable Godot addon/client.
 
 ## Install
 
-1. Install this folder as `addons/quantum_api_client/` in your Godot project.
-  If installing from this repository root, copy `addons/quantum_api_client/` into your game project.
+1. Copy the repository's `addons/quantum_api_client/` folder into your Godot project at the same path. It includes the runtime script and optional editor settings helper.
 2. In your game script, preload `res://addons/quantum_api_client/quantum_api_client.gd`.
 3. Create the client as a child node at runtime.
 4. Call `apply_project_settings()` at startup (or set values manually via setters).
@@ -54,21 +55,11 @@ Field usage:
 
 - `addons/quantum_api_client/quantum_api_client.gd` - shared runtime client
 
-This is a runtime addon, not an editor plugin. It does not need to be enabled in
-the editor's Plugins tab; preload the script and add the client as a runtime
-child node instead.
+The runtime script does not need the editor helper to run. You can enable **Quantum API Client Settings** in **Project Settings > Plugins** to edit its settings in the Inspector, or set them directly in `project.godot`.
 
 ## AssetLib Submission Metadata
 
-Use these values for the current AssetLib submission form:
-
-- Asset Name: Quantum API Client
-- Category: Addons > Scripts
-- Godot Version: 4.x
-- License: Apache-2.0
-- Repository URL: https://github.com/DavidJGrimsley/quantum-api
-- Install Path Inside ZIP: addons/quantum_api_client
-- Icon URL (direct): https://i.imgur.com/mbMnGVA.jpeg
+Use the [distributable addon's current metadata](../../../addons/quantum_api_client/README.md#assetlib-submission-metadata) when preparing an AssetLib release.
 
 ## Base URL Behavior
 
@@ -91,19 +82,9 @@ or a Web export. Anything shipped to a player can be extracted. Use a
 credential-free proxy endpoint for public builds, and inject a fresh key through
 the local process environment only for a developer-only direct-mode smoke test.
 
-## IBM Profiles (Per-User IBM Credentials)
+## IBM Profiles
 
-How a developer running a direct-mode IBM validation gets credentials and profiles:
-
-1. Open `https://davidjgrimsley.com/public-facing/api/quantum` and sign in with an Identerest account.
-2. In the `Api Keys` panel, create a Quantum API key and copy the raw key immediately (it is shown once).
-3. In the `IBM Credentials` panel, create an IBM profile (`profile_name`, IBM API token, IBM instance/CRN, channel), then click verify.
-4. Optionally mark one profile as default on that same public page.
-
-Profile management (create/list/update/delete/verify) stays on your portfolio website.
-This addon only consumes existing profile names for IBM runtime calls.
-
-For IBM-specific runtime routes, pass `ibm_profile` explicitly or configure `default_ibm_profile` in project settings.
+Use an existing profile name supplied by the API owner, or leave `default_ibm_profile` blank to use the owner's default. The addon sends only the name for IBM runtime calls; it does not manage credentials. You can override the configured name with `ibm_profile` on a call.
 
 ## Sample Usage
 

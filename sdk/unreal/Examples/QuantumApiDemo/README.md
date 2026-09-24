@@ -2,7 +2,7 @@
 
 This is the source-controlled UE 5.8 consumer project for the Quantum API plugin. It starts a health check, then runs `rotation_angle_rad = PI / 2`, then requests one local QRNG value from `[0, 1]`.
 
-## Quickstart (under 30 minutes)
+## Quickstart
 
 1. Install Unreal Engine 5.8 plus the Windows C++ toolchain.
 2. Open `QuantumApiDemo.uproject`, allow UE to generate project files, and build `QuantumApiDemoEditor`.

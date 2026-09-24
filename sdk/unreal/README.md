@@ -37,7 +37,8 @@ For a first test, use these nodes in order:
 3. `Generate Random Int`
 4. `Run Circuit`
 5. `List Backends`
-6. `Submit Random Job`
+
+`Submit Random Job` is an optional IBM hardware test after you have configured an IBM profile and selected a hardware backend. It can incur provider usage.
 
 ## Install
 
@@ -49,6 +50,8 @@ For a first test, use these nodes in order:
 The source-controlled UE 5.8 build harness is
 [Examples/QuantumApiDemo](Examples/QuantumApiDemo/README.md). It is a demo,
 not something a game team must ship or install with the plugin.
+
+For a separate playable project using the plugin, see [Guess the Qubit](https://github.com/DavidJGrimsley/guess-the-qubit).
 
 ## API access prerequisite
 

@@ -2,6 +2,8 @@
 
 Package-ready PennyLane device plugin for executing circuits through Quantum API `/v1/qasm/run`.
 
+You need access to a running Quantum API service and an existing runtime API key. This device uses the API's local simulator; it does not submit IBM hardware jobs.
+
 ## Install
 
 ```bash
@@ -50,3 +52,4 @@ Constructor keyword arguments:
 - `client`: optional preconfigured `quantum_api_sdk.QuantumApiClient`
 
 Finite-shot QNodes are reconstructed from counts. Analytic QNodes (`shots=None`) use statevector post-processing.
+The API's QASM runtime requires Qiskit; it returns an error when Qiskit is unavailable.

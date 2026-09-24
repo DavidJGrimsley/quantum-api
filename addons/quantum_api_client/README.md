@@ -19,6 +19,8 @@ The optional editor helper only makes settings easier to find. The actual
 client is a runtime node; it has no editor dependency and the helper does not
 run in an exported game.
 
+For a community project using Godot and Quantum API, see the [Quantum Jam Godot project](https://github.com/ReneJSchwartz/quantum-jam-2025-choose-your-own-adventure/tree/main/godot_project).
+
 ## Choose Your Setup
 
 | Setup | Best for | What to set |
@@ -48,8 +50,8 @@ request_timeout_seconds=10.0
   the client produces exactly one `/v1`.
 - `backend_proxy_mode`: turn this **off** for a direct API-key setup; turn it
   **on** only when your own proxy adds the upstream credentials.
-- `direct_api_key`: your Quantum API key for direct mode. It is intentionally
-  shown as a password field in Godot.
+- `direct_api_key`: a development key for direct mode. The editor masks this
+  field, but project files and exported games do not keep it secret.
 - `default_ibm_profile`: optional name of the IBM profile to use for IBM calls.
   Leave it blank to use the API account's default IBM profile.
 - `request_timeout_seconds`: how long a request may wait before returning a
@@ -63,10 +65,10 @@ These are three different features:
 | --- | --- | --- |
 | `transform_text` | Quantum API transforms text and returns it immediately | No |
 | `run_gate` | Runs a small gate effect and returns immediately | No; simulator only |
-| `submit_circuit_job` | Queues a circuit on an IBM backend, then you poll for it | Yes |
+| `submit_circuit_job` | Queues a circuit on a selected IBM backend, then you poll for it | Yes, when submitted to an IBM hardware backend |
 
 So seeing transformed text proves the API connection works, but it does not
-prove an IBM job ran. For IBM, submit a job, poll `get_circuit_job`, then fetch
+prove an IBM job ran. For IBM hardware, select a hardware backend, submit a job, poll `get_circuit_job`, then fetch
 `get_circuit_job_result` when the status is complete.
 
 ## AssetLib Submission Metadata
@@ -81,15 +83,14 @@ Use these values for the current AssetLib submission form:
 - License: Apache-2.0
 - Repository URL: https://github.com/DavidJGrimsley/quantum-api
 - Install Path Inside ZIP: addons/quantum_api_client
-- Icon URL (direct, after tagging): `https://raw.githubusercontent.com/DavidJGrimsley/quantum-api/godot-v0.1.2/addons/quantum_api_client/icon.png`
+- Icon URL: after creating the release tag, use its direct `raw.githubusercontent.com` URL for `addons/quantum_api_client/icon.png` and confirm the image loads.
 - Suggested tags: `quantum`, `api`, `http`, `ibm`, `gameplay`
 - AI-use disclosure: select **Yes** and disclose that AI assistance was used
   during development, with human review and automated validation of the
   shipped addon.
 
 The icon is included in this addon folder so the Asset Library archive contains
-the same branding. In the Asset Library form, use the direct `raw.githubusercontent.com`
-URL above after the `godot-v0.1.2` tag exists.
+the same branding. A tag-based icon URL will return 404 until that tag exists.
 
 ## Base URL Behavior
 
