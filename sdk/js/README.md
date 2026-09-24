@@ -65,7 +65,7 @@ Use direct `apiKey` client configuration for local development, prototypes, and 
 The client defaults to `auto` auth mode:
 
 - `health` and `portfolio.json` -> public
-- all other `/v1` routes -> API key
+- the runtime methods listed below -> API key (unless overridden)
 
 You can override auth per request:
 
@@ -179,4 +179,4 @@ npm --prefix sdk/js run pack:dry-run
 4. Publish with GitHub Actions using `.github/workflows/publish-sdk.yml`:
   - run manually with `workflow_dispatch`, or
   - push a tag like `sdk-v0.1.2`.
-5. Ensure repository secret `NPM_TOKEN` exists with publish access for `@mr.dj2u/quantum-api`.
+5. Configure npm trusted publishing for this workflow. The workflow uses `NPM_TOKEN` as a fallback if trusted publishing fails.

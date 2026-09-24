@@ -50,7 +50,7 @@ with QuantumApiClient(
 The client defaults to `auto` auth mode:
 
 - `health` and `portfolio.json` -> public
-- all other `/v1` routes -> API key
+- the runtime methods listed below -> API key (unless overridden)
 
 Per-call override examples:
 

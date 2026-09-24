@@ -570,6 +570,7 @@ QASM 3 import notes:
 Copy `.env.example` to `.env` and adjust values as needed.
 
 - `APP_ENV`
+- `ROOT_PATH`
 - `API_PREFIX`
 - `MAX_TEXT_LENGTH`
 - `MAX_CIRCUIT_QUBITS`
@@ -583,6 +584,7 @@ Copy `.env.example` to `.env` and adjust values as needed.
 - `IBM_TOKEN` (optional local/self-host fallback)
 - `IBM_INSTANCE` (optional local/self-host fallback)
 - `IBM_CHANNEL` (optional, default `ibm_quantum_platform`)
+- `IBM_CREDENTIAL_ENCRYPTION_KEY` (required when storing IBM profile credentials)
 - `AUTH_ENABLED`
 - `API_KEY_HEADER`
 - `API_KEY_HASH_SECRET`
@@ -593,9 +595,13 @@ Copy `.env.example` to `.env` and adjust values as needed.
 - `DEFAULT_KEY_RATE_LIMIT_PER_SECOND`
 - `DEFAULT_KEY_RATE_LIMIT_PER_MINUTE`
 - `DEFAULT_KEY_DAILY_QUOTA`
+- `MAX_ACTIVE_API_KEYS_PER_USER`
+- `MAX_TOTAL_API_KEYS_PER_USER`
 - `DATABASE_URL`
 - `DATABASE_AUTO_CREATE`
 - `SUPABASE_URL`
+- `SUPABASE_JWT_AUDIENCE`
+- `SUPABASE_JWT_ISSUER`
 - `SUPABASE_JWKS_CACHE_SECONDS`
 - `DEV_BOOTSTRAP_API_KEY_ENABLED`
 - `DEV_BOOTSTRAP_API_KEY`
@@ -603,6 +609,7 @@ Copy `.env.example` to `.env` and adjust values as needed.
 - `RATE_LIMITING_ENABLED`
 - `REDIS_URL`
 - `DEV_RATE_LIMIT_BYPASS`
+- `PUBLIC_API_CORS_ALLOW_ALL`
 - `IP_RATE_LIMIT_PER_SECOND`
 - `IP_RATE_LIMIT_PER_MINUTE`
 - `METRICS_ENABLED`
@@ -678,7 +685,7 @@ RUN_PERF_BENCHMARKS=true uv run pytest tests/perf -s
 - `sdk/unity/` - Unity runtime helper/package scaffold for gameplay `/v1` integration
 - `docs/sdk/` - SDK release governance and compatibility tracking
 - `docs/migrations/` - external client migration plans (Godot, Expo, Unreal, Unity, JS SDK, Python SDK)
-- `project/` - planning, style, and implementation docs
+- `i2/` - repository agent guidance
 
 ## Roadmap Status
 
@@ -691,9 +698,9 @@ RUN_PERF_BENCHMARKS=true uv run pytest tests/perf -s
 
 ## Client Packaging
 
-- `sdk/js/` is the package that would become the published npm package later in the roadmap.
-- `sdk/python/` is the package that would become the published PyPI package later in the roadmap.
-- `sdk/pennylane/` is the package that would become the published PennyLane plugin on PyPI later in the roadmap.
+- `sdk/js/` contains the TypeScript package published as `@mr.dj2u/quantum-api`.
+- `sdk/python/` contains the `quantum-api-sdk` Python package.
+- `sdk/pennylane/` contains the `quantum-api-pennylane` device plugin.
 - `sdk/godot/`, `sdk/unreal/`, and `sdk/unity/` are engine-specific delivery artifacts, not npm packages.
 
 ### Godot Quick Start
@@ -704,6 +711,12 @@ the archive contents at `addons/quantum_api_client/`, enable the optional
 then configure your API connection in **General > Quantum Api**. The complete
 beginner guide, including direct versus proxy authentication and the IBM job
 workflow, is in [addons/quantum_api_client/README.md](addons/quantum_api_client/README.md).
+
+### Example Projects
+
+- [Guess the Qubit](https://github.com/DavidJGrimsley/guess-the-qubit) - an Unreal Engine game prototype using the Quantum API plugin.
+- [QRNG Unity Demo](https://github.com/DavidJGrimsley/qrng-unity-demo) - a Unity project showing random-number use cases.
+- [Quantum Jam Godot project](https://github.com/ReneJSchwartz/quantum-jam-2025-choose-your-own-adventure/tree/main/godot_project) - a community Godot project.
 
 ## License
 

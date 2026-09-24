@@ -24,18 +24,22 @@ The initial Unity pass targets the gameplay subset:
 - `POST /v1/jobs/{job_id}/cancel`
 - `POST /v1/text/transform`
 
-The package lives under `sdk/unity/` so it can later be published as a Unity package without having to reshape the repo again.
+The local Unity package lives under `sdk/unity/`. Its manifest currently declares version `1.1.0` and Unity `2021.3` as the minimum editor version.
+
+See [QRNG Unity Demo](https://github.com/DavidJGrimsley/qrng-unity-demo) for a separate Unity project using this package.
 
 ## Install
 
 Unity Package Manager workflow:
 
-1. Add `sdk/unity/package.json` through Unity Package Manager's local-path flow, or copy the package into `Packages/com.quantumapi.runtime`.
+1. In Unity Package Manager, choose **Add package from disk** and select `sdk/unity/package.json`, or copy the package into `Packages/com.quantumapi.runtime`.
 2. Add `QuantumApiManager` to one GameObject in your first scene.
 3. Choose direct mode and enter an API key, or enable **Backend Proxy Mode** and enter your proxy URL. Set the timeout and optional IBM defaults if needed.
-4. Other scripts use `QuantumApiManager.Instance.Client`. The manager survives scene changes and removes duplicate instances.
+4. Other scripts use `QuantumApiManager.Instance.Client`. The manager survives scene changes and removes duplicate instances. Set its connection fields before entering Play Mode; it creates the client in `Awake`.
 
 Direct mode uses `https://davidjgrimsley.com/public-facing/api/quantum/v1` and sends the manager's API key on protected requests. Proxy mode sends requests to your proxy URL, normalized to end in `/v1`, without sending an API key or bearer token. The proxy must implement the compatible API and hold the upstream credential server-side. The Inspector shows only the connection field for the selected mode.
+
+`RandomIntAsync` uses the local simulator or classical fallback. It is not an IBM hardware call or a cryptographic randomness source; use `SubmitRandomJobAsync` for an IBM hardware job.
 
 While in Play Mode, use the manager component's **Check Health** or **Request Random (0-1)** context-menu action to try the connection without writing code. Health also runs once at startup. Results and errors appear in Unity's Console. Leave the API key empty in committed scenes and enter it locally; a key serialized into a scene or distributed build can be read by others.
 
@@ -99,13 +103,14 @@ for (var index = 0; index < 5; index += 1)
 IBM hardware QRNG job:
 
 ```csharp
+var client = QuantumApiManager.Instance.Client;
 var submit = await client.SubmitRandomJobAsync(new RandomJobSubmitRequest
 {
     min = 0,
     max = 3,
     provider = "ibm",
-    backend_name = "ibm_fez",
-    ibm_profile = "Unreal Engine Demos",
+    backend_name = "YOUR_IBM_HARDWARE_BACKEND",
+    ibm_profile = "YOUR_EXISTING_IBM_PROFILE",
 });
 
 while (true)
@@ -124,9 +129,11 @@ while (true)
         break;
     }
 
-    await Task.Delay(5000);
+    await System.Threading.Tasks.Task.Delay(5000);
 }
 ```
+
+Replace the backend and profile placeholders with names available to your API account. An IBM hardware job may queue and incur provider usage.
 
 For gameplay flows, keep the returned `job_id` and call `CancelJobAsync(job_id)` when the player exits before a pending hardware job reaches a terminal state.
 
@@ -138,7 +145,7 @@ var request = new TextTransformRequest
     text = "memory signal and quantum circuit",
 };
 
-var response = await _client.TransformTextWithFallbackAsync(
+var response = await QuantumApiManager.Instance.Client.TransformTextWithFallbackAsync(
     request,
     fallbackText: request.text
 );
