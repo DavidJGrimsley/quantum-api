@@ -1,3 +1,4 @@
+// Copyright (c) 2026 David J. Grimsley. All rights reserved.
 using UnrealBuildTool;
 using System.Collections.Generic;
 

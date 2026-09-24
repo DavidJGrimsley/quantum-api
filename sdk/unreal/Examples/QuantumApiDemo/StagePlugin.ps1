@@ -1,3 +1,4 @@
+# Copyright (c) 2026 David J. Grimsley. All rights reserved.
 param(
     [string]$PluginSource = (Join-Path $PSScriptRoot '..\\..')
 )
@@ -35,5 +36,22 @@ foreach ($entry in $distributionEntries) {
     if (Test-Path -LiteralPath $sourcePath) {
         Copy-Item -LiteralPath $sourcePath -Destination $pluginDestination -Recurse -Force
     }
+}
+
+# BuildPlugin may rewrite the patch component to 0. Keep the tested source version in the staged descriptor.
+$authoredDescriptor = Join-Path $PSScriptRoot '..\..\QuantumApi.uplugin'
+$authoredMetadata = Get-Content -LiteralPath $authoredDescriptor -Raw | ConvertFrom-Json
+if (-not $authoredMetadata.EngineVersion) {
+    throw "The authored plugin descriptor must declare EngineVersion."
+}
+$stagedDescriptor = Join-Path $pluginDestination 'QuantumApi.uplugin'
+$stagedMetadata = Get-Content -LiteralPath $stagedDescriptor -Raw | ConvertFrom-Json
+if (-not $stagedMetadata.EngineVersion) {
+    throw "The staged plugin descriptor must declare EngineVersion."
+}
+if ($stagedMetadata.EngineVersion -ne $authoredMetadata.EngineVersion) {
+    $stagedMetadata.EngineVersion = $authoredMetadata.EngineVersion
+    $json = $stagedMetadata | ConvertTo-Json -Depth 20
+    [IO.File]::WriteAllText($stagedDescriptor, $json + [Environment]::NewLine, [Text.UTF8Encoding]::new($false))
 }
 Write-Host "Staged QuantumApi plugin at $pluginDestination"
