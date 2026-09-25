@@ -24,6 +24,8 @@ func _ready() -> void:
 		Callable(self, "_test_phase_flip"),
 		Callable(self, "_test_rotation"),
 		Callable(self, "_test_rotation_without_angle"),
+		Callable(self, "_test_braid_defaults"),
+		Callable(self, "_test_braid_explicit_request"),
 		Callable(self, "_test_concurrent_requests"),
 		Callable(self, "_test_text_success"),
 		Callable(self, "_test_unauthorized_fallback"),
@@ -202,6 +204,56 @@ func _test_rotation_without_angle() -> void:
 	_start_request(client, func(callback: Callable): client.run_gate("rotation", callback), func(success: bool, payload: Dictionary):
 		_expect(!success and payload.get("status_code") == 422, "Rotation without an angle should preserve validation failure.")
 	, "missing rotation angle")
+
+func _test_braid_defaults() -> void:
+	var client = _new_client()
+	var request := {"braid_word": [{"generator": 2, "power": 1}]}
+	_start_request(client, func(callback: Callable): client.evaluate_braid(request, callback), func(success: bool, response: Dictionary):
+		var body: Dictionary = response.get("body", {})
+		var braid_word: Array = body.get("braid_word", [])
+		var state: Array = response.get("logical_state", [])
+		var probabilities: Dictionary = response.get("fusion_probabilities", {})
+		_expect(success and response.get("path") == "/v1/topological/braid", "Braid should reach the protected endpoint.")
+		_expect(!bool(response.get("saw_api_key", true)), "Proxy-mode braid must omit X-API-Key.")
+		_expect(body.get("model") == "fibonacci" and body.get("anyon_count") == 3, "Braid defaults should select the supported model.")
+		_expect(body.get("total_charge") == "tau" and body.get("initial_state") == "0", "Braid defaults should select the standard initial state.")
+		_expect(braid_word.size() == 1, "Braid word should contain the requested operation.")
+		if braid_word.size() == 1:
+			var operation: Dictionary = braid_word[0]
+			_expect(int(operation.get("generator", 0)) == 2 and int(operation.get("power", 0)) == 1, "Braid word should preserve the generator and power.")
+		_expect(body.get("measure") == false and body.get("shots") == 0, "Braid should not sample unless requested.")
+		_expect(!request.has("model"), "Braid defaults must not mutate the caller's dictionary.")
+		_expect(state.size() == 2, "Braid response should include both complex amplitudes.")
+		if state.size() == 2:
+			_expect(absf(float(state[0].get("real", 0.0)) + 0.5) < 1e-9 and absf(float(state[0].get("imag", 0.0)) - 0.3632712640026805) < 1e-9, "Braid response should preserve the sigma_2 vacuum amplitude.")
+			_expect(absf(float(state[1].get("real", 0.0)) + 0.24293413587832285) < 1e-9 and absf(float(state[1].get("imag", 0.0)) + 0.7476743906106105) < 1e-9, "Braid response should preserve the sigma_2 tau amplitude.")
+		_expect(absf(float(probabilities.get("vacuum", 0.0)) - 0.3819660112501051) < 1e-9 and absf(float(probabilities.get("tau", 0.0)) - 0.6180339887498949) < 1e-9, "Braid response should preserve the sigma_2 reference probabilities.")
+		_expect(response.get("measurement") == null and response.get("counts") == null, "Unsampled braid should not report a collapse.")
+	, "braid defaults")
+
+func _test_braid_explicit_request() -> void:
+	var client = _new_client(FIXTURE_BASE_URL, false, "dummy-key")
+	var request := {
+		"model": "fibonacci",
+		"anyon_count": 3,
+		"total_charge": "tau",
+		"initial_state": "1",
+		"braid_word": [],
+		"measure": true,
+		"shots": 5,
+		"seed": 42,
+	}
+	_start_request(client, func(callback: Callable): client.evaluate_braid(request, callback), func(success: bool, response: Dictionary):
+		var body: Dictionary = response.get("body", {})
+		var braid_word: Array = body.get("braid_word", [])
+		var counts: Dictionary = response.get("counts", {})
+		_expect(success and bool(response.get("saw_api_key", false)), "Direct-mode braid should use the configured API key.")
+		_expect(body.get("model") == "fibonacci" and int(body.get("anyon_count", 0)) == 3 and body.get("total_charge") == "tau", "Explicit braid model fields should pass through unchanged.")
+		_expect(body.get("initial_state") == "1" and body.get("measure") == true and int(body.get("shots", 0)) == 5 and int(body.get("seed", 0)) == 42, "Explicit braid state, sampling, and seed should pass through unchanged.")
+		_expect(braid_word.is_empty(), "Explicit empty braid word should remain empty.")
+		_expect(response.get("measurement") == "tau", "Measured braid should preserve the collapse label.")
+		_expect(counts.get("tau") == 5, "Measured braid should preserve shot counts.")
+	, "braid explicit request")
 
 func _test_concurrent_requests() -> void:
 	var client = _new_client()

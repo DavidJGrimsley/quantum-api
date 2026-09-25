@@ -210,20 +210,39 @@ be stored as a long-lived member, not created as a temporary stack object.
 ## Available operations
 
 Typed success payloads are available for `Health Check`, `Run Gate`,
-`Transform Text`, and `Generate Random Int`.
+`Transform Text`, `Generate Random Int`, `Evaluate Topological Braid`, and
+`Run Time Evolution`. The braid result exposes the two complex `Logical State`
+amplitudes, exact vacuum/tau probabilities, optional measurement and counts,
+and response metadata. Time evolution exposes `Final Statevector` and its
+index-aligned `Final Probabilities`. Both nodes report failures through the
+structured `On Error` pin.
+
+For a braid-driven game event, call `Evaluate Topological Braid` with the full
+ordered `Braid Word` and `Measure = false`. Assign the response's `Logical State`
+array directly to `Initial Statevector` in a `Time Evolution Request`. Add
+Hamiltonian terms such as `X` and `Z` with their coefficients, then call `Run
+Time Evolution`. This typed node uses `trotter_qrte`; the state array has two
+entries in vacuum, tau order, each with `Real` and `Imag` fields. Keep both
+components if you evolve the state again. `Final Probabilities[0]` and `[1]`
+correspond to the same two basis entries. If `Measure = true` on the braid
+request, `Has Measurement` indicates whether `Measurement` and `Counts` contain
+sampled outcomes. Request once at a gameplay event, not every frame.
 
 Named JSON-result async actions cover `Get Echo Types`, `Run Circuit`, `List
-Backends`, `Transpile`, QASM import/export/run, and circuit/QASM/QRNG job
-submission, status, result, and cancellation.
+Backends`, `Transpile`, `Evaluate Topological Braid (JSON)`, QASM
+import/export/run, and circuit/QASM/QRNG job submission, status, result, and
+cancellation.
 
 `Call Advanced Json` exposes a fixed allowlist of 22 API catalog, algorithm,
 optimization, experiment, finance, ML, and nature operations. In particular,
 the catalog option is the API metadata endpoint `/portfolio.json`, not finance
 portfolio optimization. Credential lifecycle routes, IBM profile management,
-metrics, and arbitrary paths are intentionally unavailable.
+metrics, and arbitrary paths are intentionally unavailable. Use its Time
+Evolution option for circuit-prepared or variational requests; the typed node
+accepts a complex statevector for Trotter evolution.
 
 The checked-in [endpoint coverage manifest](contract/endpoint-coverage.json)
-covers all 39 non-credential `/v1` operations.
+covers all 40 non-credential `/v1` operations.
 
 ## Distribution and validation
 

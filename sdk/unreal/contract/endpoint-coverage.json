@@ -4,6 +4,7 @@
     ["GET", "/v1/echo-types"],
     ["POST", "/v1/gates/run"],
     ["POST", "/v1/circuits/run"],
+    ["POST", "/v1/topological/braid"],
     ["POST", "/v1/random"],
     ["POST", "/v1/text/transform"],
     ["GET", "/v1/list_backends"],

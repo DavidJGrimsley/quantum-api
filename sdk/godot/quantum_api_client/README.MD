@@ -14,6 +14,7 @@ For a community Godot project, see the [Quantum Jam Godot project](https://githu
   - `health_check`
   - `transform_text`
   - `run_gate`
+  - `evaluate_braid`
   - `list_backends`
   - `transpile`
   - `submit_circuit_job`
@@ -87,6 +88,12 @@ the local process environment only for a developer-only direct-mode smoke test.
 Use an existing profile name supplied by the API owner, or leave `default_ibm_profile` blank to use the owner's default. The addon sends only the name for IBM runtime calls; it does not manage credentials. You can override the configured name with `ibm_profile` on a call.
 
 ## Sample Usage
+
+For an ordered three-anyon Fibonacci braid, call
+`evaluate_braid({"braid_word": [{"generator": 1, "power": 1}]}, callback)`.
+The callback receives computed fusion probabilities and `{real, imag}`
+amplitudes. The [distributable addon example](../../../addons/quantum_api_client/README.md#sample-usage)
+shows the full callback and optional measurement fields.
 
 ```gdscript
 const QuantumApiClientScript = preload("res://addons/quantum_api_client/quantum_api_client.gd")

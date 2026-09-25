@@ -207,20 +207,36 @@ be stored as a long-lived member, not created as a temporary stack object.
 ## Available operations
 
 Typed success payloads are available for `Health Check`, `Run Gate`,
-`Transform Text`, and `Generate Random Int`.
+`Transform Text`, `Generate Random Int`, `Evaluate Topological Braid`, and
+`Run Time Evolution`. The braid result includes exact vacuum/tau probabilities,
+the two complex `Logical State` amplitudes, optional measurement and counts,
+and response metadata. Time evolution returns a complex `Final Statevector` and
+index-aligned `Final Probabilities`.
+
+To continue a braid through a boss phase, call `Evaluate Topological Braid`
+with the complete ordered braid word and `Measure = false`. Copy its `Logical
+State` array into the `Initial Statevector` field of a `Time Evolution Request`,
+add Hamiltonian terms such as `X` and `Z`, and call `Run Time Evolution`. The
+typed evolution node uses the Trotter variant. The two entries stay in vacuum,
+tau order; retain both `Real` and `Imag` for subsequent evolution. If you
+request braid measurement, check `Has Measurement` before using `Measurement`
+or `Counts`. The `On Error` pin carries HTTP or response errors. Trigger these
+requests at gameplay events rather than on Tick.
 
 Named JSON-result async actions cover `Get Echo Types`, `Run Circuit`, `List
-Backends`, `Transpile`, QASM import/export/run, and circuit/QASM/QRNG job
-submission, status, result, and cancellation.
+Backends`, `Transpile`, `Evaluate Topological Braid (JSON)`, QASM
+import/export/run, and circuit/QASM/QRNG job submission, status, result, and
+cancellation.
 
 `Call Advanced Json` exposes a fixed allowlist of 22 API catalog, algorithm,
 optimization, experiment, finance, ML, and nature operations. In particular,
 the catalog option is the API metadata endpoint `/portfolio.json`, not finance
 portfolio optimization. Credential lifecycle routes, IBM profile management,
-metrics, and arbitrary paths are intentionally unavailable.
+metrics, and arbitrary paths are intentionally unavailable. Its Time Evolution
+option remains available for circuit-prepared and variational requests.
 
 The checked-in [endpoint coverage manifest](../contract/endpoint-coverage.json)
-covers all 39 non-credential `/v1` operations.
+covers all 40 non-credential `/v1` operations.
 
 ## Distribution and validation
 

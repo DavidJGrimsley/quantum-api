@@ -57,6 +57,22 @@ namespace QuantumApi.Unity
             return SendAsync<GateRunResponse>("/gates/run", UnityWebRequest.kHttpVerbPOST, BuildGateRunJson(request), requestOptions);
         }
 
+        public Task<TopologicalBraidResponse> EvaluateBraidAsync(
+            TopologicalBraidRequest request,
+            QuantumApiRequestOptions requestOptions = null)
+        {
+            if (request == null)
+            {
+                return FailTask<TopologicalBraidResponse>("invalid_request", "Topological braid evaluation requires a payload.");
+            }
+
+            return SendAsync<TopologicalBraidResponse>(
+                "/topological/braid",
+                UnityWebRequest.kHttpVerbPOST,
+                BuildTopologicalBraidJson(request),
+                requestOptions);
+        }
+
         public Task<RandomIntResponse> RandomIntAsync(
             int min,
             int max,
@@ -194,6 +210,27 @@ namespace QuantumApi.Unity
             }
 
             yield return SendCoroutine("/gates/run", UnityWebRequest.kHttpVerbPOST, BuildGateRunJson(request), onSuccess, onError, requestOptions);
+        }
+
+        public IEnumerator EvaluateBraidCoroutine(
+            TopologicalBraidRequest request,
+            Action<TopologicalBraidResponse> onSuccess,
+            Action<QuantumApiError> onError,
+            QuantumApiRequestOptions requestOptions = null)
+        {
+            if (request == null)
+            {
+                onError?.Invoke(QuantumApiError.Local("invalid_request", "Topological braid evaluation requires a payload."));
+                yield break;
+            }
+
+            yield return SendCoroutine(
+                "/topological/braid",
+                UnityWebRequest.kHttpVerbPOST,
+                BuildTopologicalBraidJson(request),
+                onSuccess,
+                onError,
+                requestOptions);
         }
 
         public IEnumerator RandomIntCoroutine(
@@ -551,7 +588,32 @@ namespace QuantumApi.Unity
                 return ParseTextTransformResponse(json) as T;
             }
 
+            if (typeof(T) == typeof(TopologicalBraidResponse))
+            {
+                return ParseTopologicalBraidResponse(json) as T;
+            }
+
             return QuantumApiJson.TryDeserialize<T>(json);
+        }
+
+        private static TopologicalBraidResponse ParseTopologicalBraidResponse(string json)
+        {
+            var response = QuantumApiJson.TryDeserialize<TopologicalBraidResponse>(json);
+            // JsonUtility creates default values for JSON nulls. Preserve the
+            // optional measurement fields when a braid was not sampled.
+            var measurement = QuantumApiJson.TryExtractRawFieldValue(json, "measurement");
+            if (measurement == null || measurement == "null")
+            {
+                response.measurement = null;
+            }
+
+            var counts = QuantumApiJson.TryExtractRawFieldValue(json, "counts");
+            if (counts == null || counts == "null")
+            {
+                response.counts = null;
+            }
+
+            return response;
         }
 
         private static TextTransformResponse ParseTextTransformResponse(string json)
@@ -579,6 +641,34 @@ namespace QuantumApi.Unity
             }
 
             return $"{{\"gate_type\":\"{escapedGateType}\"}}";
+        }
+
+        private static string BuildTopologicalBraidJson(TopologicalBraidRequest request)
+        {
+            var builder = new StringBuilder();
+            builder.Append("{");
+            builder.Append("\"model\":\"").Append(EscapeJsonString(string.IsNullOrWhiteSpace(request.model) ? "fibonacci" : request.model)).Append("\",");
+            builder.Append("\"anyon_count\":").Append(request.anyon_count).Append(",");
+            builder.Append("\"total_charge\":\"").Append(EscapeJsonString(string.IsNullOrWhiteSpace(request.total_charge) ? "tau" : request.total_charge)).Append("\",");
+            builder.Append("\"initial_state\":\"").Append(EscapeJsonString(string.IsNullOrWhiteSpace(request.initial_state) ? "0" : request.initial_state)).Append("\",");
+            builder.Append("\"braid_word\":[");
+            var operations = request.braid_word ?? Array.Empty<BraidOperation>();
+            for (var i = 0; i < operations.Length; i++)
+            {
+                if (i > 0) builder.Append(",");
+                var operation = operations[i] ?? new BraidOperation();
+                builder.Append("{\"generator\":").Append(operation.generator)
+                    .Append(",\"power\":").Append(operation.power).Append("}");
+            }
+            builder.Append("],");
+            builder.Append("\"measure\":").Append(request.measure ? "true" : "false").Append(",");
+            builder.Append("\"shots\":").Append(request.shots);
+            if (request.sendSeed)
+            {
+                builder.Append(",\"seed\":").Append(request.seed);
+            }
+            builder.Append("}");
+            return builder.ToString();
         }
 
         private string BuildRandomJobSubmitJson(RandomJobSubmitRequest request)

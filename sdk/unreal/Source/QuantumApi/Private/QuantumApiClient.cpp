@@ -95,6 +95,117 @@ void SetOptionalString(const TSharedRef<FJsonObject>& JsonObject, const TCHAR* F
         JsonObject->SetStringField(FieldName, Value);
     }
 }
+
+bool ParseObject(const FString& Json, TSharedPtr<FJsonObject>& OutObject)
+{
+    return FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Json), OutObject) && OutObject.IsValid();
+}
+
+bool GetObject(const TSharedPtr<FJsonObject>& Parent, const TCHAR* Name, TSharedPtr<FJsonObject>& OutObject)
+{
+    const TSharedPtr<FJsonValue> Value = Parent->TryGetField(Name);
+    if (!Value.IsValid() || Value->Type != EJson::Object) return false;
+    OutObject = Value->AsObject();
+    return OutObject.IsValid();
+}
+
+bool GetFiniteNumber(const TSharedPtr<FJsonObject>& Parent, const TCHAR* Name, double& OutNumber)
+{
+    return Parent->TryGetNumberField(Name, OutNumber) && FMath::IsFinite(OutNumber);
+}
+
+bool GetComplexState(const TSharedPtr<FJsonObject>& Parent, const TCHAR* Name, TArray<FQuantumApiComplexAmplitude>& OutState)
+{
+    const TSharedPtr<FJsonValue> Field = Parent->TryGetField(Name);
+    if (!Field.IsValid() || Field->Type != EJson::Array) return false;
+    for (const TSharedPtr<FJsonValue>& Value : Field->AsArray())
+    {
+        if (!Value.IsValid() || Value->Type != EJson::Object) return false;
+        const TSharedPtr<FJsonObject> Item = Value->AsObject();
+        FQuantumApiComplexAmplitude Amplitude;
+        if (!Item.IsValid() || !GetFiniteNumber(Item, TEXT("real"), Amplitude.Real) || !GetFiniteNumber(Item, TEXT("imag"), Amplitude.Imag)) return false;
+        OutState.Add(Amplitude);
+    }
+    return !OutState.IsEmpty();
+}
+
+bool ParseBraidResponse(const FString& Json, FQuantumApiTopologicalBraidResponse& OutResponse)
+{
+    TSharedPtr<FJsonObject> Root;
+    TSharedPtr<FJsonObject> Probabilities;
+    TSharedPtr<FJsonObject> Metadata;
+    if (!ParseObject(Json, Root)
+        || !Root->TryGetStringField(TEXT("model"), OutResponse.Model)
+        || !Root->TryGetStringField(TEXT("total_charge"), OutResponse.TotalCharge)
+        || !Root->TryGetStringField(TEXT("initial_state"), OutResponse.InitialState)
+        || !Root->TryGetNumberField(TEXT("anyon_count"), OutResponse.AnyonCount)
+        || !GetComplexState(Root, TEXT("logical_state"), OutResponse.LogicalState)
+        || OutResponse.LogicalState.Num() != 2
+        || !GetObject(Root, TEXT("fusion_probabilities"), Probabilities)
+        || !GetFiniteNumber(Probabilities, TEXT("vacuum"), OutResponse.VacuumProbability)
+        || !GetFiniteNumber(Probabilities, TEXT("tau"), OutResponse.TauProbability)
+        || !Root->TryGetNumberField(TEXT("shots"), OutResponse.Shots)
+        || !GetObject(Root, TEXT("metadata"), Metadata)
+        || !Metadata->TryGetStringField(TEXT("simulation_type"), OutResponse.SimulationType)
+        || !Metadata->TryGetStringField(TEXT("convention"), OutResponse.Convention)
+        || !Metadata->TryGetNumberField(TEXT("logical_dimension"), OutResponse.LogicalDimension)) return false;
+
+    const TSharedPtr<FJsonValue> WordValue = Root->TryGetField(TEXT("braid_word"));
+    if (!WordValue.IsValid() || WordValue->Type != EJson::Array) return false;
+    for (const TSharedPtr<FJsonValue>& Value : WordValue->AsArray())
+    {
+        if (!Value.IsValid() || Value->Type != EJson::Object) return false;
+        const TSharedPtr<FJsonObject> Item = Value->AsObject();
+        FQuantumApiBraidOperation Operation;
+        if (!Item.IsValid() || !Item->TryGetNumberField(TEXT("generator"), Operation.Generator)
+            || !Item->TryGetNumberField(TEXT("power"), Operation.Power)) return false;
+        OutResponse.BraidWord.Add(Operation);
+    }
+
+    const TSharedPtr<FJsonValue> Measurement = Root->TryGetField(TEXT("measurement"));
+    if (!Measurement.IsValid() || (Measurement->Type != EJson::Null && Measurement->Type != EJson::String)) return false;
+    if (Measurement->Type == EJson::String)
+    {
+        OutResponse.bHasMeasurement = true;
+        OutResponse.Measurement = Measurement->AsString();
+    }
+    const TSharedPtr<FJsonValue> CountValue = Root->TryGetField(TEXT("counts"));
+    if (!CountValue.IsValid() || (CountValue->Type != EJson::Null && CountValue->Type != EJson::Object)) return false;
+    if (CountValue->Type == EJson::Object)
+    {
+        const TSharedPtr<FJsonObject> Counts = CountValue->AsObject();
+        if (!Counts.IsValid()) return false;
+        for (const TPair<FString, TSharedPtr<FJsonValue>>& Entry : Counts->Values)
+        {
+            if (!Entry.Value.IsValid() || Entry.Value->Type != EJson::Number) return false;
+            const double Count = Entry.Value->AsNumber();
+            if (!FMath::IsFinite(Count) || Count < 0 || Count > MAX_int32 || FMath::FloorToDouble(Count) != Count) return false;
+            OutResponse.Counts.Add(Entry.Key, static_cast<int32>(Count));
+        }
+    }
+    return true;
+}
+
+bool ParseTimeEvolutionResponse(const FString& Json, FQuantumApiTimeEvolutionResponse& OutResponse)
+{
+    TSharedPtr<FJsonObject> Root;
+    if (!ParseObject(Json, Root)
+        || !GetComplexState(Root, TEXT("final_statevector"), OutResponse.FinalStatevector)
+        || !Root->TryGetStringField(TEXT("variant"), OutResponse.Variant)
+        || !Root->TryGetStringField(TEXT("provider"), OutResponse.Provider)
+        || !Root->TryGetStringField(TEXT("backend_mode"), OutResponse.BackendMode)) return false;
+
+    const TSharedPtr<FJsonValue> Probabilities = Root->TryGetField(TEXT("final_probabilities"));
+    if (!Probabilities.IsValid() || Probabilities->Type != EJson::Array) return false;
+    for (const TSharedPtr<FJsonValue>& Value : Probabilities->AsArray())
+    {
+        if (!Value.IsValid() || Value->Type != EJson::Number) return false;
+        const double Probability = Value->AsNumber();
+        if (!FMath::IsFinite(Probability) || Probability < 0.0 || Probability > 1.0) return false;
+        OutResponse.FinalProbabilities.Add(Probability);
+    }
+    return OutResponse.FinalProbabilities.Num() == OutResponse.FinalStatevector.Num();
+}
 }
 
 FQuantumApiClient::FQuantumApiClient(const UQuantumApiSettings* InSettings, TSharedPtr<IQuantumApiTransport> InTransport)
@@ -208,6 +319,146 @@ void FQuantumApiClient::RunCircuit(const FQuantumApiCircuitRunRequest& Request, 
     JsonObject->SetBoolField(TEXT("include_statevector"), Request.bIncludeStatevector);
     if (Request.bSendSeed) JsonObject->SetNumberField(TEXT("seed"), Request.Seed);
     RequestJson(TEXT("/circuits/run"), TEXT("POST"), SerializeJsonObject(JsonObject), Options, false, MoveTemp(OnSuccess), MoveTemp(OnError));
+}
+
+void FQuantumApiClient::EvaluateTopologicalBraid(const FQuantumApiTopologicalBraidRequest& Request, const FQuantumApiRequestOptions& Options, FQuantumApiJsonDelegate OnSuccess, FQuantumApiErrorDelegate OnError) const
+{
+    if (Request.AnyonCount != 3)
+    {
+        OnError.ExecuteIfBound(BuildClientError(TEXT("invalid_request"), TEXT("Topological braid v1 currently requires Anyon Count = 3.")));
+        return;
+    }
+
+    const TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
+    JsonObject->SetStringField(TEXT("model"), Request.Model.IsEmpty() ? TEXT("fibonacci") : Request.Model);
+    JsonObject->SetNumberField(TEXT("anyon_count"), Request.AnyonCount);
+    JsonObject->SetStringField(TEXT("total_charge"), Request.TotalCharge.IsEmpty() ? TEXT("tau") : Request.TotalCharge);
+    JsonObject->SetStringField(TEXT("initial_state"), Request.InitialState.IsEmpty() ? TEXT("0") : Request.InitialState);
+    JsonObject->SetBoolField(TEXT("measure"), Request.bMeasure);
+    JsonObject->SetNumberField(TEXT("shots"), FMath::Clamp(Request.Shots, 0, 4096));
+    if (Request.bSendSeed)
+    {
+        JsonObject->SetNumberField(TEXT("seed"), Request.Seed);
+    }
+
+    TArray<TSharedPtr<FJsonValue>> BraidWord;
+    for (const FQuantumApiBraidOperation& Operation : Request.BraidWord)
+    {
+        if ((Operation.Generator != 1 && Operation.Generator != 2) || (Operation.Power != 1 && Operation.Power != -1))
+        {
+            OnError.ExecuteIfBound(BuildClientError(TEXT("invalid_request"), TEXT("Each braid operation requires Generator 1 or 2 and Power 1 or -1.")));
+            return;
+        }
+
+        const TSharedRef<FJsonObject> Item = MakeShared<FJsonObject>();
+        Item->SetNumberField(TEXT("generator"), Operation.Generator);
+        Item->SetNumberField(TEXT("power"), Operation.Power);
+        BraidWord.Add(MakeShared<FJsonValueObject>(Item));
+    }
+    JsonObject->SetArrayField(TEXT("braid_word"), BraidWord);
+
+    RequestJson(TEXT("/topological/braid"), TEXT("POST"), SerializeJsonObject(JsonObject), Options, false, MoveTemp(OnSuccess), MoveTemp(OnError));
+}
+
+void FQuantumApiClient::EvaluateTopologicalBraidTyped(const FQuantumApiTopologicalBraidRequest& Request, const FQuantumApiRequestOptions& Options, FQuantumApiTopologicalBraidDelegate OnSuccess, FQuantumApiErrorDelegate OnError) const
+{
+    EvaluateTopologicalBraid(Request, Options,
+        FQuantumApiJsonDelegate::CreateLambda([OnSuccess, OnError](const FQuantumApiJsonResponse& Raw)
+        {
+            FQuantumApiTopologicalBraidResponse Payload;
+            if (!ParseBraidResponse(Raw.Json, Payload))
+            {
+                FQuantumApiError Error = BuildClientError(TEXT("invalid_response"), TEXT("Failed to parse topological braid response JSON."));
+                Error.RequestId = Raw.Meta.RequestId;
+                Error.StatusCode = Raw.Meta.StatusCode;
+                OnError.ExecuteIfBound(Error);
+                return;
+            }
+            Payload.Meta = Raw.Meta;
+            OnSuccess.ExecuteIfBound(Payload);
+        }), OnError);
+}
+
+void FQuantumApiClient::RunTimeEvolution(const FQuantumApiTimeEvolutionRequest& Request, const FQuantumApiRequestOptions& Options, FQuantumApiTimeEvolutionDelegate OnSuccess, FQuantumApiErrorDelegate OnError) const
+{
+    const int32 Dimension = Request.InitialStatevector.Num();
+    if (Dimension < 2 || (Dimension & (Dimension - 1)) != 0 || Request.Hamiltonian.IsEmpty()
+        || !FMath::IsFinite(Request.Time) || Request.Time <= 0.0
+        || Request.NumTimesteps < 1 || Request.NumTimesteps > 32 || Request.Shots < 1)
+    {
+        OnError.ExecuteIfBound(BuildClientError(TEXT("invalid_request"), TEXT("Time evolution requires a power-of-two statevector, Hamiltonian, positive time and shots, and 1-32 timesteps.")));
+        return;
+    }
+
+    int32 NumQubits = 0;
+    for (int32 Count = Dimension; Count > 1; Count >>= 1) ++NumQubits;
+    TArray<TSharedPtr<FJsonValue>> Hamiltonian;
+    for (const FQuantumApiPauliTerm& Term : Request.Hamiltonian)
+    {
+        if (Term.Pauli.Len() != NumQubits || !FMath::IsFinite(Term.Coefficient))
+        {
+            OnError.ExecuteIfBound(BuildClientError(TEXT("invalid_request"), TEXT("Each Hamiltonian Pauli term must match the statevector qubit count and have a finite coefficient.")));
+            return;
+        }
+        for (const TCHAR Pauli : Term.Pauli)
+        {
+            if (Pauli != TEXT('I') && Pauli != TEXT('X') && Pauli != TEXT('Y') && Pauli != TEXT('Z'))
+            {
+                OnError.ExecuteIfBound(BuildClientError(TEXT("invalid_request"), TEXT("Hamiltonian Pauli terms may contain only I, X, Y, and Z.")));
+                return;
+            }
+        }
+        const TSharedRef<FJsonObject> Item = MakeShared<FJsonObject>();
+        Item->SetStringField(TEXT("pauli"), Term.Pauli);
+        Item->SetNumberField(TEXT("coefficient"), Term.Coefficient);
+        Hamiltonian.Add(MakeShared<FJsonValueObject>(Item));
+    }
+
+    TArray<TSharedPtr<FJsonValue>> InitialStatevector;
+    double NormSquared = 0.0;
+    for (const FQuantumApiComplexAmplitude& Amplitude : Request.InitialStatevector)
+    {
+        if (!FMath::IsFinite(Amplitude.Real) || !FMath::IsFinite(Amplitude.Imag))
+        {
+            OnError.ExecuteIfBound(BuildClientError(TEXT("invalid_request"), TEXT("Initial statevector amplitudes must be finite.")));
+            return;
+        }
+        NormSquared += Amplitude.Real * Amplitude.Real + Amplitude.Imag * Amplitude.Imag;
+        const TSharedRef<FJsonObject> Item = MakeShared<FJsonObject>();
+        Item->SetNumberField(TEXT("real"), Amplitude.Real);
+        Item->SetNumberField(TEXT("imag"), Amplitude.Imag);
+        InitialStatevector.Add(MakeShared<FJsonValueObject>(Item));
+    }
+    if (!FMath::IsFinite(NormSquared) || !FMath::IsNearlyEqual(NormSquared, 1.0, 1e-9))
+    {
+        OnError.ExecuteIfBound(BuildClientError(TEXT("invalid_request"), TEXT("Initial statevector must have unit norm.")));
+        return;
+    }
+
+    const TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
+    JsonObject->SetStringField(TEXT("variant"), TEXT("trotter_qrte"));
+    JsonObject->SetArrayField(TEXT("hamiltonian"), Hamiltonian);
+    JsonObject->SetArrayField(TEXT("initial_statevector"), InitialStatevector);
+    JsonObject->SetNumberField(TEXT("time"), Request.Time);
+    JsonObject->SetNumberField(TEXT("num_timesteps"), Request.NumTimesteps);
+    JsonObject->SetNumberField(TEXT("shots"), Request.Shots);
+    if (Request.bSendSeed) JsonObject->SetNumberField(TEXT("seed"), Request.Seed);
+
+    RequestJson(TEXT("/algorithms/time_evolution"), TEXT("POST"), SerializeJsonObject(JsonObject), Options, false,
+        FQuantumApiJsonDelegate::CreateLambda([OnSuccess, OnError](const FQuantumApiJsonResponse& Raw)
+        {
+            FQuantumApiTimeEvolutionResponse Payload;
+            if (!ParseTimeEvolutionResponse(Raw.Json, Payload))
+            {
+                FQuantumApiError Error = BuildClientError(TEXT("invalid_response"), TEXT("Failed to parse time evolution response JSON."));
+                Error.RequestId = Raw.Meta.RequestId;
+                Error.StatusCode = Raw.Meta.StatusCode;
+                OnError.ExecuteIfBound(Error);
+                return;
+            }
+            Payload.Meta = Raw.Meta;
+            OnSuccess.ExecuteIfBound(Payload);
+        }), OnError);
 }
 
 void FQuantumApiClient::ListBackends(const FQuantumApiBackendListRequest& Request, const FQuantumApiRequestOptions& Options, FQuantumApiJsonDelegate OnSuccess, FQuantumApiErrorDelegate OnError) const

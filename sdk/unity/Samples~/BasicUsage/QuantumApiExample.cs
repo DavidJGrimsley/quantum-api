@@ -1,4 +1,5 @@
 // Copyright (c) 2026 David J. Grimsley. All rights reserved.
+using System;
 using System.Threading.Tasks;
 using QuantumApi.Unity;
 using UnityEngine;
@@ -37,6 +38,7 @@ namespace QuantumApi.Unity.Samples
         private async Task RunAsyncExamples()
         {
             await RunGateExamplesAsync();
+            await RunBraidExampleAsync();
             await RunRandomExamplesAsync();
             await RunReadableErrorExampleAsync();
             await RunTextTransformExampleAsync();
@@ -63,6 +65,46 @@ namespace QuantumApi.Unity.Samples
             catch (QuantumApiError error)
             {
                 Debug.LogWarning($"Gate example failed: {error.Message}");
+            }
+        }
+
+        private async Task RunBraidExampleAsync()
+        {
+            try
+            {
+                var braid = await _client.EvaluateBraidAsync(new TopologicalBraidRequest
+                {
+                    braid_word = new[]
+                    {
+                        new BraidOperation { generator = 2, power = 1 },
+                    },
+                });
+                if (braid.logical_state == null || braid.logical_state.Length != 2 || braid.fusion_probabilities == null)
+                {
+                    Debug.LogWarning("Braid response is missing its logical state or probabilities.");
+                    return;
+                }
+
+                var tauAmplitude = braid.logical_state[1];
+                Debug.Log($"Braid tau probability: {braid.fusion_probabilities.tau:P1}; "
+                    + $"tau amplitude: {tauAmplitude.real} + {tauAmplitude.imag}i");
+                if (braid.measurement != null || braid.counts != null)
+                {
+                    Debug.LogWarning("Unsampled braid should not contain a measurement or counts.");
+                }
+                // TQSim's fixed-total-tau sigma_2 |0> reference, also used by the Godot package harness.
+                if (Math.Abs(braid.logical_state[0].real + 0.5) > 1e-9
+                    || Math.Abs(braid.logical_state[0].imag - 0.3632712640026805) > 1e-9
+                    || Math.Abs(tauAmplitude.real + 0.24293413587832285) > 1e-9
+                    || Math.Abs(tauAmplitude.imag + 0.7476743906106105) > 1e-9
+                    || Math.Abs(braid.fusion_probabilities.tau - 0.6180339887498949) > 1e-9)
+                {
+                    Debug.LogWarning("Braid sigma_2 reference did not match the API result.");
+                }
+            }
+            catch (QuantumApiError error)
+            {
+                Debug.LogWarning($"Braid example failed: {error.Message}");
             }
         }
 

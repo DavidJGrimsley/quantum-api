@@ -9,3 +9,4 @@ from quantum_api.models.nature import *  # noqa: F401,F403
 from quantum_api.models.optimization import *  # noqa: F401,F403
 from quantum_api.models.qiskit_common import *  # noqa: F401,F403
 from quantum_api.models.runtime_contracts import *  # noqa: F401,F403
+from quantum_api.models.topological import *  # noqa: F401,F403

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -298,6 +299,7 @@ class TimeEvolutionRequest(BaseModel):
     hamiltonian: list[PauliTerm] = Field(min_length=1)
     time: float = Field(gt=0.0)
     initial_state: CircuitDefinition | None = None
+    initial_statevector: list[Amplitude] | None = None
     aux_operators: list[NamedPauliSum] | None = None
     num_timesteps: int | None = Field(default=None, ge=1, le=32)
     ansatz: AnsatzConfig | None = None
@@ -335,28 +337,52 @@ class TimeEvolutionRequest(BaseModel):
     @model_validator(mode="after")
     def validate_variant_requirements(self) -> TimeEvolutionRequest:
         if self.variant == "trotter_qrte":
-            if self.initial_state is None:
-                raise ValueError("initial_state is required for variant 'trotter_qrte'")
+            if (self.initial_state is None) == (self.initial_statevector is None):
+                raise ValueError(
+                    "exactly one of initial_state or initial_statevector is required for variant 'trotter_qrte'"
+                )
+            if self.initial_statevector is not None:
+                count = len(self.initial_statevector)
+                if count < 2 or count & (count - 1):
+                    raise ValueError("initial_statevector length must be a power of two of at least 2")
+                num_qubits = count.bit_length() - 1
+                max_qubits = get_settings().max_circuit_qubits
+                if num_qubits > max_qubits:
+                    raise ValueError(f"initial_statevector exceeds MAX_CIRCUIT_QUBITS ({max_qubits})")
+                if len(self.hamiltonian[0].pauli.strip()) != num_qubits:
+                    raise ValueError("initial_statevector dimension must match the Hamiltonian qubit count")
+                if any(
+                    not math.isfinite(amplitude.real) or not math.isfinite(amplitude.imag)
+                    for amplitude in self.initial_statevector
+                ):
+                    raise ValueError("initial_statevector amplitudes must be finite")
+                norm_squared = math.fsum(
+                    amplitude.real * amplitude.real + amplitude.imag * amplitude.imag
+                    for amplitude in self.initial_statevector
+                )
+                if not math.isclose(norm_squared, 1.0, rel_tol=1e-9, abs_tol=1e-9):
+                    raise ValueError("initial_statevector must have unit norm")
             if self.ansatz is not None or self.initial_parameters is not None or self.optimizer is not None:
                 raise ValueError("ansatz, initial_parameters, and optimizer are not used by variant 'trotter_qrte'")
         elif self.variant in {"var_qrte", "var_qite"}:
             if self.ansatz is None or self.initial_parameters is None:
                 raise ValueError("ansatz and initial_parameters are required for variational time evolution")
-            if self.initial_state is not None:
-                raise ValueError("initial_state is not supported for variational time evolution variants")
+            if self.initial_state is not None or self.initial_statevector is not None:
+                raise ValueError("initial_state and initial_statevector are not supported for variational time evolution variants")
             if self.optimizer is not None:
                 raise ValueError("optimizer is only valid for variant 'pvqd'")
         else:
             if self.ansatz is None or self.initial_parameters is None or self.optimizer is None:
                 raise ValueError("ansatz, initial_parameters, and optimizer are required for variant 'pvqd'")
-            if self.initial_state is not None:
-                raise ValueError("initial_state is not supported for variant 'pvqd'")
+            if self.initial_state is not None or self.initial_statevector is not None:
+                raise ValueError("initial_state and initial_statevector are not supported for variant 'pvqd'")
         return self
 
 
 class TimeEvolutionResponse(BaseModel):
     final_state_operations: list[NormalizedOperation]
     final_statevector: list[Amplitude]
+    final_probabilities: list[float]
     times: list[float] | None = None
     aux_operator_values: list[TimeEvolutionAuxOperatorValue] | None = None
     final_parameters: list[float] | None = None

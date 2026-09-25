@@ -76,6 +76,73 @@ namespace QuantumApi.Unity
     }
 
     [Serializable]
+    public sealed class BraidOperation
+    {
+        public int generator = 1;
+        public int power = 1;
+    }
+
+    [Serializable]
+    public sealed class TopologicalBraidRequest
+    {
+        public string model = "fibonacci";
+        public int anyon_count = 3;
+        public string total_charge = "tau";
+        public string initial_state = "0";
+        public BraidOperation[] braid_word = Array.Empty<BraidOperation>();
+        public bool measure;
+        public int shots;
+        public int seed;
+        [NonSerialized]
+        public bool sendSeed;
+    }
+
+    [Serializable]
+    public sealed class ComplexValue
+    {
+        public double real;
+        public double imag;
+    }
+
+    [Serializable]
+    public sealed class FusionProbabilities
+    {
+        public double vacuum;
+        public double tau;
+    }
+
+    [Serializable]
+    public sealed class BraidCounts
+    {
+        public int vacuum;
+        public int tau;
+    }
+
+    [Serializable]
+    public sealed class TopologicalBraidMetadata
+    {
+        public string simulation_type = "";
+        public string convention = "";
+        public int logical_dimension;
+    }
+
+    [Serializable]
+    public sealed class TopologicalBraidResponse
+    {
+        public string model = "";
+        public int anyon_count;
+        public string total_charge = "";
+        public string initial_state = "";
+        public BraidOperation[] braid_word = Array.Empty<BraidOperation>();
+        public ComplexValue[] logical_state = Array.Empty<ComplexValue>();
+        public FusionProbabilities fusion_probabilities = new FusionProbabilities();
+        public string measurement;
+        public int shots;
+        public BraidCounts counts;
+        public TopologicalBraidMetadata metadata = new TopologicalBraidMetadata();
+    }
+
+    [Serializable]
     public sealed class RandomIntRequest
     {
         public int min;

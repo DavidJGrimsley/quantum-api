@@ -122,6 +122,60 @@ void UQuantumApiRandomIntAsyncAction::Activate()
         }));
 }
 
+UQuantumApiTopologicalBraidAsyncAction* UQuantumApiTopologicalBraidAsyncAction::EvaluateTopologicalBraid(UObject* WorldContextObject, FQuantumApiTopologicalBraidRequest Request, FQuantumApiRequestOptions Options)
+{
+    UQuantumApiTopologicalBraidAsyncAction* Action = RegisterAction<UQuantumApiTopologicalBraidAsyncAction>(WorldContextObject);
+    Action->BraidRequest = MoveTemp(Request);
+    Action->RequestOptions = MoveTemp(Options);
+    return Action;
+}
+
+void UQuantumApiTopologicalBraidAsyncAction::Activate()
+{
+    Client = MakeShared<FQuantumApiClient>(GetDefault<UQuantumApiSettings>());
+    const TWeakObjectPtr<UQuantumApiTopologicalBraidAsyncAction> WeakThis(this);
+    Client->EvaluateTopologicalBraidTyped(BraidRequest, RequestOptions,
+        FQuantumApiTopologicalBraidDelegate::CreateLambda([WeakThis](const FQuantumApiTopologicalBraidResponse& Response)
+        {
+            if (!WeakThis.IsValid()) return;
+            WeakThis->OnSuccess.Broadcast(Response);
+            WeakThis->SetReadyToDestroy();
+        }),
+        FQuantumApiErrorDelegate::CreateLambda([WeakThis](const FQuantumApiError& Error)
+        {
+            if (!WeakThis.IsValid()) return;
+            WeakThis->OnError.Broadcast(Error);
+            WeakThis->SetReadyToDestroy();
+        }));
+}
+
+UQuantumApiTimeEvolutionAsyncAction* UQuantumApiTimeEvolutionAsyncAction::RunTimeEvolution(UObject* WorldContextObject, FQuantumApiTimeEvolutionRequest Request, FQuantumApiRequestOptions Options)
+{
+    UQuantumApiTimeEvolutionAsyncAction* Action = RegisterAction<UQuantumApiTimeEvolutionAsyncAction>(WorldContextObject);
+    Action->EvolutionRequest = MoveTemp(Request);
+    Action->RequestOptions = MoveTemp(Options);
+    return Action;
+}
+
+void UQuantumApiTimeEvolutionAsyncAction::Activate()
+{
+    Client = MakeShared<FQuantumApiClient>(GetDefault<UQuantumApiSettings>());
+    const TWeakObjectPtr<UQuantumApiTimeEvolutionAsyncAction> WeakThis(this);
+    Client->RunTimeEvolution(EvolutionRequest, RequestOptions,
+        FQuantumApiTimeEvolutionDelegate::CreateLambda([WeakThis](const FQuantumApiTimeEvolutionResponse& Response)
+        {
+            if (!WeakThis.IsValid()) return;
+            WeakThis->OnSuccess.Broadcast(Response);
+            WeakThis->SetReadyToDestroy();
+        }),
+        FQuantumApiErrorDelegate::CreateLambda([WeakThis](const FQuantumApiError& Error)
+        {
+            if (!WeakThis.IsValid()) return;
+            WeakThis->OnError.Broadcast(Error);
+            WeakThis->SetReadyToDestroy();
+        }));
+}
+
 UQuantumApiJsonAsyncAction* UQuantumApiJsonAsyncAction::Create(UObject* WorldContextObject, EActionKind Kind, FQuantumApiRequestOptions Options)
 {
     UQuantumApiJsonAsyncAction* Action = RegisterAction<UQuantumApiJsonAsyncAction>(WorldContextObject);
@@ -139,6 +193,13 @@ UQuantumApiJsonAsyncAction* UQuantumApiJsonAsyncAction::RunCircuit(UObject* Worl
 {
     UQuantumApiJsonAsyncAction* Action = Create(WorldContextObject, EActionKind::Circuit, MoveTemp(Options));
     Action->CircuitRequest = MoveTemp(Request);
+    return Action;
+}
+
+UQuantumApiJsonAsyncAction* UQuantumApiJsonAsyncAction::EvaluateTopologicalBraid(UObject* WorldContextObject, FQuantumApiTopologicalBraidRequest Request, FQuantumApiRequestOptions Options)
+{
+    UQuantumApiJsonAsyncAction* Action = Create(WorldContextObject, EActionKind::TopologicalBraid, MoveTemp(Options));
+    Action->TopologicalBraidRequest = MoveTemp(Request);
     return Action;
 }
 
@@ -248,6 +309,7 @@ void UQuantumApiJsonAsyncAction::Activate()
     {
     case EActionKind::EchoTypes: Client->GetEchoTypes(RequestOptions, Success, Failure); break;
     case EActionKind::Circuit: Client->RunCircuit(CircuitRequest, RequestOptions, Success, Failure); break;
+    case EActionKind::TopologicalBraid: Client->EvaluateTopologicalBraid(TopologicalBraidRequest, RequestOptions, Success, Failure); break;
     case EActionKind::Backends: Client->ListBackends(BackendRequest, RequestOptions, Success, Failure); break;
     case EActionKind::Transpile: Client->Transpile(TranspileRequest, RequestOptions, Success, Failure); break;
     case EActionKind::ImportQasm: Client->ImportQasm(QasmRequest, RequestOptions, Success, Failure); break;

@@ -17,6 +17,7 @@ The initial Unity pass targets the gameplay subset:
 - `GET /v1/health`
 - `GET /v1/echo-types`
 - `POST /v1/gates/run`
+- `POST /v1/topological/braid`
 - `POST /v1/random`
 - `POST /v1/jobs/random`
 - `GET /v1/jobs/{job_id}`
@@ -91,6 +92,32 @@ StartCoroutine(QuantumApiManager.Instance.Client.RunGateCoroutine(
     error => Debug.LogWarning(error.Message)
 ));
 ```
+
+Typed Fibonacci braid call:
+
+```csharp
+var braid = await QuantumApiManager.Instance.Client.EvaluateBraidAsync(
+    new TopologicalBraidRequest
+    {
+        braid_word = new[]
+        {
+            new BraidOperation { generator = 2, power = 1 },
+        },
+    });
+Debug.Log($"Tau probability: {braid.fusion_probabilities.tau:P1}");
+Debug.Log($"Tau amplitude: {braid.logical_state[1].real} + {braid.logical_state[1].imag}i");
+```
+
+For this single `sigma_2` crossing from the default state, the expected tau
+probability is approximately `0.618034`. The included sample checks the full
+two-amplitude reference vector when run in Unity.
+
+Operations run in array order. The request defaults to three Fibonacci anyons
+with total charge `tau`, initial state `0`, and no measurement. Set `measure`
+and `shots` to sample; set `sendSeed=true` with `seed` for reproducible samples.
+The response includes two complex amplitudes, fusion probabilities, and
+optional measurement and counts. This is a simulator call, not an IBM job.
+`EvaluateBraidCoroutine` provides the equivalent coroutine entry point.
 
 Direct-key QRNG smoke test:
 
