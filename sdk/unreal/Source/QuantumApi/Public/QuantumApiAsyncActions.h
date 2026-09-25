@@ -92,6 +92,8 @@ public:
     static UQuantumApiJsonAsyncAction* GetEchoTypes(UObject* WorldContextObject, FQuantumApiRequestOptions Options);
     UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = "true", WorldContext = "WorldContextObject"), Category = "Quantum API|Circuits")
     static UQuantumApiJsonAsyncAction* RunCircuit(UObject* WorldContextObject, FQuantumApiCircuitRunRequest Request, FQuantumApiRequestOptions Options);
+    UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = "true", WorldContext = "WorldContextObject"), Category = "Quantum API|Topological")
+    static UQuantumApiJsonAsyncAction* EvaluateTopologicalBraid(UObject* WorldContextObject, FQuantumApiTopologicalBraidRequest Request, FQuantumApiRequestOptions Options);
     UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = "true", WorldContext = "WorldContextObject"), Category = "Quantum API|Runtime")
     static UQuantumApiJsonAsyncAction* ListBackends(UObject* WorldContextObject, FQuantumApiBackendListRequest Request, FQuantumApiRequestOptions Options);
     UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = "true", WorldContext = "WorldContextObject"), Category = "Quantum API|Runtime")
@@ -120,12 +122,13 @@ public:
     virtual void Activate() override;
 
 private:
-    enum class EActionKind : uint8 { EchoTypes, Circuit, Backends, Transpile, ImportQasm, ExportQasm, RunQasm, CircuitJob, QasmJob, RandomJob, JobStatus, JobResult, CancelJob, Advanced };
+    enum class EActionKind : uint8 { EchoTypes, Circuit, TopologicalBraid, Backends, Transpile, ImportQasm, ExportQasm, RunQasm, CircuitJob, QasmJob, RandomJob, JobStatus, JobResult, CancelJob, Advanced };
     static UQuantumApiJsonAsyncAction* Create(UObject* WorldContextObject, EActionKind Kind, FQuantumApiRequestOptions Options);
 
     EActionKind ActionKind = EActionKind::EchoTypes;
     FQuantumApiRequestOptions RequestOptions;
     FQuantumApiCircuitRunRequest CircuitRequest;
+    FQuantumApiTopologicalBraidRequest TopologicalBraidRequest;
     FQuantumApiBackendListRequest BackendRequest;
     FQuantumApiTranspileRequest TranspileRequest;
     FQuantumApiQasmRequest QasmRequest;
