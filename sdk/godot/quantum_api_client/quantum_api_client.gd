@@ -112,6 +112,25 @@ func run_gate(gate_type: String, callback: Callable, rotation_angle_rad: Variant
 
 	_request_json("/gates/run", HTTPClient.METHOD_POST, payload, callback, true)
 
+func evaluate_braid(payload: Dictionary, callback: Callable) -> void:
+	var request_payload: Dictionary = payload.duplicate(true)
+	if !request_payload.has("model"):
+		request_payload["model"] = "fibonacci"
+	if !request_payload.has("anyon_count"):
+		request_payload["anyon_count"] = 3
+	if !request_payload.has("total_charge"):
+		request_payload["total_charge"] = "tau"
+	if !request_payload.has("initial_state"):
+		request_payload["initial_state"] = "0"
+	if !request_payload.has("braid_word"):
+		request_payload["braid_word"] = []
+	if !request_payload.has("measure"):
+		request_payload["measure"] = false
+	if !request_payload.has("shots"):
+		request_payload["shots"] = 0
+
+	_request_json("/topological/braid", HTTPClient.METHOD_POST, request_payload, callback, true)
+
 func list_backends(
 	callback: Callable,
 	provider: String = "",
