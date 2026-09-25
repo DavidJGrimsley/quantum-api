@@ -88,6 +88,10 @@ namespace QuantumApi.Unity.Samples
                 var tauAmplitude = braid.logical_state[1];
                 Debug.Log($"Braid tau probability: {braid.fusion_probabilities.tau:P1}; "
                     + $"tau amplitude: {tauAmplitude.real} + {tauAmplitude.imag}i");
+                if (braid.measurement != null || braid.counts != null)
+                {
+                    Debug.LogWarning("Unsampled braid should not contain a measurement or counts.");
+                }
                 // TQSim's fixed-total-tau sigma_2 |0> reference, also used by the Godot package harness.
                 if (Math.Abs(braid.logical_state[0].real + 0.5) > 1e-9
                     || Math.Abs(braid.logical_state[0].imag - 0.3632712640026805) > 1e-9

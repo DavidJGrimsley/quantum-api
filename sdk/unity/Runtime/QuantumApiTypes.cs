@@ -136,9 +136,9 @@ namespace QuantumApi.Unity
         public BraidOperation[] braid_word = Array.Empty<BraidOperation>();
         public ComplexValue[] logical_state = Array.Empty<ComplexValue>();
         public FusionProbabilities fusion_probabilities = new FusionProbabilities();
-        public string measurement = "";
+        public string measurement;
         public int shots;
-        public BraidCounts counts = new BraidCounts();
+        public BraidCounts counts;
         public TopologicalBraidMetadata metadata = new TopologicalBraidMetadata();
     }
 

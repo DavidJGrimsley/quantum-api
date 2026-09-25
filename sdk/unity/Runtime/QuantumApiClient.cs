@@ -588,7 +588,32 @@ namespace QuantumApi.Unity
                 return ParseTextTransformResponse(json) as T;
             }
 
+            if (typeof(T) == typeof(TopologicalBraidResponse))
+            {
+                return ParseTopologicalBraidResponse(json) as T;
+            }
+
             return QuantumApiJson.TryDeserialize<T>(json);
+        }
+
+        private static TopologicalBraidResponse ParseTopologicalBraidResponse(string json)
+        {
+            var response = QuantumApiJson.TryDeserialize<TopologicalBraidResponse>(json);
+            // JsonUtility creates default values for JSON nulls. Preserve the
+            // optional measurement fields when a braid was not sampled.
+            var measurement = QuantumApiJson.TryExtractRawFieldValue(json, "measurement");
+            if (measurement == null || measurement == "null")
+            {
+                response.measurement = null;
+            }
+
+            var counts = QuantumApiJson.TryExtractRawFieldValue(json, "counts");
+            if (counts == null || counts == "null")
+            {
+                response.counts = null;
+            }
+
+            return response;
         }
 
         private static TextTransformResponse ParseTextTransformResponse(string json)
