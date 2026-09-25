@@ -1,0 +1,1330 @@
+# Braid Breaker: Implementation Plan for the Game, Quantum API, and Engine Plugins
+
+## Executive summary
+
+**Recommendation:** build Braid Breaker around a very small, additive topological API rather than expanding the existing circuit API first. The jam-critical backend feature should be exactly one new endpoint:
+
+```http
+POST /v1/topological/braid
+```
+
+It should initially support **three Fibonacci anyons with fixed total charge \(\tau\)**, braid generators \(\sigma_1^{\pm1}\) and \(\sigma_2^{\pm1}\), exact fusion-channel probabilities, and optional sampling/measurement. This is a scientifically defensible minimum: Fibonacci anyons obey \(\tau\times\tau=1+\tau\); three anyons can encode a logical qubit in a fixed-total-charge sector; the \(F\)-matrix changes fusion basis; the \(R\)-matrix describes exchange; and for three strands the generators can be represented by \(R\) and \(F^{-1}RF\). citeturn6view3turn7view0turn7view1
+
+For the **jam**, do **not** make TQSim a hard dependency, do not add server-side sessions, do not attempt arbitrary \(n\)-anyon fusion trees, and do not require compilation to IBM hardware. Implement the tiny three-anyon model directly with tested complex matrices, while using TQSim as an independent reference implementation in tests. TQSim already models Fibonacci anyons, exposes `braid`, `braid_sequence`, fusion measurement, and shot-based execution, making it useful as a validation oracle. citeturn2view0
+
+The game should own its braid history:
+
+```text
+Level choice → append braid operation → continue fighting
+                                     ↓
+                              Boss encounter
+                                     ↓
+                      Evaluate braid, measure=false
+                                     ↓
+                       Boss initial quantum state
+                                     ↓
+                      Time-evolution during combat
+                                     ↓
+                           QTE / measurement
+                                     ↓
+                          Classical boss branch
+```
+
+The API remains **stateless**. Unreal stores the braid word in the save/game state and resubmits it whenever it needs evaluation. This fits REST's stateless design and removes server-side save/session synchronization from the project. OWASP also notes that REST APIs are stateless and that stateful sessions add security and implementation complexity. citeturn11view0
+
+For the engine work, expose the same concepts in all three plugins, but prioritize them in this order:
+
+| Priority | Workstream | Recommendation |
+|---|---|---|
+| **P0** | API | `POST /v1/topological/braid`, Fibonacci three-anyon model, exact probabilities, optional `measure` |
+| **P0** | Unreal plugin | Blueprint-callable async `Evaluate Braid` and existing `Time Evolution` nodes |
+| **P0** | Unreal prototype | Level-choice braid history → boss initialization → time evolution → QTE collapse |
+| **P1** | Unity/Godot SDKs | Matching typed braid request/result methods |
+| **P1** | API testing/security | mathematical invariants, limits, rate limiting, schema tests |
+| **P2** | Circuit API | `rx`, `rz` |
+| **P2** | Topological API | `/v1/topological/compile` |
+| **P3** | Circuit API | arbitrary `unitary` after strict matrix-size/unitarity validation |
+
+A realistic **ten-week plan** is approximately **14–17 person-weeks** for two developers working in parallel: one primarily on API/SDK infrastructure and one primarily on Unreal/gameplay, with occasional quantum-math review. A solo implementation should either cut the Unity/Godot work and compile endpoint or expect the schedule to extend beyond ten calendar weeks.
+
+### Assumptions
+
+This report assumes the current API surface described in our conversation: `/v1/circuits/run` currently exposes a small gate set centered on `X`, `Z`, `H`, `RY`, and `CX`; `/v1/algorithms/time_evolution` already exists; Unity, Godot, and Unreal integrations already have an HTTP/client foundation; and Braid Breaker is primarily an Unreal Engine prototype. Exact repository layout, DTO names, authentication mechanism, Qiskit package version, Unreal version, and current time-evolution request schema were not provided, so those should be verified during the first milestone rather than redesigned unnecessarily.
+
+The current Qiskit documentation confirms native `RXGate`, `RZGate`, arbitrary `UnitaryGate`, and Pauli-Hamiltonian time evolution through `PauliEvolutionGate`. `PauliEvolutionGate` represents \(U(t)=e^{-itH}\) and supports product-formula synthesis such as Lie-Trotter. citeturn9view0turn9view1turn1search0turn12view0turn12view1
+
+## Architecture and API contract
+
+### Recommended architecture
+
+The critical architectural decision is to treat **braiding as a domain above circuits**, not merely add `braid` as another conventional gate.
+
+```mermaid
+flowchart TD
+    UE["Braid Breaker — Unreal"]
+    UNITY["Unity SDK / Plugin"]
+    GODOT["Godot SDK / Plugin"]
+    UEP["Unreal Plugin"]
+
+    UE --> UEP
+
+    UNITY --> API
+    GODOT --> API
+    UEP --> API
+
+    API["Quantum API"]
+
+    API --> TOPO["Topological Domain"]
+    API --> ALG["Algorithms Domain"]
+    API --> CIR["Circuits Domain"]
+
+    TOPO --> BRAID["POST /v1/topological/braid"]
+    TOPO --> COMP["Later: /v1/topological/compile"]
+
+    ALG --> EVOLVE["Existing /v1/algorithms/time_evolution"]
+
+    CIR --> RUN["Existing /v1/circuits/run"]
+    CIR --> EXT["Later: RX / RZ / Unitary"]
+
+    BRAID --> FIB["Fibonacci Anyon Engine"]
+    FIB --> FR["F / R matrices"]
+    FIB --> PROB["Exact fusion probabilities"]
+    FIB --> SAMPLE["Optional measurement sampling"]
+
+    COMP --> QISKIT["Qiskit QuantumCircuit / UnitaryGate"]
+    EVOLVE --> QISKIT
+    RUN --> QISKIT
+```
+
+The topological module should **not depend conceptually on `/circuits/run`**. It is perfectly reasonable for `/topological/compile` to eventually produce a Qiskit circuit, but native Fibonacci braiding is naturally expressed in a fusion-space basis, not as `H`, `CX`, etc. The standard Fibonacci description uses the fusion rule, \(F\)-moves, and \(R\)-moves; Qiskit's arbitrary `UnitaryGate` is useful later for representing the resulting logical unitary once it has been constructed. citeturn7view0turn7view1turn1search0
+
+### Minimal endpoint surface
+
+| Endpoint | Jam status | Purpose | Recommendation |
+|---|---:|---|---|
+| `POST /v1/topological/braid` | **P0** | Evaluate Fibonacci braid; optionally measure | Build now |
+| `POST /v1/algorithms/time_evolution` | **Existing/P0** | Boss quantum-state evolution | Reuse; only extend if current schema cannot accept required initial state |
+| `POST /v1/circuits/run` | Existing | Generic circuits | Leave backward compatible |
+| `POST /v1/topological/compile` | P2 | Convert braid to logical unitary/circuit representation | Post-jam |
+| `/v1/circuits/run` + `rx` | P2 | Generic X-axis rotation | Add after vertical slice |
+| `/v1/circuits/run` + `rz` | P2 | Phase/Z rotation | Add after vertical slice |
+| `/v1/circuits/run` + `unitary` | P3 | Arbitrary unitary input | Add only with strict limits and validation |
+
+Qiskit currently exposes `RXGate` and `RZGate` directly, and `UnitaryGate` accepts an arbitrary unitary matrix and can be appended to a `QuantumCircuit`. This makes those circuit extensions straightforward technically, but they are **not required to make the jam version of Fibonacci braiding work**. citeturn9view0turn9view1turn1search0
+
+### Jam braid request
+
+Use structured braid operations rather than user-entered strings internally. Strings are nice for display, but structured data is substantially easier to validate and expose through Unity/Godot/Unreal enums.
+
+```json
+{
+  "model": "fibonacci",
+  "anyon_count": 3,
+  "total_charge": "tau",
+  "initial_state": "0",
+  "braid_word": [
+    {
+      "generator": 1,
+      "power": 1
+    },
+    {
+      "generator": 2,
+      "power": 1
+    },
+    {
+      "generator": 1,
+      "power": -1
+    }
+  ],
+  "measure": false
+}
+```
+
+Define execution semantics explicitly:
+
+```text
+generator: 1  → σ₁
+generator: 2  → σ₂
+
+power:  1 → clockwise / forward generator
+power: -1 → inverse generator
+```
+
+For the jam, restrict `power` to `-1` or `1`. Repeated crossings are simply repeated array entries. This avoids ambiguity around `power: 5000` and keeps resource limits obvious.
+
+The array should be interpreted **in execution order**:
+
+```json
+[
+  { "generator": 1, "power": 1 },
+  { "generator": 2, "power": 1 }
+]
+```
+
+means:
+
+```text
+first apply σ₁
+then apply σ₂
+```
+
+Internally, if state vectors are column vectors, the accumulated matrix therefore becomes:
+
+\[
+|\psi'\rangle =
+\rho(\sigma_2)\rho(\sigma_1)|\psi\rangle.
+\]
+
+This convention should be documented because conventional braid-word notation and matrix multiplication can appear reversed; Nayak et al. explicitly note this ordering issue. citeturn7view1
+
+### Jam braid response
+
+```json
+{
+  "model": "fibonacci",
+  "anyon_count": 3,
+  "total_charge": "tau",
+  "basis": "three_anyon_total_tau",
+  "braid_word": [
+    "sigma_1",
+    "sigma_2",
+    "sigma_1^-1"
+  ],
+  "logical_state": {
+    "basis": ["0", "1"],
+    "amplitudes": [
+      { "re": 0.5123, "im": -0.2154 },
+      { "re": 0.6441, "im": 0.5248 }
+    ]
+  },
+  "fusion_probabilities": {
+    "vacuum": 0.3089,
+    "tau": 0.6911
+  },
+  "measurement": null,
+  "counts": null,
+  "metadata": {
+    "convention": "fibonacci_nayak_chiral_v1",
+    "state_norm": 1.0
+  }
+}
+```
+
+The numerical values above are schema examples, not reference values for that specific braid.
+
+Returning two logical amplitudes is useful because probabilities alone lose the relative phase. If your current `/time_evolution` endpoint can consume an arbitrary initial statevector, these amplitudes provide a clean handoff into the boss's evolution. If it cannot, the first milestone should determine whether an **optional** `initial_state` field can be added without breaking existing users.
+
+For external game logic, also return the simpler fusion probabilities. A designer can therefore use the API without understanding complex amplitudes.
+
+### Optional measurement
+
+For a QTE-collapse request:
+
+```json
+{
+  "model": "fibonacci",
+  "anyon_count": 3,
+  "total_charge": "tau",
+  "initial_state": "0",
+  "braid_word": [
+    { "generator": 1, "power": 1 },
+    { "generator": 2, "power": 1 }
+  ],
+  "measure": true,
+  "shots": 1
+}
+```
+
+Example:
+
+```json
+{
+  "fusion_probabilities": {
+    "vacuum": 0.381966,
+    "tau": 0.618034
+  },
+  "measurement": "tau",
+  "counts": {
+    "tau": 1
+  }
+}
+```
+
+I would define the behavior as:
+
+```text
+measure=false
+    → exact probabilities
+    → no sampling
+
+measure=true, shots omitted
+    → shots defaults to 1
+    → one collapse outcome
+
+measure=true, shots=N
+    → return N sampled measurements as counts
+```
+
+Do **not** make shot-based estimation the normal way to calculate the probabilities. For this tiny simulator, compute exact amplitudes/probabilities and only use shots when you intentionally want sampled measurements or a histogram.
+
+### Later compile endpoint
+
+Post-jam:
+
+```http
+POST /v1/topological/compile
+```
+
+Request:
+
+```json
+{
+  "model": "fibonacci",
+  "anyon_count": 3,
+  "total_charge": "tau",
+  "braid_word": [
+    { "generator": 1, "power": 1 },
+    { "generator": 2, "power": -1 },
+    { "generator": 1, "power": 1 }
+  ],
+  "target": "logical_unitary"
+}
+```
+
+Response:
+
+```json
+{
+  "logical_qubits": 1,
+  "dimension": 2,
+  "unitary": [
+    [
+      { "re": 0.0, "im": 0.0 },
+      { "re": 0.0, "im": 0.0 }
+    ],
+    [
+      { "re": 0.0, "im": 0.0 },
+      { "re": 0.0, "im": 0.0 }
+    ]
+  ],
+  "metadata": {
+    "simulation_type": "digital_simulation_of_fibonacci_braid"
+  }
+}
+```
+
+Because the proposed jam encoding fixes three anyons to total charge \(\tau\), the computational sector is two-dimensional and behaves as one logical qubit. That makes the accumulated 2×2 braid unitary compatible with Qiskit's `UnitaryGate`; the resulting circuit could later be transpiled into ordinary qubit gates. This would be a **digital simulation of the anyonic braid transformation**, not physical braiding of anyons on superconducting IBM hardware. Qiskit's `UnitaryGate` explicitly accepts unitary matrices and can be inserted into `QuantumCircuit`. citeturn1search0turn7view2
+
+## Topological backend implementation
+
+### Fibonacci representation
+
+The jam implementation should lock the model down to:
+
+```text
+Model: Fibonacci
+Anyons: τ, τ, τ
+Total charge: τ
+Logical Hilbert-space dimension: 2
+```
+
+The Fibonacci fusion rule is:
+
+\[
+\tau\times\tau = 1+\tau.
+\]
+
+For three Fibonacci anyons, the standard computational states can be chosen according to whether the first pair fuses to \(1\) or \(\tau\), while fixing the total charge to \(\tau\). The standard review describes these as the logical \(|0\rangle\) and \(|1\rangle\) states; the separate total-charge-\(1\) state is non-computational and can be excluded when you fix total charge to \(\tau\). citeturn6view3turn7view2
+
+This restriction is extremely useful for Braid Breaker. Instead of implementing a general fusion-tree library, your state is simply:
+
+\[
+|\psi\rangle =
+\begin{pmatrix}
+a\\
+b
+\end{pmatrix}.
+\]
+
+Initialize:
+
+```text
+|0> = [1, 0]ᵀ
+|1> = [0, 1]ᵀ
+```
+
+### F and R matrices
+
+Using the convention in Nayak et al., with
+
+\[
+\phi=\frac{1+\sqrt{5}}2,
+\]
+
+the nontrivial Fibonacci \(F\)-matrix in the relevant sector is:
+
+\[
+F=
+\begin{pmatrix}
+\phi^{-1} & \phi^{-1/2}\\
+\phi^{-1/2} & -\phi^{-1}
+\end{pmatrix}.
+\]
+
+The same review derives the exchange phases
+
+\[
+R^{1}_{\tau\tau}=e^{-4\pi i/5},
+\]
+
+and
+
+\[
+R^{\tau}_{\tau\tau}=-e^{-2\pi i/5},
+\]
+
+so in this basis:
+
+\[
+R=
+\begin{pmatrix}
+e^{-4\pi i/5} & 0\\
+0 & -e^{-2\pi i/5}
+\end{pmatrix}.
+\]
+
+The review also explicitly shows that the exchange of the second and third anyons requires a basis change and has the symbolic form \(F^{-1}RF\). citeturn7view0turn7view1
+
+Therefore implement:
+
+\[
+\rho(\sigma_1)=R
+\]
+
+and
+
+\[
+\rho(\sigma_2)=F^{-1}RF.
+\]
+
+The inverse braids are simply:
+
+\[
+\rho(\sigma_i^{-1})=\rho(\sigma_i)^\dagger.
+\]
+
+Do **not** silently mix formulas from different articles. The review notes both gauge freedom in \(F\)-matrix conventions and the existence of the opposite chirality, which reverses relevant braid phases. Lock one convention into the API and return its name/version in metadata. citeturn7view0turn7view1
+
+A backend layout can remain very small:
+
+```text
+topological/
+    models/
+        fibonacci.py
+    braid.py
+    schemas.py
+    sampling.py
+    tests/
+```
+
+Conceptually:
+
+```python
+def evaluate_braid(initial_state, operations):
+    state = initial_state
+
+    for operation in operations:
+        generator = braid_generator(operation.generator)
+
+        if operation.power == -1:
+            generator = generator.conj().T
+
+        state = generator @ state
+
+    probabilities = abs(state) ** 2
+    return state, probabilities
+```
+
+Use `complex128` or equivalent double-precision complex arithmetic.
+
+### Direct implementation versus TQSim
+
+For **P0**, implement the 2×2 model yourself and use TQSim for comparison tests rather than making TQSim your runtime dependency.
+
+TQSim is specifically an open-source topological quantum simulator for Fibonacci anyons and already exposes manual braiding, braid sequences, fusion measurement, and shot execution. Its README demonstrates `AnyonicCircuit.braid()`, `measure()`, and `run(shots=...)`. citeturn2view0
+
+That makes this a strong testing architecture:
+
+```mermaid
+flowchart LR
+    TEST["Reference Test Vector"]
+    OUR["Quantum API Fibonacci Engine"]
+    TQ["TQSim Reference"]
+    PAPER["Published F/R Matrices"]
+
+    TEST --> OUR
+    TEST --> TQ
+    PAPER --> TEST
+
+    OUR --> A["Probabilities / Unitaires"]
+    TQ --> B["Reference behavior"]
+
+    A --> CMP["Numerical comparison"]
+    B --> CMP
+```
+
+This gives you three independent checks:
+
+1. published mathematical identities;
+2. your own implementation;
+3. TQSim behavior.
+
+### Boss time evolution
+
+Keep braiding and Hamiltonian time evolution separate conceptually.
+
+Qiskit's `PauliEvolutionGate` represents
+
+\[
+U(t)=e^{-itH}
+\]
+
+for Hermitian Pauli Hamiltonians. Exact implementation can be expensive for general Hamiltonians, so Qiskit supports synthesis strategies such as Lie-Trotter and higher-order Suzuki-Trotter formulas. citeturn12view0turn12view1turn12view2
+
+For Braid Breaker, start with **one logical boss qubit**, for example:
+
+\[
+H =
+aX+bZ.
+\]
+
+Gameplay mappings could be:
+
+```text
+X coefficient:
+    instability / state switching
+
+Z coefficient:
+    defensive ↔ aggressive bias
+
+evolution time:
+    phase duration
+
+player combo:
+    increase X
+
+player takes damage:
+    increase +Z
+
+perfect dodge:
+    push Z negative
+
+special attack:
+    temporarily increase X
+```
+
+Do not call the API every frame. Use phase events:
+
+```text
+Boss starts
+    ↓
+evaluate initial quantum state
+
+Combat for ~3–8 seconds
+    ↓
+collect player-performance modifiers
+
+Phase transition
+    ↓
+one time-evolution API call
+
+Continue combat
+    ↓
+next phase
+
+QTE threshold
+    ↓
+use latest returned probabilities/state
+```
+
+This makes network latency largely irrelevant to frame-to-frame combat.
+
+### Scientific-fidelity choice for the QTE
+
+There are two implementation levels.
+
+**Jam version:** the server returns exact current probabilities before the QTE; Unreal samples one outcome locally when the QTE completes. This is computationally equivalent to a measurement draw from those probabilities for game purposes and has no QTE-critical network latency.
+
+**Post-jam strict continuity:** carry the complex logical state from braid → time evolution → explicit measurement operation and return the collapsed state. This may require a small optional measurement feature on `/time_evolution` or a future generic state/measurement contract.
+
+Do not introduce server-side quantum-state IDs solely for the jam.
+
+## Engine SDKs and Unreal prototype
+
+### Cross-engine plugin surface
+
+Keep terminology and data shapes identical across the three integrations.
+
+| Capability | Unity | Godot | Unreal |
+|---|---|---|---|
+| Evaluate braid | `EvaluateBraidAsync` | `evaluate_braid` | **Evaluate Topological Braid** Blueprint node |
+| Time evolution | `RunTimeEvolutionAsync` | `run_time_evolution` | **Run Time Evolution** Blueprint node |
+| Append braid locally | `BraidWord.Add(...)` | `braid_word.append(...)` | Array `Add` / helper node |
+| Compile braid later | `CompileBraidAsync` | `compile_braid` | **Compile Topological Braid** |
+| Generic circuit | existing `RunCircuit...` | existing equivalent | existing equivalent |
+| Result | `BraidResult` | `Dictionary`/typed resource | `FQuantumBraidResult` Blueprint struct |
+
+Unity has `UnityWebRequest` infrastructure for sending HTTP requests and custom headers, while Godot's `HTTPRequest` node directly supports HTTP(S), REST-style POST requests, completion signals, JSON payloads, and timeouts. citeturn4search10turn5view0 Unreal has a native HTTP module, but your Unreal plugin should hide raw HTTP entirely from gameplay Blueprints. citeturn5view2
+
+### Shared data model
+
+Use concepts that map cleanly across C#, GDScript, and Unreal reflection:
+
+```text
+BraidOperation
+    Generator: int
+    Power: int
+
+BraidRequest
+    Model: enum/string
+    AnyonCount: int
+    TotalCharge: enum/string
+    InitialState: enum/string
+    BraidWord: array<BraidOperation>
+    Measure: bool
+    Shots: int
+
+ComplexValue
+    Real: double
+    Imaginary: double
+
+BraidResult
+    LogicalState: array<ComplexValue>
+    VacuumProbability: double
+    TauProbability: double
+    Measurement: string/enum
+    Counts: map
+```
+
+For plugin users, prefer enums:
+
+```text
+EFibonacciFusionChannel
+    Vacuum
+    Tau
+
+EBraidGenerator
+    Sigma1
+    Sigma2
+
+EBraidDirection
+    Forward
+    Inverse
+```
+
+The REST payload can remain generic JSON.
+
+### Unity usage
+
+```csharp
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+public async Task StartBossAsync()
+{
+    var request = new BraidRequest
+    {
+        Model = "fibonacci",
+        AnyonCount = 3,
+        TotalCharge = "tau",
+        InitialState = "0",
+        Measure = false,
+        BraidWord = new List<BraidOperation>
+        {
+            new() { Generator = 1, Power = 1 },
+            new() { Generator = 2, Power = 1 },
+            new() { Generator = 1, Power = -1 }
+        }
+    };
+
+    BraidResult result = await quantumClient.EvaluateBraidAsync(request);
+
+    float aggression =
+        (float)result.FusionProbabilities.Tau;
+
+    boss.InitializeQuantumState(result.LogicalState, aggression);
+}
+```
+
+The SDK should deal with JSON, headers, timeouts, and HTTP status codes internally rather than making game developers construct `UnityWebRequest` themselves. Unity's networking API supports explicit request headers and HTTP requests, so this abstraction fits the engine's existing networking model. citeturn4search10turn5view3
+
+### Godot usage
+
+```gdscript
+var braid_word: Array = []
+
+func choose_left_path() -> void:
+    braid_word.append({
+        "generator": 1,
+        "power": 1
+    })
+
+func start_boss() -> void:
+    var request := {
+        "model": "fibonacci",
+        "anyon_count": 3,
+        "total_charge": "tau",
+        "initial_state": "0",
+        "braid_word": braid_word,
+        "measure": false
+    }
+
+    quantum_api.evaluate_braid(request)
+
+
+func _on_braid_completed(result: Dictionary) -> void:
+    var tau_probability = result["fusion_probabilities"]["tau"]
+    boss.initialize_quantum_state(result, tau_probability)
+```
+
+Godot's built-in `HTTPRequest` supports POST bodies, completion signals, and configurable REST-appropriate timeouts; the stable docs recommend using a finite timeout for ordinary REST requests. citeturn5view0
+
+### Unreal Blueprint API
+
+The Unreal plugin should expose an asynchronous node approximately like:
+
+```text
+Evaluate Topological Braid
+─────────────────────────────────────
+Exec ───────────────►
+Request              FQuantumBraidRequest
+                     │
+                     ├── Success
+                     │      Result: FQuantumBraidResult
+                     │
+                     └── Failure
+                            Error: FQuantumApiError
+```
+
+Gameplay Blueprint flow:
+
+```text
+BP_LevelExit
+    │
+    └─ Player selects upper exit
+          │
+          └─ Get GameInstance
+                │
+                └─ Append Braid Operation
+                     Generator = Sigma1
+                     Direction = Forward
+```
+
+At the boss:
+
+```text
+Event Begin Boss Encounter
+        │
+        ▼
+Get Braid History
+        │
+        ▼
+Make Braid Request
+Measure = false
+        │
+        ▼
+Evaluate Topological Braid
+        │
+        ├─ Failure
+        │    └─ Use deterministic fallback
+        │
+        └─ Success
+              │
+              ├─ Store Logical State
+              ├─ Store Fusion Probabilities
+              └─ Initialize Boss Phase
+```
+
+At a boss phase transition:
+
+```text
+Boss Health <= Phase Threshold
+        │
+        ▼
+Build Hamiltonian From Combat Stats
+        │
+        ▼
+Run Time Evolution
+        │
+        ▼
+Store Updated State / Probabilities
+        │
+        ▼
+Begin Next Phase
+```
+
+At the QTE:
+
+```text
+Start QTE
+   │
+   ├─ Read latest quantum probabilities
+   │
+   ├─ Generate prompt sequence
+   │
+   └─ Start timer
+         │
+         ▼
+Player executes QTE
+         │
+         ▼
+Collapse / sample quantum outcome
+         │
+         ├─ Vacuum → defensive/counter outcome
+         │
+         └─ Tau → unstable/vulnerable outcome
+                   │
+                   ▼
+             Combine with QTE grade
+```
+
+### Blueprint first, C++ second
+
+**Start gameplay implementation in Blueprints.** Epic describes Blueprints as a complete node-based gameplay scripting system and explicitly supports the pattern where C++ supplies foundational functionality that designers extend in Blueprints. citeturn5view1
+
+For this project:
+
+```text
+BLUEPRINTS
+    level branching
+    braid history
+    boss health/phase logic
+    QTE widgets
+    prompt sequencing
+    player input
+    boss state transitions
+    VFX
+    animation
+    debug HUD
+
+PLUGIN C++
+    HTTP
+    JSON serialization
+    API authentication
+    Blueprint async nodes
+    retry / timeout handling
+    DTO/USTRUCT definitions
+
+OPTIONAL GAME C++
+    only after profiling
+    complex reusable combat architecture
+    save serialization if BP becomes awkward
+```
+
+There is little value in moving the Braid Breaker prototype into C++ early. Its difficult problems are **design and integration**, not CPU performance.
+
+### Unreal Blueprint checklist
+
+For the vertical slice, implement these items in order:
+
+- `BP_BraidGameInstance` owns an array of `FBraidOperation`, with `AppendBraid`, `ClearBraid`, `GetBraidWord`, and SaveGame serialization.
+- Every branch/exit actor contributes exactly one operation such as `σ1`, `σ1^-1`, `σ2`, or `σ2^-1`.
+- Boss `BeginPlay` retrieves braid history and asynchronously calls **Evaluate Topological Braid** with `Measure=false`.
+- Boss caches returned logical amplitudes and fusion probabilities.
+- Boss phase transitions build time-evolution inputs from combat telemetry and call **Run Time Evolution** asynchronously.
+- QTE state is prefetched before the visible prompt begins; never stall the QTE waiting for HTTP.
+- QTE maps quantum result → prompt family and player execution → grade.
+- API failure has a deterministic local fallback so loss of Wi-Fi cannot soft-lock the demo.
+- Debug HUD displays `σ1 σ2 σ1^-1`, `P(vacuum)`, `P(tau)`, current boss mode, and last measurement.
+- Final jam build has a switch to hide that debug HUD for normal play.
+
+## Testing, performance, security, and migration
+
+### Mathematical unit tests
+
+These tests are more valuable than large numbers of ordinary endpoint tests because a sign error in \(R\) or an incorrect multiplication order can produce superficially plausible output.
+
+| Test | Expected invariant |
+|---|---|
+| `F_is_unitary` | \(F^\dagger F \approx I\) |
+| `R_is_unitary` | \(R^\dagger R \approx I\) |
+| `sigma1_is_unitary` | \(\sigma_1^\dagger\sigma_1\approx I\) |
+| `sigma2_is_unitary` | \(\sigma_2^\dagger\sigma_2\approx I\) |
+| `inverse_sigma1` | \(\sigma_1\sigma_1^{-1}\approx I\) |
+| `inverse_sigma2` | \(\sigma_2\sigma_2^{-1}\approx I\) |
+| `braid_relation` | \(\sigma_1\sigma_2\sigma_1\approx\sigma_2\sigma_1\sigma_2\) |
+| `non_commutative` | \(\sigma_1\sigma_2\not\approx\sigma_2\sigma_1\) |
+| `norm_preserved` | \(\lVert\psi\rVert=1\) after every operation |
+| `probability_sum` | \(P(1)+P(\tau)\approx1\) |
+| `empty_braid` | output state equals input state |
+| `paper_reference` | matrices agree with chosen published convention |
+
+The theoretical basis for these tests comes directly from the fusion/braid representation: the \(F\)-matrix is a unitary basis change, braiding acts unitarily, and three-strand braids are generated from \(\sigma_1,\sigma_2\) and their inverses. citeturn7view0turn7view1
+
+Use tight deterministic tolerances such as:
+
+```text
+atol = 1e-12
+```
+
+for direct matrix identities in double precision, relaxing where appropriate for long braid products.
+
+### Cross-validation with TQSim
+
+Create a small fixture set:
+
+```text
+[]
+[σ1]
+[σ1, σ1^-1]
+[σ2]
+[σ1, σ2]
+[σ2, σ1]
+[σ1, σ2, σ1]
+[σ2, σ1, σ2]
+[a 10–20 crossing deterministic braid]
+```
+
+Compare mathematically equivalent configurations against TQSim's Fibonacci model where basis/convention mappings permit direct comparison. TQSim's public usage explicitly supports individual braids, braid sequences, measurement by fusion, and repeated-shot execution. citeturn2view0
+
+### API contract tests
+
+Test:
+
+```text
+valid generators only
+power ∈ {-1,+1}
+anyon_count == 3 for v1
+model == fibonacci
+total_charge == tau for v1
+braid length bounded
+shots bounded
+unknown JSON fields according to your normal API policy
+malformed complex values rejected
+measure=false + shots>0 rejected or normalized consistently
+Content-Type must be application/json
+```
+
+I suggest a jam limit of:
+
+```text
+max braid operations: 256
+max shots: 4096
+```
+
+That is far above anything Braid Breaker needs while preventing deliberately pathological payloads.
+
+OWASP recommends validating input type, range, length and format, setting request-size limits, requiring appropriate content types, and rate limiting resource-consuming APIs. citeturn11view0turn11view1
+
+### Shot-count guidance
+
+For this endpoint, **exact probabilities should be the default**.
+
+Use:
+
+| Situation | Shots |
+|---|---:|
+| Boss initialization | `0` / none |
+| Normal probability display | `0` / none |
+| One QTE collapse | `1` |
+| Debug histogram | `128–256` |
+| Presentation histogram | `512–1024` |
+| Routine gameplay | Avoid large-shot runs |
+
+At \(p=0.5\), which is the worst case for binomial sampling error, approximate 95% margins are about:
+
+```text
+128 shots  → ±8.7 percentage points
+256 shots  → ±6.1
+512 shots  → ±4.3
+1024 shots → ±3.1
+```
+
+So using 1,000 shots every time a boss changes phase buys you nothing useful for the game. Exact simulation followed by a single measurement is both faster and conceptually cleaner.
+
+### Performance strategy
+
+For three anyons in the fixed-total-\(\tau\) sector, each braid operation is only a 2×2 complex matrix-vector multiply. The **network request will dominate the actual quantum-model computation**.
+
+Therefore:
+
+```text
+Do:
+    call braid once at boss initialization
+    call time evolution at major phase transitions
+    prefetch QTE quantum data
+    cache immutable braid evaluations if useful
+
+Do not:
+    call backend every Tick
+    call on every punch
+    call on every animation frame
+    block player input waiting for HTTP
+```
+
+Time evolution is the potentially heavier operation because general Hamiltonian evolution may require approximation/synthesis; Qiskit's documentation explicitly notes that exact implementation can require exponentially many gates in general and uses product-formula synthesis such as Lie-Trotter by default. citeturn12view0turn12view1
+
+### Stateless and security design
+
+The game should send:
+
+```json
+{
+  "braid_word": [...]
+}
+```
+
+each time.
+
+The server should **not** have:
+
+```text
+POST /start-player-braid-session
+POST /append-to-my-braid
+GET /my-current-braid
+```
+
+for this game.
+
+Instead:
+
+```text
+Unreal SaveGame
+    owns braid history
+
+Quantum API
+    evaluates request
+    returns result
+    forgets gameplay state
+```
+
+OWASP describes REST APIs as stateless and notes that maintaining server sessions introduces complexity; it also recommends HTTPS, per-endpoint access control where needed, API-key protections for public compute services, `429` responses for rate limiting, validation of input ranges and lengths, and avoiding credentials in URLs. citeturn11view0
+
+Concretely:
+
+```text
+HTTPS only outside local development
+API key/auth header using your existing mechanism
+never put API key in query string
+rate limit /topological/braid
+max braid length
+max shots
+max request-body size
+JSON only
+generic production error messages
+log request ID, latency and validation failures
+do not log credentials
+```
+
+Arbitrary `unitary` deserves **stricter** limits than the braid endpoint because matrix size grows exponentially with qubit count. That is one reason to defer it. Start with at most one- and two-qubit arbitrary matrices if/when it is exposed, validate matrix dimensions, finite values, and \(U^\dagger U\approx I\), and set a strict qubit/dimension cap. Resource-limiting is particularly important for APIs that expose caller-controlled computation. citeturn11view1
+
+### Migration from `/v1/circuits/run`
+
+Make the migration completely additive:
+
+```text
+Today
+
+/v1/circuits/run
+    X Z H RY CX
+
+
+Phase A
+
+/v1/circuits/run
+    unchanged
+
+/v1/topological/braid
+    new
+
+
+Phase B
+
+/v1/circuits/run
+    + RX
+    + RZ
+
+
+Phase C
+
+/v1/topological/compile
+    ↓
+logical unitary
+    ↓
+optionally convert to circuit representation
+
+
+Phase D
+
+/v1/circuits/run
+    + UNITARY
+```
+
+No existing circuit request needs to change.
+
+Do not implement `/topological/braid` by forcing users to manually construct `H`, `RY`, and `CX` approximations. The whole point of the new domain is that a game developer can say:
+
+```text
+σ1 → σ2 → σ1⁻¹
+```
+
+while the service owns the underlying \(F/R\) mathematics.
+
+Qiskit's `RX`, `RZ`, and arbitrary `UnitaryGate` are available as later generic circuit capabilities. citeturn9view0turn9view1turn1search0
+
+## Prioritized roadmap
+
+The following assumes **two developers**: Developer A primarily API/SDK, Developer B primarily Unreal/gameplay. Quantum-math review is folded into API estimates.
+
+```mermaid
+gantt
+    title Braid Breaker — Ten Week Implementation
+    dateFormat  YYYY-MM-DD
+    axisFormat  Week %W
+
+    section API
+    Contract and math spike           :a1, 2026-09-28, 7d
+    Fibonacci braid engine            :a2, after a1, 14d
+    API tests and hardening           :a3, after a2, 14d
+    RX/RZ extensions                  :a4, after a3, 7d
+    Compile prototype                 :a5, after a4, 14d
+
+    section Plugins
+    Unreal braid node                 :b1, 2026-10-05, 14d
+    Unity and Godot braid APIs        :b2, 2026-10-19, 14d
+    Cross-plugin contract tests       :b3, after b2, 7d
+
+    section Unreal Game
+    Beat-em-up vertical slice         :c1, 2026-09-28, 21d
+    Level braid choices               :c2, 2026-10-12, 14d
+    Quantum boss evolution            :c3, after c2, 14d
+    QTE collapse                      :c4, after c3, 7d
+    Polish and demo                   :c5, after c4, 14d
+```
+
+| Weeks | Priority | Milestone | Deliverables | Est. effort |
+|---|---|---|---|---:|
+| **1** | P0 | Contract/math spike | Freeze three-anyon model, convention, JSON schema; verify current time-evolution input/output; reference test vectors | **1.5 pw** |
+| **2–3** | P0 | Braiding backend | Fibonacci F/R implementation, `σ1/σ2/inverses`, `/topological/braid`, exact probabilities, optional measurement | **2.0 pw** |
+| **2–3** | P0 | Unreal combat shell | Character, camera, movement lane, basic attacks, enemy, one short level | **2.0 pw** |
+| **3–4** | P0 | Unreal plugin integration | Blueprint `Evaluate Topological Braid`; request/result structs; errors/timeouts | **1.0 pw** |
+| **4–5** | P0 | Braid gameplay | Branch exits append braid operations; GameInstance/SaveGame history; braid-debug UI | **1.5 pw** |
+| **5–6** | P0 | Quantum boss | Braid-driven boss initialization; time-evolution phase calls; combat telemetry → Hamiltonian parameters | **2.0 pw** |
+| **6–7** | P0 | QTE vertical slice | QTE widget/input system, probability-driven prompts/outcome, collapse VFX, success/failure branches | **1.5 pw** |
+| **7–8** | P1 | SDK parity | Unity and Godot typed braid methods; samples; cross-SDK JSON fixtures | **1.5–2.0 pw** |
+| **8** | P1 | Hardening | fuzz/schema tests, rate limits, braid/shot caps, fallback behaviors, profiling | **1.0 pw** |
+| **9** | P2 | Circuit extensions | `RX`, `RZ`, tests/docs; optional compile spike | **1.0 pw** |
+| **9–10** | P2 | Compile/docs/demo | `/topological/compile` prototype, Qiskit `UnitaryGate` integration, examples, jam demo polish | **1.5 pw** |
+
+**Total:** approximately **15–17 person-weeks**.
+
+For the actual game jam, stop at the end of the P0 vertical slice even if the broader roadmap is incomplete. Unity/Godot parity, compile support, and arbitrary-unitary circuit support are product work, not jam blockers.
+
+### Milestone gates
+
+At the end of the backend milestone, this must work:
+
+```text
+POST braid
+σ1 σ2
+→ probabilities
+
+POST braid
+σ2 σ1
+→ different state/probabilities
+```
+
+That demonstrates the non-Abelian/order-sensitive mechanic.
+
+At the end of the gameplay milestone:
+
+```text
+Door A → σ1
+Door B → σ1^-1
+
+next choice → σ2
+
+boss starts with visibly different behavior
+depending on the accumulated braid
+```
+
+At the final vertical-slice milestone:
+
+```text
+PLAY
+↓
+fight
+↓
+make two route choices
+↓
+see braid visualization
+↓
+enter boss
+↓
+boss behavior derived from braid
+↓
+combat modifies time evolution
+↓
+QTE
+↓
+measurement/collapse
+↓
+different boss consequence
+```
+
+## Jam demo, risks, and final priorities
+
+### Best three-minute demo
+
+For judges, optimize for **legibility**, not amount of content.
+
+**Opening, roughly 30 seconds:** one small combat encounter establishes that it is a side-scrolling beat-em-up.
+
+**First branch:** the player chooses between two exits:
+
+```text
+UPPER ROUTE
++ σ1
+
+LOWER ROUTE
++ σ1^-1
+```
+
+Show strands crossing for one second during the transition.
+
+**Second branch:** append \(\sigma_2\) or \(\sigma_2^{-1}\).
+
+A tiny HUD can show:
+
+```text
+BRAID
+σ1  σ2
+```
+
+**Boss entrance:** asynchronously call:
+
+```text
+POST /v1/topological/braid
+measure=false
+```
+
+Show briefly:
+
+```text
+P(vacuum)  31%
+P(tau)     69%
+```
+
+The boss aura/stance changes according to that state.
+
+**Combat phase:** one time-evolution call occurs after enough player actions accumulate.
+
+**Boss threshold:** time slows.
+
+```text
+QUANTUM COLLAPSE
+```
+
+The QTE starts.
+
+A successful QTE plus a favorable quantum outcome creates a large stun/finisher.
+
+End.
+
+That communicates all four concepts in one continuous gameplay loop:
+
+```text
+PATH
+ ↓
+BRAID
+ ↓
+QUANTUM STATE
+ ↓
+TIME EVOLUTION
+ ↓
+MEASUREMENT
+ ↓
+GAMEPLAY CONSEQUENCE
+```
+
+### Extended five-to-ten-minute demo
+
+Add only:
+
+```text
+3 route choices
+2 ordinary combat rooms
+1 boss
+2 boss phases
+2 QTEs
+```
+
+Do not add a second boss before the first boss is polished.
+
+### Major risks
+
+| Risk | Severity | Mitigation |
+|---|---:|---|
+| Wrong F/R sign, basis, or chirality | **High** | Freeze published convention; matrix invariant tests; TQSim comparison |
+| Braid notation/order mismatch | **High** | API array explicitly means chronological execution order; unit tests |
+| API work consumes whole jam | **High** | Direct 2×2 implementation; one endpoint only |
+| Time-evolution schema cannot accept braid state | Medium/High | Verify Week 1; add optional initial-state field only if necessary |
+| Network latency ruins QTE | **High** | Prefetch; never start visible QTE while waiting for API |
+| Plugin scope explodes | Medium | Unreal first; Unity/Godot after vertical slice |
+| Arbitrary-unitary feature introduces abuse surface | Medium | Defer; strict dimensions/unitarity/resource limits |
+| Gameplay feels like RNG punishment | **High** | Quantum result chooses circumstance; QTE skill determines exploitation/counter |
+| Quantum explanation overwhelms judges | Medium | Show strands, route history, one probability display, one collapse |
+| Blueprint graph becomes unmanageable | Medium | Keep HTTP in plugin C++; componentize boss, QTE, braid manager |
+| API unavailable during presentation | **High** | deterministic local prerecorded/fallback braid values and clear offline mode |
+
+### Final priority order
+
+The strongest implementation sequence is:
+
+```text
+FIRST
+─────────────────────────────
+F/R matrix tests
+        ↓
+/v1/topological/braid
+        ↓
+Unreal Blueprint API node
+        ↓
+Braid history in GameInstance
+        ↓
+One branching level
+        ↓
+One boss initialized from braid
+        ↓
+Existing time-evolution call
+        ↓
+One QTE collapse
+        ↓
+3–10 minute polished demo
+
+
+SECOND
+─────────────────────────────
+Unity integration
+Godot integration
+API hardening
+RX
+RZ
+
+
+THIRD
+─────────────────────────────
+/topological/compile
+UnitaryGate integration
+arbitrary unitary input
+generalized anyon/fusion support
+hardware-oriented compilation
+```
+
+The critical scope decision is to **avoid building a general topological quantum-computing platform before building Braid Breaker**. Three Fibonacci anyons in a fixed \(\tau\) sector already give you authentic fusion states, nontrivial \(F\)-basis changes, \(R\)-exchange phases, inverse braids, noncommuting order-dependent operations, and fusion measurement—the exact concepts the game mechanic needs. Those are well established in the standard Fibonacci-anyon treatment, while TQSim demonstrates that a game-friendly `braid → measure → shots` abstraction is practical in software. citeturn6view3turn7view0turn7view1turn2view0
+
+For Braid Breaker, the ideal product story is therefore simple:
+
+> **The game remembers where you went. Those choices become a genuine Fibonacci braid. The API evaluates that braid into a quantum state. The state shapes the boss. The boss evolves while you fight it. Then the QTE turns measurement into a player-skill moment.**
+
+That gives the jam mechanic a real mathematical backbone without allowing the quantum infrastructure to overwhelm the game.
