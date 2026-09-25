@@ -111,6 +111,7 @@ def test_portfolio_metadata_contract(unauth_client):
     assert ("POST", "/v1/random") in by_signature
     assert ("GET", "/v1/jobs/{job_id}") in by_signature
     assert ("POST", "/v1/qasm/run") in by_signature
+    assert ("POST", "/v1/topological/braid") in by_signature
     assert ("POST", "/v1/optimization/qaoa") in by_signature
     assert ("POST", "/v1/optimization/vqe") in by_signature
     assert ("POST", "/v1/experiments/state_tomography") in by_signature
@@ -129,6 +130,7 @@ def test_portfolio_metadata_contract(unauth_client):
     assert by_signature[("POST", "/v1/random")]["auth"] == "api_key"
     assert by_signature[("GET", "/v1/jobs/{job_id}")]["auth"] == "api_key"
     assert by_signature[("POST", "/v1/qasm/run")]["auth"] == "api_key"
+    assert by_signature[("POST", "/v1/topological/braid")]["auth"] == "api_key"
     assert by_signature[("POST", "/v1/optimization/qaoa")]["auth"] == "api_key"
     assert by_signature[("POST", "/v1/optimization/vqe")]["auth"] == "api_key"
     assert by_signature[("POST", "/v1/experiments/state_tomography")]["auth"] == "api_key"
@@ -187,6 +189,7 @@ def test_openapi_declares_security_schemes_for_docs(unauth_client):
     assert payload["paths"]["/v1/random"]["post"]["responses"]["200"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/RandomIntResponse"
     }
+    assert payload["paths"]["/v1/topological/braid"]["post"]["security"] == [{"ApiKeyAuth": []}]
     assert payload["paths"]["/v1/optimization/qaoa"]["post"]["security"] == [{"ApiKeyAuth": []}]
     assert "security" not in payload["paths"]["/v1/health"]["get"]
     assert "security" not in payload["paths"]["/v1/portfolio.json"]["get"]
@@ -242,6 +245,7 @@ def test_openapi_orders_meta_routes_after_runtime_routes(unauth_client):
 
     ordered_paths = list(payload["paths"].keys())
     assert ordered_paths.index("/v1/algorithms/grover_search") < ordered_paths.index("/v1/portfolio.json")
+    assert ordered_paths.index("/v1/topological/braid") < ordered_paths.index("/v1/portfolio.json")
     assert ordered_paths.index("/v1/optimization/maxcut") < ordered_paths.index("/v1/portfolio.json")
     assert ordered_paths.index("/v1/finance/portfolio_diversification") < ordered_paths.index("/v1/portfolio.json")
     assert ordered_paths.index("/v1/ml/vqc_classifier") < ordered_paths.index("/v1/portfolio.json")
