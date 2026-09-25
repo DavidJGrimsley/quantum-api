@@ -49,6 +49,7 @@ def run_time_evolution(request: TimeEvolutionRequest) -> dict[str, object]:
     )
 
     from qiskit.circuit.library import real_amplitudes
+    from qiskit.quantum_info import Statevector
     from qiskit_algorithms import PVQD, TrotterQRTE, VarQITE, VarQRTE
     from qiskit_algorithms.state_fidelities import ComputeUncompute
     from qiskit_algorithms.time_evolvers import TimeEvolutionProblem
@@ -59,10 +60,20 @@ def run_time_evolution(request: TimeEvolutionRequest) -> dict[str, object]:
     num_timesteps = request.num_timesteps or 1
 
     if request.variant == "trotter_qrte":
+        initial_state = (
+            Statevector(
+                np.asarray(
+                    [complex(amplitude.real, amplitude.imag) for amplitude in request.initial_statevector],
+                    dtype=complex,
+                )
+            )
+            if request.initial_statevector is not None
+            else build_circuit(request.initial_state)
+        )
         problem = TimeEvolutionProblem(
             hamiltonian,
             time=request.time,
-            initial_state=build_circuit(request.initial_state),
+            initial_state=initial_state,
             aux_operators=aux_operators,
         )
         result = TrotterQRTE(estimator=estimator, num_timesteps=num_timesteps).evolve(problem)
@@ -114,6 +125,12 @@ def run_time_evolution(request: TimeEvolutionRequest) -> dict[str, object]:
             backend_mode = "statevector_estimator_sampler"
 
     final_state_operations, final_statevector = serialize_evolved_state(result.evolved_state)
+    final_probabilities = [
+        amplitude["real"] ** 2 + amplitude["imag"] ** 2 for amplitude in final_statevector
+    ]
+    probability_total = sum(final_probabilities)
+    if probability_total:
+        final_probabilities = [probability / probability_total for probability in final_probabilities]
     parameter_history = getattr(result, "parameters", None)
     if parameter_history is None:
         parameter_history = getattr(result, "parameter_values", None)
@@ -128,6 +145,7 @@ def run_time_evolution(request: TimeEvolutionRequest) -> dict[str, object]:
     return {
         "final_state_operations": final_state_operations,
         "final_statevector": final_statevector,
+        "final_probabilities": final_probabilities,
         "times": [float(value) for value in times] if times is not None else None,
         "aux_operator_values": serialize_aux_operator_values(
             aux_ops_evaluated,

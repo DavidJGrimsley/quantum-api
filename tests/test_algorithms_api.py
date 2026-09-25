@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import cmath
+import math
+
 import pytest
 
 from quantum_api.models.api import (
@@ -8,11 +11,13 @@ from quantum_api.models.api import (
     PhaseEstimationRequest,
     TimeEvolutionRequest,
 )
+from quantum_api.models.topological import TopologicalBraidRequest
 from quantum_api.services.algorithms.amplitude_estimation import run_amplitude_estimation
 from quantum_api.services.algorithms.grover_search import run_grover_search
 from quantum_api.services.algorithms.phase_estimation import run_phase_estimation
 from quantum_api.services.algorithms.time_evolution import run_time_evolution
 from quantum_api.services.quantum_runtime import runtime
+from quantum_api.services.topological.braid import run_topological_braid
 
 requires_algorithms = pytest.mark.skipif(
     not runtime.qiskit_algorithms_available,
@@ -102,7 +107,57 @@ def test_time_evolution_service_returns_final_state_payload():
     payload = run_time_evolution(TimeEvolutionRequest.model_validate(_time_body()))
     assert payload["final_state_operations"]
     assert payload["final_statevector"]
+    assert payload["final_probabilities"] == pytest.approx([0.5, 0.5])
     assert payload["variant"] == "trotter_qrte"
+
+
+@requires_algorithms
+def test_braid_statevector_flows_through_time_evolution_endpoint(client):
+    braid = run_topological_braid(
+        TopologicalBraidRequest.model_validate(
+            {"braid_word": [{"generator": 2, "power": 1}], "measure": False}
+        )
+    )
+    initial = braid["logical_state"]
+    request = _time_body()
+    request.pop("initial_state")
+    request["initial_statevector"] = initial
+    response = client.post("/v1/algorithms/time_evolution", json=request)
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["final_probabilities"] == pytest.approx(
+        [braid["fusion_probabilities"]["vacuum"], braid["fusion_probabilities"]["tau"]],
+        abs=1e-10,
+    )
+    assert sum(result["final_probabilities"]) == pytest.approx(1.0)
+    before = [complex(item["real"], item["imag"]) for item in initial]
+    after = [complex(item["real"], item["imag"]) for item in result["final_statevector"]]
+    assert after[1] / after[0] == pytest.approx(
+        (before[1] / before[0]) * cmath.exp(1j), abs=1e-10
+    )
+
+
+@requires_algorithms
+def test_time_evolution_accepts_its_own_final_statevector(client):
+    request = _time_body()
+    request.pop("initial_state")
+    request["hamiltonian"] = [{"pauli": "X", "coefficient": 1.0}]
+    request["initial_statevector"] = [
+        {"real": math.sqrt(0.5), "imag": 0.0},
+        {"real": 0.0, "imag": math.sqrt(0.5)},
+    ]
+    first = client.post("/v1/algorithms/time_evolution", json=request)
+    assert first.status_code == 200
+    assert first.json()["final_probabilities"] == pytest.approx(
+        [(1 + math.sin(1.0)) / 2, (1 - math.sin(1.0)) / 2], abs=1e-10
+    )
+    request["initial_statevector"] = first.json()["final_statevector"]
+    second = client.post("/v1/algorithms/time_evolution", json=request)
+    assert second.status_code == 200
+    assert second.json()["final_probabilities"] == pytest.approx(
+        [(1 + math.sin(2.0)) / 2, (1 - math.sin(2.0)) / 2], abs=1e-10
+    )
 
 
 @requires_algorithms
@@ -175,3 +230,54 @@ def test_time_evolution_validation_rejects_missing_initial_state_for_trotter(cli
     payload.pop("initial_state")
     response = client.post("/v1/algorithms/time_evolution", json=payload)
     assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "amplitudes",
+    [
+        [{"real": 1.0, "imag": 0.0}],
+        [{"real": 1.0, "imag": 0.0}] * 3,
+        [{"real": 1.0, "imag": 0.0}] * 4,
+        [{"real": 0.5, "imag": 0.0}, {"real": 0.5, "imag": 0.0}],
+    ],
+)
+def test_time_evolution_rejects_invalid_initial_statevectors(client, amplitudes):
+    payload = _time_body()
+    payload.pop("initial_state")
+    payload["initial_statevector"] = amplitudes
+    response = client.post("/v1/algorithms/time_evolution", json=payload)
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize("value", [math.inf, math.nan, 1e308])
+def test_time_evolution_rejects_nonfinite_or_overflowing_amplitudes(value):
+    payload = _time_body()
+    payload.pop("initial_state")
+    payload["initial_statevector"] = [
+        {"real": value, "imag": 0.0},
+        {"real": 0.0, "imag": 0.0},
+    ]
+    with pytest.raises(ValueError, match="initial_statevector"):
+        TimeEvolutionRequest.model_validate(payload)
+
+
+def test_time_evolution_rejects_both_initial_state_forms(client):
+    payload = _time_body()
+    payload["initial_statevector"] = [
+        {"real": 1.0, "imag": 0.0},
+        {"real": 0.0, "imag": 0.0},
+    ]
+    response = client.post("/v1/algorithms/time_evolution", json=payload)
+    assert response.status_code == 422
+
+
+def test_time_evolution_nonfinite_raw_json_returns_validation_error(client):
+    response = client.post(
+        "/v1/algorithms/time_evolution",
+        content='{"variant":"trotter_qrte","hamiltonian":[{"pauli":"Z","coefficient":1}],'
+        '"time":0.5,"initial_statevector":[{"real":1e309,"imag":0},'
+        '{"real":0,"imag":0}]}',
+        headers={"Content-Type": "application/json"},
+    )
+    assert response.status_code == 422
+    assert response.json()["error"] == "validation_error"

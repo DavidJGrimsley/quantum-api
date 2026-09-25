@@ -361,6 +361,79 @@ struct FQuantumApiTopologicalBraidRequest
     int32 Seed = 0;
 };
 
+/** One amplitude in a logical or computational basis state. Keep both components for later evolution. */
+USTRUCT(BlueprintType)
+struct FQuantumApiComplexAmplitude
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quantum API|State") double Real = 0.0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quantum API|State") double Imag = 0.0;
+};
+
+USTRUCT(BlueprintType)
+struct FQuantumApiTopologicalBraidResponse
+{
+    GENERATED_BODY()
+
+    UPROPERTY(BlueprintReadOnly, Category = "Quantum API|Topological") FString Model;
+    UPROPERTY(BlueprintReadOnly, Category = "Quantum API|Topological") int32 AnyonCount = 0;
+    UPROPERTY(BlueprintReadOnly, Category = "Quantum API|Topological") FString TotalCharge;
+    UPROPERTY(BlueprintReadOnly, Category = "Quantum API|Topological") FString InitialState;
+    UPROPERTY(BlueprintReadOnly, Category = "Quantum API|Topological") TArray<FQuantumApiBraidOperation> BraidWord;
+    /** Two amplitudes in vacuum, tau order; pass these unchanged to Time Evolution. */
+    UPROPERTY(BlueprintReadOnly, Category = "Quantum API|Topological") TArray<FQuantumApiComplexAmplitude> LogicalState;
+    UPROPERTY(BlueprintReadOnly, Category = "Quantum API|Topological") double VacuumProbability = 0.0;
+    UPROPERTY(BlueprintReadOnly, Category = "Quantum API|Topological") double TauProbability = 0.0;
+    UPROPERTY(BlueprintReadOnly, Category = "Quantum API|Topological") bool bHasMeasurement = false;
+    UPROPERTY(BlueprintReadOnly, Category = "Quantum API|Topological") FString Measurement;
+    UPROPERTY(BlueprintReadOnly, Category = "Quantum API|Topological") int32 Shots = 0;
+    UPROPERTY(BlueprintReadOnly, Category = "Quantum API|Topological") TMap<FString, int32> Counts;
+    UPROPERTY(BlueprintReadOnly, Category = "Quantum API|Topological") FString SimulationType;
+    UPROPERTY(BlueprintReadOnly, Category = "Quantum API|Topological") FString Convention;
+    UPROPERTY(BlueprintReadOnly, Category = "Quantum API|Topological") int32 LogicalDimension = 0;
+    UPROPERTY(BlueprintReadOnly, Category = "Quantum API|Topological") FQuantumApiResponseMeta Meta;
+};
+
+USTRUCT(BlueprintType)
+struct FQuantumApiPauliTerm
+{
+    GENERATED_BODY()
+
+    /** One I/X/Y/Z character per qubit, such as X or Z for a single logical qubit. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quantum API|Time Evolution") FString Pauli = TEXT("Z");
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quantum API|Time Evolution") double Coefficient = 1.0;
+};
+
+/** Trotter evolution from a complex state, including a braid result. Other variants remain available through Advanced JSON. */
+USTRUCT(BlueprintType)
+struct FQuantumApiTimeEvolutionRequest
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quantum API|Time Evolution") TArray<FQuantumApiPauliTerm> Hamiltonian;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quantum API|Time Evolution") TArray<FQuantumApiComplexAmplitude> InitialStatevector;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quantum API|Time Evolution", meta = (ClampMin = "0.000001")) double Time = 0.5;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quantum API|Time Evolution", meta = (ClampMin = "1", ClampMax = "32")) int32 NumTimesteps = 2;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quantum API|Time Evolution", meta = (ClampMin = "1")) int32 Shots = 512;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quantum API|Time Evolution") bool bSendSeed = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quantum API|Time Evolution", meta = (EditCondition = "bSendSeed")) int32 Seed = 0;
+};
+
+USTRUCT(BlueprintType)
+struct FQuantumApiTimeEvolutionResponse
+{
+    GENERATED_BODY()
+
+    UPROPERTY(BlueprintReadOnly, Category = "Quantum API|Time Evolution") TArray<FQuantumApiComplexAmplitude> FinalStatevector;
+    /** Basis probabilities in the same index order as FinalStatevector. */
+    UPROPERTY(BlueprintReadOnly, Category = "Quantum API|Time Evolution") TArray<double> FinalProbabilities;
+    UPROPERTY(BlueprintReadOnly, Category = "Quantum API|Time Evolution") FString Variant;
+    UPROPERTY(BlueprintReadOnly, Category = "Quantum API|Time Evolution") FString Provider;
+    UPROPERTY(BlueprintReadOnly, Category = "Quantum API|Time Evolution") FString BackendMode;
+    UPROPERTY(BlueprintReadOnly, Category = "Quantum API|Time Evolution") FQuantumApiResponseMeta Meta;
+};
+
 USTRUCT(BlueprintType)
 struct FQuantumApiAdvancedRequest
 {

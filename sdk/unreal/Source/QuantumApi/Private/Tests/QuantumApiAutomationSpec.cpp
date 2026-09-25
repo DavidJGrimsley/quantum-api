@@ -1,9 +1,12 @@
 // Copyright (c) 2026 David J. Grimsley. All rights reserved.
 #if WITH_DEV_AUTOMATION_TESTS
 
+#include "Dom/JsonObject.h"
 #include "Misc/AutomationTest.h"
 #include "QuantumApiClient.h"
 #include "QuantumApiSettings.h"
+#include "Serialization/JsonReader.h"
+#include "Serialization/JsonSerializer.h"
 
 namespace
 {
@@ -187,6 +190,90 @@ bool FQuantumApiTransportSpec::RunTest(const FString& Parameters)
     MissingHardwareBackendClient.SubmitRandomJob(FQuantumApiRandomJobRequest(), FQuantumApiRequestOptions(), FQuantumApiJsonDelegate(), FQuantumApiErrorDelegate::CreateLambda([&MissingHardwareBackendError](const FQuantumApiError& Error) { MissingHardwareBackendError = Error; }));
     TestEqual(TEXT("Missing IBM backend is rejected locally"), MissingHardwareBackendError.Error, FString(TEXT("invalid_request")));
     TestEqual(TEXT("Missing IBM backend makes no request"), MissingHardwareBackendMock->Requests.Num(), 0);
+
+    const TSharedRef<FQuantumApiMockTransport> BraidMock = MakeShared<FQuantumApiMockTransport>();
+    FQuantumApiTransportResponse BraidResponse;
+    BraidResponse.bConnectedSuccessfully = true;
+    BraidResponse.StatusCode = 200;
+    BraidResponse.Headers.Add(TEXT("X-Request-ID"), TEXT("request-braid-1"));
+    BraidResponse.Body = TEXT("{\"model\":\"fibonacci\",\"anyon_count\":3,\"total_charge\":\"tau\",\"initial_state\":\"0\",\"braid_word\":[{\"generator\":1,\"power\":-1}],\"logical_state\":[{\"real\":0.6,\"imag\":0.2},{\"real\":0.714142842854285,\"imag\":-0.3}],\"fusion_probabilities\":{\"vacuum\":0.4,\"tau\":0.6},\"measurement\":\"tau\",\"shots\":2,\"counts\":{\"vacuum\":0,\"tau\":2},\"metadata\":{\"simulation_type\":\"digital_simulation_of_fibonacci_braid\",\"convention\":\"test\",\"logical_dimension\":2}}");
+    BraidMock->QueuedResponses.Add(BraidResponse);
+    FQuantumApiClient BraidClient(MakeSettings(EQuantumApiAuthMode::DirectApiKey), BraidMock);
+    FQuantumApiTopologicalBraidRequest BraidRequest;
+    FQuantumApiBraidOperation BraidOperation;
+    BraidOperation.Power = -1;
+    BraidRequest.BraidWord.Add(BraidOperation);
+    FQuantumApiTopologicalBraidResponse BraidPayload;
+    BraidClient.EvaluateTopologicalBraidTyped(BraidRequest, FQuantumApiRequestOptions(),
+        FQuantumApiTopologicalBraidDelegate::CreateLambda([&BraidPayload](const FQuantumApiTopologicalBraidResponse& Response) { BraidPayload = Response; }),
+        FQuantumApiErrorDelegate::CreateLambda([this](const FQuantumApiError& Error) { AddError(FString::Printf(TEXT("Unexpected braid error: %s"), *Error.Message)); }));
+    TestEqual(TEXT("Typed braid uses the braid route"), BraidMock->Requests[0].Url, FString(TEXT("https://davidjgrimsley.com/public-facing/api/quantum/v1/topological/braid")));
+    TestEqual(TEXT("Typed braid keeps complex state length"), BraidPayload.LogicalState.Num(), 2);
+    if (BraidPayload.LogicalState.Num() != 2) return false;
+    TestEqual(TEXT("Typed braid keeps imaginary phase"), BraidPayload.LogicalState[1].Imag, -0.3);
+    TestEqual(TEXT("Typed braid exposes tau probability"), BraidPayload.TauProbability, 0.6);
+    TestEqual(TEXT("Typed braid exposes measurement"), BraidPayload.Measurement, FString(TEXT("tau")));
+    TestEqual(TEXT("Typed braid exposes counts"), BraidPayload.Counts.FindRef(TEXT("tau")), 2);
+    TestEqual(TEXT("Typed braid keeps request ID"), BraidPayload.Meta.RequestId, FString(TEXT("request-braid-1")));
+
+    const TSharedRef<FQuantumApiMockTransport> EvolutionMock = MakeShared<FQuantumApiMockTransport>();
+    FQuantumApiTransportResponse EvolutionResponse;
+    EvolutionResponse.bConnectedSuccessfully = true;
+    EvolutionResponse.StatusCode = 200;
+    EvolutionResponse.Body = TEXT("{\"final_statevector\":[{\"real\":0.5,\"imag\":-0.5},{\"real\":0.5,\"imag\":0.5}],\"final_probabilities\":[0.5,0.5],\"variant\":\"trotter_qrte\",\"provider\":\"qiskit-algorithms\",\"backend_mode\":\"statevector_estimator\"}");
+    EvolutionMock->QueuedResponses.Add(EvolutionResponse);
+    FQuantumApiClient EvolutionClient(MakeSettings(EQuantumApiAuthMode::DirectApiKey), EvolutionMock);
+    FQuantumApiTimeEvolutionRequest EvolutionRequest;
+    EvolutionRequest.InitialStatevector = BraidPayload.LogicalState;
+    FQuantumApiPauliTerm XTerm;
+    XTerm.Pauli = TEXT("X");
+    XTerm.Coefficient = 0.25;
+    EvolutionRequest.Hamiltonian.Add(XTerm);
+    FQuantumApiPauliTerm ZTerm;
+    ZTerm.Pauli = TEXT("Z");
+    ZTerm.Coefficient = 0.75;
+    EvolutionRequest.Hamiltonian.Add(ZTerm);
+    FQuantumApiTimeEvolutionResponse EvolutionPayload;
+    EvolutionClient.RunTimeEvolution(EvolutionRequest, FQuantumApiRequestOptions(),
+        FQuantumApiTimeEvolutionDelegate::CreateLambda([&EvolutionPayload](const FQuantumApiTimeEvolutionResponse& Response) { EvolutionPayload = Response; }),
+        FQuantumApiErrorDelegate::CreateLambda([this](const FQuantumApiError& Error) { AddError(FString::Printf(TEXT("Unexpected evolution error: %s"), *Error.Message)); }));
+    TestEqual(TEXT("Evolution uses the algorithm route"), EvolutionMock->Requests[0].Url, FString(TEXT("https://davidjgrimsley.com/public-facing/api/quantum/v1/algorithms/time_evolution")));
+    TSharedPtr<FJsonObject> EvolutionBody;
+    TestTrue(TEXT("Evolution request is JSON"), FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(EvolutionMock->Requests[0].Body), EvolutionBody) && EvolutionBody.IsValid());
+    if (!EvolutionBody.IsValid()) return false;
+    const TArray<TSharedPtr<FJsonValue>>* SentState = nullptr;
+    TestTrue(TEXT("Evolution sends complex statevector"), EvolutionBody->TryGetArrayField(TEXT("initial_statevector"), SentState) && SentState != nullptr && SentState->Num() == 2);
+    if (SentState == nullptr || SentState->Num() != 2) return false;
+    double SentImag = 0.0;
+    TestTrue(TEXT("Evolution preserves imaginary phase"), (*SentState)[1]->AsObject()->TryGetNumberField(TEXT("imag"), SentImag) && FMath::IsNearlyEqual(SentImag, -0.3, 1e-9));
+    TestFalse(TEXT("Evolution does not send a circuit"), EvolutionBody->HasField(TEXT("initial_state")));
+    if (EvolutionPayload.FinalStatevector.Num() != 2 || EvolutionPayload.FinalProbabilities.Num() != 2) return false;
+    TestEqual(TEXT("Evolution parses final phase"), EvolutionPayload.FinalStatevector[0].Imag, -0.5);
+    TestEqual(TEXT("Evolution parses aligned probabilities"), EvolutionPayload.FinalProbabilities[1], 0.5);
+
+    const TSharedRef<FQuantumApiMockTransport> InvalidEvolutionMock = MakeShared<FQuantumApiMockTransport>();
+    FQuantumApiClient InvalidEvolutionClient(MakeSettings(EQuantumApiAuthMode::DirectApiKey), InvalidEvolutionMock);
+    FQuantumApiError InvalidEvolutionError;
+    InvalidEvolutionClient.RunTimeEvolution(FQuantumApiTimeEvolutionRequest(), FQuantumApiRequestOptions(), FQuantumApiTimeEvolutionDelegate(),
+        FQuantumApiErrorDelegate::CreateLambda([&InvalidEvolutionError](const FQuantumApiError& Error) { InvalidEvolutionError = Error; }));
+    TestEqual(TEXT("Missing evolution state is rejected locally"), InvalidEvolutionError.Error, FString(TEXT("invalid_request")));
+    TestEqual(TEXT("Invalid evolution makes no request"), InvalidEvolutionMock->Requests.Num(), 0);
+    FQuantumApiTimeEvolutionRequest NonUnitEvolutionRequest = EvolutionRequest;
+    NonUnitEvolutionRequest.InitialStatevector[0].Real = 0.0;
+    FQuantumApiError NonUnitEvolutionError;
+    InvalidEvolutionClient.RunTimeEvolution(NonUnitEvolutionRequest, FQuantumApiRequestOptions(), FQuantumApiTimeEvolutionDelegate(),
+        FQuantumApiErrorDelegate::CreateLambda([&NonUnitEvolutionError](const FQuantumApiError& Error) { NonUnitEvolutionError = Error; }));
+    TestEqual(TEXT("Non-unit evolution state is rejected locally"), NonUnitEvolutionError.Error, FString(TEXT("invalid_request")));
+    TestEqual(TEXT("Non-unit evolution makes no request"), InvalidEvolutionMock->Requests.Num(), 0);
+
+    const TSharedRef<FQuantumApiMockTransport> MalformedEvolutionMock = MakeShared<FQuantumApiMockTransport>();
+    EvolutionResponse.Body = TEXT("{\"final_statevector\":[{\"real\":1,\"imag\":0}],\"variant\":\"trotter_qrte\",\"provider\":\"qiskit-algorithms\",\"backend_mode\":\"statevector_estimator\"}");
+    MalformedEvolutionMock->QueuedResponses.Add(EvolutionResponse);
+    FQuantumApiClient MalformedEvolutionClient(MakeSettings(EQuantumApiAuthMode::DirectApiKey), MalformedEvolutionMock);
+    FQuantumApiError MalformedEvolutionError;
+    MalformedEvolutionClient.RunTimeEvolution(EvolutionRequest, FQuantumApiRequestOptions(), FQuantumApiTimeEvolutionDelegate(),
+        FQuantumApiErrorDelegate::CreateLambda([&MalformedEvolutionError](const FQuantumApiError& Error) { MalformedEvolutionError = Error; }));
+    TestEqual(TEXT("Malformed evolution response is an error"), MalformedEvolutionError.Error, FString(TEXT("invalid_response")));
 
     return true;
 }

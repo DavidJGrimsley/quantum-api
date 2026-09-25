@@ -107,6 +107,45 @@ class FixtureHandler(BaseHTTPRequestHandler):
                 return
             self._json(HTTPStatus.OK, {"measurement": 1, "success": True, "superposition_strength": 0.5, **context})
             return
+        if path == "/v1/topological/braid":
+            braid_word = body.get("braid_word")
+            initial_state = body.get("initial_state")
+            if braid_word == [{"generator": 2, "power": 1}] and initial_state == "0":
+                # Published TQSim fixed-total-tau reference for sigma_2 |0>.
+                logical_state = [
+                    {"real": -0.5, "imag": 0.3632712640026805},
+                    {"real": -0.24293413587832285, "imag": -0.7476743906106105},
+                ]
+                probabilities = {"vacuum": 0.3819660112501051, "tau": 0.6180339887498949}
+                outcome = "vacuum"
+            elif braid_word == [] and initial_state == "1":
+                logical_state = [{"real": 0.0, "imag": 0.0}, {"real": 1.0, "imag": 0.0}]
+                probabilities = {"vacuum": 0.0, "tau": 1.0}
+                outcome = "tau"
+            else:
+                self._json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": "unsupported_fixture_braid"})
+                return
+            measure = body.get("measure") is True
+            shots = body.get("shots", 0) if measure else 0
+            self._json(HTTPStatus.OK, {
+                "model": "fibonacci",
+                "anyon_count": 3,
+                "total_charge": "tau",
+                "initial_state": initial_state,
+                "braid_word": braid_word,
+                "logical_state": logical_state,
+                "fusion_probabilities": probabilities,
+                "measurement": outcome if measure else None,
+                "shots": shots,
+                "counts": {"vacuum": shots if outcome == "vacuum" else 0, "tau": shots if outcome == "tau" else 0} if measure else None,
+                "metadata": {
+                    "simulation_type": "digital_simulation_of_fibonacci_braid",
+                    "convention": "fixture",
+                    "logical_dimension": 2,
+                },
+                **context,
+            })
+            return
         if path == "/v1/transpile":
             self._json(HTTPStatus.OK, {"transpiled": True, **context})
             return

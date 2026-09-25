@@ -10,6 +10,8 @@ DECLARE_DELEGATE_OneParam(FQuantumApiHealthDelegate, const FQuantumApiHealthResp
 DECLARE_DELEGATE_OneParam(FQuantumApiRunGateDelegate, const FQuantumApiRunGateResponse&)
 DECLARE_DELEGATE_OneParam(FQuantumApiTextTransformDelegate, const FQuantumApiTextTransformResponse&)
 DECLARE_DELEGATE_OneParam(FQuantumApiRandomIntDelegate, const FQuantumApiRandomIntResponse&)
+DECLARE_DELEGATE_OneParam(FQuantumApiTopologicalBraidDelegate, const FQuantumApiTopologicalBraidResponse&)
+DECLARE_DELEGATE_OneParam(FQuantumApiTimeEvolutionDelegate, const FQuantumApiTimeEvolutionResponse&)
 
 /** Transport boundary used by the runtime HTTP adapter and UE Automation mocks. */
 struct FQuantumApiTransportRequest
@@ -55,6 +57,8 @@ public:
 
     void RunCircuit(const FQuantumApiCircuitRunRequest& Request, const FQuantumApiRequestOptions& Options, FQuantumApiJsonDelegate OnSuccess, FQuantumApiErrorDelegate OnError) const;
     void EvaluateTopologicalBraid(const FQuantumApiTopologicalBraidRequest& Request, const FQuantumApiRequestOptions& Options, FQuantumApiJsonDelegate OnSuccess, FQuantumApiErrorDelegate OnError) const;
+    void EvaluateTopologicalBraidTyped(const FQuantumApiTopologicalBraidRequest& Request, const FQuantumApiRequestOptions& Options, FQuantumApiTopologicalBraidDelegate OnSuccess, FQuantumApiErrorDelegate OnError) const;
+    void RunTimeEvolution(const FQuantumApiTimeEvolutionRequest& Request, const FQuantumApiRequestOptions& Options, FQuantumApiTimeEvolutionDelegate OnSuccess, FQuantumApiErrorDelegate OnError) const;
     void ListBackends(const FQuantumApiBackendListRequest& Request, const FQuantumApiRequestOptions& Options, FQuantumApiJsonDelegate OnSuccess, FQuantumApiErrorDelegate OnError) const;
     void Transpile(const FQuantumApiTranspileRequest& Request, const FQuantumApiRequestOptions& Options, FQuantumApiJsonDelegate OnSuccess, FQuantumApiErrorDelegate OnError) const;
     void ImportQasm(const FQuantumApiQasmRequest& Request, const FQuantumApiRequestOptions& Options, FQuantumApiJsonDelegate OnSuccess, FQuantumApiErrorDelegate OnError) const;

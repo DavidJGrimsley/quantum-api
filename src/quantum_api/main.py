@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -149,7 +150,10 @@ def _validation_message(exc: RequestValidationError) -> str:
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
-    details = jsonable_encoder(exc.errors())
+    details = jsonable_encoder(
+        exc.errors(),
+        custom_encoder={float: lambda value: value if math.isfinite(value) else str(value)},
+    )
     return JSONResponse(
         status_code=422,
         content=_error_payload(

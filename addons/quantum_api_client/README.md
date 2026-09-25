@@ -67,6 +67,9 @@ These are three different features:
 | `run_gate` | Runs a small gate effect and returns immediately | No; simulator only |
 | `submit_circuit_job` | Queues a circuit on a selected IBM backend, then you poll for it | Yes, when submitted to an IBM hardware backend |
 
+`evaluate_braid` also runs immediately on the API simulator. It evaluates an
+ordered braid of three Fibonacci anyons; it does not submit an IBM hardware job.
+
 So seeing transformed text proves the API connection works, but it does not
 prove an IBM job ran. For IBM hardware, select a hardware backend, submit a job, poll `get_circuit_job`, then fetch
 `get_circuit_job_result` when the status is complete.
@@ -135,6 +138,33 @@ if developer_key.is_empty():
     return
 quantum_api_client.set_api_key(developer_key)
 ```
+
+Fibonacci braid example (the callback receives `(success, payload)` once):
+
+```gdscript
+quantum_api_client.evaluate_braid({
+    "braid_word": [
+        {"generator": 1, "power": 1},
+        {"generator": 2, "power": -1},
+    ],
+}, func(success: bool, payload: Dictionary) -> void:
+    if !success:
+        push_warning("Braid failed: " + str(payload.get("message", "unknown error")))
+        return
+    var probabilities: Dictionary = payload["fusion_probabilities"]
+    print("Tau probability: ", probabilities["tau"])
+    print("Complex amplitudes: ", payload["logical_state"])
+)
+```
+
+Operations run in the listed order. Each `generator` is `1` or `2`, and each
+`power` is `1` or `-1`. The helper supplies `model="fibonacci"`,
+`anyon_count=3`, `total_charge="tau"`, `initial_state="0"`, `measure=false`,
+and `shots=0` when omitted. Add `measure=true`, `shots`, and an optional `seed`
+to sample outcomes. `fusion_probabilities` are exact simulator probabilities;
+`logical_state` holds `{real, imag}` amplitudes. See the
+[braid contract](../../docs/domains/topological-braid.md) for limits and the
+measurement fields.
 
 IBM hardware discovery example:
 
