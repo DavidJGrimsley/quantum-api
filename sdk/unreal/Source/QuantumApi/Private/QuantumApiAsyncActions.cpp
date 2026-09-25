@@ -142,6 +142,13 @@ UQuantumApiJsonAsyncAction* UQuantumApiJsonAsyncAction::RunCircuit(UObject* Worl
     return Action;
 }
 
+UQuantumApiJsonAsyncAction* UQuantumApiJsonAsyncAction::EvaluateTopologicalBraid(UObject* WorldContextObject, FQuantumApiTopologicalBraidRequest Request, FQuantumApiRequestOptions Options)
+{
+    UQuantumApiJsonAsyncAction* Action = Create(WorldContextObject, EActionKind::TopologicalBraid, MoveTemp(Options));
+    Action->TopologicalBraidRequest = MoveTemp(Request);
+    return Action;
+}
+
 UQuantumApiJsonAsyncAction* UQuantumApiJsonAsyncAction::ListBackends(UObject* WorldContextObject, FQuantumApiBackendListRequest Request, FQuantumApiRequestOptions Options)
 {
     UQuantumApiJsonAsyncAction* Action = Create(WorldContextObject, EActionKind::Backends, MoveTemp(Options));
@@ -248,6 +255,7 @@ void UQuantumApiJsonAsyncAction::Activate()
     {
     case EActionKind::EchoTypes: Client->GetEchoTypes(RequestOptions, Success, Failure); break;
     case EActionKind::Circuit: Client->RunCircuit(CircuitRequest, RequestOptions, Success, Failure); break;
+    case EActionKind::TopologicalBraid: Client->EvaluateTopologicalBraid(TopologicalBraidRequest, RequestOptions, Success, Failure); break;
     case EActionKind::Backends: Client->ListBackends(BackendRequest, RequestOptions, Success, Failure); break;
     case EActionKind::Transpile: Client->Transpile(TranspileRequest, RequestOptions, Success, Failure); break;
     case EActionKind::ImportQasm: Client->ImportQasm(QasmRequest, RequestOptions, Success, Failure); break;
