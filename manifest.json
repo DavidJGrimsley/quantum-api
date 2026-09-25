@@ -68,6 +68,7 @@
       "POST /v1/algorithms/grover_search",
       "POST /v1/algorithms/phase_estimation",
       "POST /v1/algorithms/time_evolution",
+      "POST /v1/topological/braid",
       "POST /v1/optimization/knapsack",
       "POST /v1/optimization/maxcut",
       "POST /v1/optimization/qaoa",
