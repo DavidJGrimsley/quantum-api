@@ -71,7 +71,7 @@ The request allows at most 256 operations and 4,096 shots. If `measure` is false
 }
 ```
 
-The example is computed from the request above with seed 7; the final imaginary part shown as `0.0` is approximately `2.2e-16` in double precision. `logical_state[0]` is the vacuum fusion channel and `logical_state[1]` is the tau fusion channel. Each amplitude uses `real` and `imag` keys. The convention follows the Fibonacci F/R phases in [Nayak et al.](https://arxiv.org/abs/0707.1889). Reference vectors are also checked against [TQSim 0.0.2](https://github.com/Constantine-Quantum-Tech/tqsim), with its total-vacuum basis state excluded from this API's fixed-total-tau sector.
+The example is computed from the request above with seed 7; the final imaginary part shown as `0.0` is approximately `2.2e-16` in double precision. `logical_state[0]` means the first pair of anyons fuses to vacuum; `logical_state[1]` means that pair fuses to tau. **Both states have total charge tau.** The third possible state of three anyons has total charge vacuum and is outside this endpoint's two-dimensional sector. Each amplitude uses `real` and `imag` keys. The convention follows the Fibonacci F/R phases in [Nayak et al.](https://arxiv.org/abs/0707.1889). Reference vectors are also checked against [TQSim 0.0.2](https://github.com/Constantine-Quantum-Tech/tqsim), with its total-vacuum basis state excluded from this API's fixed-total-tau sector.
 
 ## Game integration
 
@@ -86,4 +86,4 @@ sigma_1^-1, sigma_2    -> P(tau) ≈ 0.9443
 sigma_1^-1, sigma_2^-1 -> P(tau) ≈ 0.7426
 ```
 
-At a boss or other readout event, call the endpoint with `measure: false` for probabilities or `measure: true` for a sampled fusion outcome. For a boss state that evolves later, pass the returned `logical_state` into `/v1/algorithms/time_evolution` as `initial_statevector` and keep the complex amplitudes through each phase.
+At a boss or other readout event, call the endpoint with `measure: false` for probabilities or `measure: true` for a sampled fusion outcome. For a boss state that evolves later, pass the returned two-entry `logical_state` into `/v1/algorithms/time_evolution` as `initial_statevector` and keep the complex amplitudes through each phase. A one-qubit Pauli Hamiltonian then acts on this ordered logical basis. The generic time-evolution endpoint does not infer a multi-anyon fusion basis from a longer vector; extending this handoff to more anyons needs an explicit basis mapping and sector constraints.

@@ -27,7 +27,7 @@ Example request:
 }
 ```
 
-To evolve a braid, set `initial_statevector` to that braid response's `logical_state`. This example uses an illustrative normalized complex state:
+To evolve a braid, set `initial_statevector` to that braid response's two-entry `logical_state`, in order: first-pair vacuum channel, then first-pair tau channel, both with total charge tau. The one-qubit Hamiltonian acts on this logical basis. Pass the complex `real` and `imag` components unchanged; no phase correction is applied or needed for the documented braid convention. This example uses an illustrative normalized complex state:
 
 ```json
 {

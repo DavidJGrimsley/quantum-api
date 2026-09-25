@@ -139,6 +139,38 @@ def test_braid_statevector_flows_through_time_evolution_endpoint(client):
 
 
 @requires_algorithms
+def test_braid_handoff_preserves_exact_complex_phase_and_logical_basis(client):
+    braid = run_topological_braid(
+        TopologicalBraidRequest.model_validate(
+            {
+                "braid_word": [
+                    {"generator": 1, "power": 1},
+                    {"generator": 2, "power": -1},
+                    {"generator": 1, "power": -1},
+                ]
+            }
+        )
+    )
+    before = [complex(item["real"], item["imag"]) for item in braid["logical_state"]]
+    time = 0.31
+    request = {
+        "variant": "trotter_qrte",
+        "hamiltonian": [{"pauli": "X", "coefficient": 1.0}],
+        "time": time,
+        "initial_statevector": braid["logical_state"],
+    }
+    response = client.post("/v1/algorithms/time_evolution", json=request)
+
+    assert response.status_code == 200
+    after = [complex(item["real"], item["imag"]) for item in response.json()["final_statevector"]]
+    expected = [
+        math.cos(time) * before[0] - 1j * math.sin(time) * before[1],
+        math.cos(time) * before[1] - 1j * math.sin(time) * before[0],
+    ]
+    assert after == pytest.approx(expected, abs=1e-10)
+
+
+@requires_algorithms
 def test_time_evolution_accepts_its_own_final_statevector(client):
     request = _time_body()
     request.pop("initial_state")
