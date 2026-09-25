@@ -82,7 +82,7 @@ def test_unreal_plugin_covers_every_non_credential_v1_operation() -> None:
     typed = {tuple(item) for item in coverage["typed"]}
     advanced_json = {tuple(item) for item in coverage["advanced_json"]}
 
-    assert len(typed) == 17
+    assert len(typed) == 18
     assert len(advanced_json) == 22
     assert typed.isdisjoint(advanced_json)
     assert typed | advanced_json == _runtime_operations()
