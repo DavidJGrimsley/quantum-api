@@ -210,6 +210,45 @@ void FQuantumApiClient::RunCircuit(const FQuantumApiCircuitRunRequest& Request, 
     RequestJson(TEXT("/circuits/run"), TEXT("POST"), SerializeJsonObject(JsonObject), Options, false, MoveTemp(OnSuccess), MoveTemp(OnError));
 }
 
+void FQuantumApiClient::EvaluateTopologicalBraid(const FQuantumApiTopologicalBraidRequest& Request, const FQuantumApiRequestOptions& Options, FQuantumApiJsonDelegate OnSuccess, FQuantumApiErrorDelegate OnError) const
+{
+    if (Request.AnyonCount != 3)
+    {
+        OnError.ExecuteIfBound(BuildClientError(TEXT("invalid_request"), TEXT("Topological braid v1 currently requires Anyon Count = 3.")));
+        return;
+    }
+
+    const TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
+    JsonObject->SetStringField(TEXT("model"), Request.Model.IsEmpty() ? TEXT("fibonacci") : Request.Model);
+    JsonObject->SetNumberField(TEXT("anyon_count"), Request.AnyonCount);
+    JsonObject->SetStringField(TEXT("total_charge"), Request.TotalCharge.IsEmpty() ? TEXT("tau") : Request.TotalCharge);
+    JsonObject->SetStringField(TEXT("initial_state"), Request.InitialState.IsEmpty() ? TEXT("0") : Request.InitialState);
+    JsonObject->SetBoolField(TEXT("measure"), Request.bMeasure);
+    JsonObject->SetNumberField(TEXT("shots"), FMath::Clamp(Request.Shots, 0, 4096));
+    if (Request.bSendSeed)
+    {
+        JsonObject->SetNumberField(TEXT("seed"), Request.Seed);
+    }
+
+    TArray<TSharedPtr<FJsonValue>> BraidWord;
+    for (const FQuantumApiBraidOperation& Operation : Request.BraidWord)
+    {
+        if ((Operation.Generator != 1 && Operation.Generator != 2) || (Operation.Power != 1 && Operation.Power != -1))
+        {
+            OnError.ExecuteIfBound(BuildClientError(TEXT("invalid_request"), TEXT("Each braid operation requires Generator 1 or 2 and Power 1 or -1.")));
+            return;
+        }
+
+        const TSharedRef<FJsonObject> Item = MakeShared<FJsonObject>();
+        Item->SetNumberField(TEXT("generator"), Operation.Generator);
+        Item->SetNumberField(TEXT("power"), Operation.Power);
+        BraidWord.Add(MakeShared<FJsonValueObject>(Item));
+    }
+    JsonObject->SetArrayField(TEXT("braid_word"), BraidWord);
+
+    RequestJson(TEXT("/topological/braid"), TEXT("POST"), SerializeJsonObject(JsonObject), Options, false, MoveTemp(OnSuccess), MoveTemp(OnError));
+}
+
 void FQuantumApiClient::ListBackends(const FQuantumApiBackendListRequest& Request, const FQuantumApiRequestOptions& Options, FQuantumApiJsonDelegate OnSuccess, FQuantumApiErrorDelegate OnError) const
 {
     TMap<FString, FString> Query;
