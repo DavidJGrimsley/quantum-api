@@ -223,7 +223,7 @@ portfolio optimization. Credential lifecycle routes, IBM profile management,
 metrics, and arbitrary paths are intentionally unavailable.
 
 The checked-in [endpoint coverage manifest](contract/endpoint-coverage.json)
-covers all 39 non-credential `/v1` operations.
+covers all 40 non-credential `/v1` operations.
 
 ## Distribution and validation
 
