@@ -310,6 +310,58 @@ struct FQuantumApiRandomJobRequest
 };
 
 USTRUCT(BlueprintType)
+struct FQuantumApiBraidOperation
+{
+    GENERATED_BODY()
+
+    /** 1 exchanges strands 1/2; 2 exchanges strands 2/3. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quantum API|Topological", meta = (ClampMin = "1", ClampMax = "2"))
+    int32 Generator = 1;
+
+    /** 1 = forward braid, -1 = inverse braid. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quantum API|Topological")
+    int32 Power = 1;
+};
+
+USTRUCT(BlueprintType)
+struct FQuantumApiTopologicalBraidRequest
+{
+    GENERATED_BODY()
+
+    /** v1 currently supports the Fibonacci model only. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quantum API|Topological")
+    FString Model = TEXT("fibonacci");
+
+    /** v1 fixes the model to three anyons with total charge tau. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quantum API|Topological")
+    int32 AnyonCount = 3;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quantum API|Topological")
+    FString TotalCharge = TEXT("tau");
+
+    /** Logical fusion-basis state: "0" or "1". */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quantum API|Topological")
+    FString InitialState = TEXT("0");
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quantum API|Topological")
+    TArray<FQuantumApiBraidOperation> BraidWord;
+
+    /** When true, the API samples a fusion outcome in addition to exact probabilities. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quantum API|Topological")
+    bool bMeasure = false;
+
+    /** 0 means one sample when Measure is true; otherwise 1-4096. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quantum API|Topological", meta = (ClampMin = "0", ClampMax = "4096"))
+    int32 Shots = 0;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quantum API|Topological")
+    bool bSendSeed = false;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Quantum API|Topological", meta = (EditCondition = "bSendSeed"))
+    int32 Seed = 0;
+};
+
+USTRUCT(BlueprintType)
 struct FQuantumApiAdvancedRequest
 {
     GENERATED_BODY()
