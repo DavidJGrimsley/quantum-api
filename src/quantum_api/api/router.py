@@ -13,6 +13,7 @@ from quantum_api.api.nature import router as nature_router
 from quantum_api.api.optimization import router as optimization_router
 from quantum_api.api.portfolio import router as portfolio_router
 from quantum_api.api.runtime_routes import router as runtime_router
+from quantum_api.api.topological import router as topological_router
 from quantum_api.config import get_settings
 
 initial_settings = get_settings()
@@ -24,6 +25,7 @@ router.include_router(auth_router, include_in_schema=False)
 router.include_router(runtime_router)
 router.include_router(jobs_router)
 router.include_router(algorithms_router)
+router.include_router(topological_router)
 router.include_router(optimization_router)
 router.include_router(experiments_router)
 router.include_router(finance_router)
