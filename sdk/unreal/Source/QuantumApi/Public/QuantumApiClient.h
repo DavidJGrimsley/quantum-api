@@ -54,6 +54,7 @@ public:
     void GenerateRandomInt(const FQuantumApiRandomIntRequest& Request, const FQuantumApiRequestOptions& Options, FQuantumApiRandomIntDelegate OnSuccess, FQuantumApiErrorDelegate OnError) const;
 
     void RunCircuit(const FQuantumApiCircuitRunRequest& Request, const FQuantumApiRequestOptions& Options, FQuantumApiJsonDelegate OnSuccess, FQuantumApiErrorDelegate OnError) const;
+    void EvaluateTopologicalBraid(const FQuantumApiTopologicalBraidRequest& Request, const FQuantumApiRequestOptions& Options, FQuantumApiJsonDelegate OnSuccess, FQuantumApiErrorDelegate OnError) const;
     void ListBackends(const FQuantumApiBackendListRequest& Request, const FQuantumApiRequestOptions& Options, FQuantumApiJsonDelegate OnSuccess, FQuantumApiErrorDelegate OnError) const;
     void Transpile(const FQuantumApiTranspileRequest& Request, const FQuantumApiRequestOptions& Options, FQuantumApiJsonDelegate OnSuccess, FQuantumApiErrorDelegate OnError) const;
     void ImportQasm(const FQuantumApiQasmRequest& Request, const FQuantumApiRequestOptions& Options, FQuantumApiJsonDelegate OnSuccess, FQuantumApiErrorDelegate OnError) const;
