@@ -174,4 +174,5 @@ jobs:
           files: dist/*.zip
 
       - name: Print commit for Asset Library form
-        run: echo "Commit: $(git rev-parse HEAD)"
+        run: |
+          echo "Commit: $(git rev-parse HEAD)"
