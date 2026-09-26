@@ -2,7 +2,7 @@
   "FileVersion": 3,
   "Version": 3,
   "VersionName": "0.3.0-beta",
-  "EngineVersion": "5.8.2",
+  "EngineVersion": "5.8.0",
   "FriendlyName": "Quantum API",
   "Description": "Blueprint-friendly runtime HTTP client for the Quantum API mounted /v1 contract, including QRNG and jobs.",
   "Category": "Engine Tools",

@@ -1,3 +1,4 @@
+<!-- Copyright (c) 2026 David J. Grimsley. All rights reserved. -->
 # Topological braid
 
 Use `POST /v1/topological/braid` to evaluate a small non-Abelian braid in the Fibonacci anyon model.
