@@ -177,10 +177,10 @@ uses generator `1` or `2` and power `1` or `-1`:
 }
 ```
 
-The response includes exact `fusion_probabilities` and a two-entry complex
-`logical_state` in vacuum/tau order. When `measure=true`, it can also return
-a sampled `measurement` and `counts`. The request supports at most 256 braid
-operations and 4096 shots.
+The response includes calculated `fusion_probabilities` and a two-entry complex
+`logical_state` in vacuum/tau order. When `measure=true`, it also returns
+a sampled `measurement` and `counts`, using one shot when `shots=0`. The
+request supports at most 256 braid operations and 4096 shots.
 
 For games, keep the braid history locally and submit the complete ordered braid
 word at the event that needs evaluation. Do not call the endpoint every frame.

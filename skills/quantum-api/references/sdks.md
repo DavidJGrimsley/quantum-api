@@ -103,6 +103,6 @@ its configuration fields, then instantiate the runtime client node. Direct
 mode uses a supplied key; proxy mode sends no API key. The client handles
 health, gates, text, `evaluate_braid`, backend discovery, transpilation, and IBM
 circuit jobs. `evaluate_braid` fills the fixed Fibonacci defaults when omitted
-and returns exact fusion probabilities plus the complex logical state.
+and returns calculated fusion probabilities plus the complex logical state.
 See [the addon README](../../../addons/quantum_api_client/README.md) for its
 method signatures, timeout behavior, and one-callback error handling.
