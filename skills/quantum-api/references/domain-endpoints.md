@@ -151,6 +151,50 @@ current OpenAPI schema for payloads:
 
 ---
 
+## Topological Braiding
+
+### `POST /v1/topological/braid`
+
+Evaluates a small non-Abelian braid in the Fibonacci anyon model. This is a
+digital simulator endpoint, not physical braiding on IBM hardware.
+
+The v1 contract is intentionally fixed to three Fibonacci anyons with total
+charge `tau` and a two-dimensional logical fusion space. Each braid operation
+uses generator `1` or `2` and power `1` or `-1`:
+
+```json
+{
+  "model": "fibonacci",
+  "anyon_count": 3,
+  "total_charge": "tau",
+  "initial_state": "0",
+  "braid_word": [
+    { "generator": 1, "power": 1 },
+    { "generator": 2, "power": -1 }
+  ],
+  "measure": false,
+  "shots": 0
+}
+```
+
+The response includes exact `fusion_probabilities` and a two-entry complex
+`logical_state` in vacuum/tau order. When `measure=true`, it can also return
+a sampled `measurement` and `counts`. The request supports at most 256 braid
+operations and 4096 shots.
+
+For games, keep the braid history locally and submit the complete ordered braid
+word at the event that needs evaluation. Do not call the endpoint every frame.
+If a later boss/state simulation should evolve from the braid result, pass the
+returned `logical_state` directly to
+`POST /v1/algorithms/time_evolution` as `initial_statevector`; preserve both
+the real and imaginary components.
+
+See the full [topological braid guide](../../../docs/domains/topological-braid.md)
+for conventions, measurement behavior, game-integration patterns, and the
+braid-to-time-evolution handoff.
+
+---
+
 ## Checking Availability
 
 `GET /v1/health` reports base Qiskit availability only. It does not report
