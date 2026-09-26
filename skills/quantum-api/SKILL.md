@@ -3,7 +3,8 @@ name: quantum-api
 description: >-
   Integrate the Quantum API into apps, games, scripts, and PennyLane circuits.
   Use for its REST runtime, local or IBM random jobs, QASM, domain algorithms,
-  and first-party JavaScript, Python, Unreal, Unity, and Godot clients.
+  Fibonacci-anyon braid simulation, and first-party JavaScript, Python, Unreal,
+  Unity, and Godot clients.
 ---
 
 # Quantum API integration
@@ -16,7 +17,7 @@ such as `/random` to one of these bases; do not add `/v1` twice.
 
 - For REST request and response shapes, read [api-contract.md](references/api-contract.md).
 - For a client library or game engine, read [sdks.md](references/sdks.md).
-- For optimization, experiments, finance, ML, or nature, read [domain-endpoints.md](references/domain-endpoints.md).
+- For optimization, experiments, finance, ML, nature, topological braiding, or time evolution, read [domain-endpoints.md](references/domain-endpoints.md).
 - For errors, runtime modes, and retries, read [troubleshooting.md](references/troubleshooting.md).
 - For runtime credentials, read [authentication.md](references/authentication.md).
 
@@ -49,6 +50,11 @@ runtime calls that use an existing key or profile name.
   result routes; an `ibm-hardware` source is not a cryptographic guarantee.
 - `POST /v1/circuits/run` and `POST /v1/qasm/run` are synchronous simulator
   calls. IBM circuit and QASM jobs use the asynchronous `/v1/jobs/*` routes.
+- `POST /v1/topological/braid` digitally simulates a three-Fibonacci-anyon
+  braid in a fixed two-dimensional logical fusion space. It is not physical
+  anyon braiding on IBM hardware. Preserve the returned complex `logical_state`
+  if it will be handed to `POST /v1/algorithms/time_evolution` as
+  `initial_statevector`.
 - The server may return `503` when Qiskit or an optional domain extra is
   unavailable. Check `GET /v1/health` before diagnosing runtime capability.
 
