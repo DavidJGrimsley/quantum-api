@@ -9,8 +9,10 @@ outside an integration agent's scope.
 
 `@mr.dj2u/quantum-api` 0.1.2 is published on npm. It supports browser, Node,
 and Expo use. For a distributed app, call a backend proxy so the key stays on
-the server. The current typed client has no wrapper for `/v1/random` or
-`/v1/jobs/random`; use authenticated HTTP for those routes. When the proxy
+the server. The current typed client has no wrapper for `/v1/random`,
+`/v1/jobs/random`, or `/v1/topological/braid`; use authenticated HTTP for those
+routes. It does expose `timeEvolution(...)`, so a braid result obtained over
+HTTP can be passed to time evolution through `initial_statevector`. When the proxy
 adds upstream authentication, pass `{ auth: "none" }` to protected SDK calls.
 
 ```bash
@@ -38,8 +40,9 @@ authentication options.
 ## Python and PennyLane
 
 `quantum-api-sdk` 0.1.0 and `quantum-api-pennylane` 0.1.0 are published on
-PyPI. The Python client is synchronous. Its current method list likewise
-lacks dedicated random wrappers; use authenticated HTTP for the QRNG routes.
+PyPI. The Python client is synchronous. Its current method list lacks
+wrappers for the QRNG and topological braid routes; use authenticated HTTP for
+those calls. It does expose `time_evolution(...)` for the braid-state handoff.
 
 ```bash
 pip install quantum-api-sdk quantum-api-pennylane
@@ -71,24 +74,25 @@ It is a runtime HTTP client for Blueprint and C++; UEFN is unsupported.
 Copy the plugin to `<Project>/Plugins/QuantumApi`, enable it, and configure
 **Project Settings → Quantum API**. Direct mode uses the fixed hosted API URL;
 proxy mode uses the configured backend proxy URL. The plugin supports local
-random integers, circuit and QASM calls, IBM jobs, and allowlisted advanced
-routes. It retries safe reads only, never submissions or random requests.
+random integers, circuit and QASM calls, IBM jobs, typed `Evaluate Topological
+Braid` and `Run Time Evolution` Blueprint/C++ flows, and allowlisted advanced
+routes. The braid response's complex `Logical State` can be assigned directly
+to a time-evolution request's `Initial Statevector`. It retries safe reads only,
+never submissions or random requests.
 Use [Setup and Use](../../../sdk/unreal/Docs/SetupAndUse.md) for exact nodes,
 settings, and packaging steps.
 
 ## Unity
 
-The merged `sdk/unity/` package is version `0.1.0`. Install the folder using
-Unity Package Manager's local path option. Its `QuantumApi.Unity` client has
-`RandomIntAsync(min, max)` and coroutine support, plus
-`SubmitRandomJobAsync`, `GetJobAsync`, `GetJobResultAsync`, and
-`CancelJobAsync`. In version 0.1.0, construct `QuantumApiClient` with
-`QuantumApiClientOptions`; see [the Unity README](../../../sdk/unity/README.md)
-for the exact configuration and sample.
-
-[PR #19](https://github.com/DavidJGrimsley/quantum-api/pull/19) proposes a
-shared `QuantumApiManager` and package version 0.2.0. That interface is
-pending and must not be used as the default guidance until it merges.
+The source `sdk/unity/` package currently declares version `1.1.0` with
+Unity 2021.3 as the minimum editor version. Use the shared
+`QuantumApiManager.Instance.Client` for runtime calls after configuring direct
+API-key or backend-proxy mode in the manager. The gameplay client supports
+`RandomIntAsync`, IBM random-job helpers, and
+`EvaluateBraidAsync(TopologicalBraidRequest)` plus the equivalent coroutine
+entry point. The braid call is an immediate simulator request, not an IBM job.
+See [the Unity README](../../../sdk/unity/README.md) for the exact install,
+manager, request, and sample code.
 
 ## Godot
 
@@ -97,6 +101,8 @@ is 0.1.2. Copy the entire folder into the game's `addons/` directory.
 Enable **Quantum API Client Settings** once in Project Settings to register
 its configuration fields, then instantiate the runtime client node. Direct
 mode uses a supplied key; proxy mode sends no API key. The client handles
-health, gates, text, backend discovery, transpilation, and IBM circuit jobs.
+health, gates, text, `evaluate_braid`, backend discovery, transpilation, and IBM
+circuit jobs. `evaluate_braid` fills the fixed Fibonacci defaults when omitted
+and returns exact fusion probabilities plus the complex logical state.
 See [the addon README](../../../addons/quantum_api_client/README.md) for its
 method signatures, timeout behavior, and one-callback error handling.
